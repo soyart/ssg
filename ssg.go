@@ -11,6 +11,10 @@ const (
 	HtmlFlags          = html.CommonFlags | html.HrefTargetBlank
 )
 
+type ssg struct {
+	logger Logger
+}
+
 func ToHtml(md []byte) []byte {
 	node := markdown.Parse(md, parser.NewWithExtensions(MarkdownExtensions))
 	renderer := html.NewRenderer(html.RendererOptions{

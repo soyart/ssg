@@ -10,25 +10,29 @@ type Logger struct {
 	LogErr *slog.Logger
 }
 
-func NewLogger(
+func SiteLogger(
 	site string,
 	logOut io.Writer,
 	logErr io.Writer,
 ) Logger {
-	o := slog.New(slog.NewTextHandler(
-		logOut,
-		&slog.HandlerOptions{
-			AddSource: true,
-			Level:     slog.LevelDebug,
-		})).
+	o := slog.
+		New(slog.NewTextHandler(
+			logOut,
+			&slog.HandlerOptions{
+				AddSource: false,
+				Level:     slog.LevelDebug,
+			}),
+		).
 		With("site", site)
 
-	e := slog.New(slog.NewJSONHandler(
-		logErr,
-		&slog.HandlerOptions{
-			AddSource: true,
-			Level:     slog.LevelDebug,
-		})).
+	e := slog.
+		New(slog.NewJSONHandler(
+			logOut,
+			&slog.HandlerOptions{
+				AddSource: false,
+				Level:     slog.LevelDebug,
+			}),
+		).
 		With("site", site)
 
 	return Logger{
