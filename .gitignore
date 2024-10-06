@@ -1,2 +1,4 @@
 # Nix build result
 /result
+
+/cmd/debug
