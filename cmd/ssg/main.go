@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/soyart/ssg"
 )
@@ -25,11 +27,16 @@ const (
 )
 
 func main() {
+	errs := make(chan error)
+	writes := make(chan write)
+
 	site := site{
 		src:    "artnoi.com/src",
 		dist:   "artnoi.com/dist",
-		header: header,
-		footer: footer,
+		header: bytes.NewBufferString(header),
+		footer: bytes.NewBufferString(footer),
+		writes: writes,
+		errs:   errs,
 	}
 
 	err := site.gen()
@@ -39,18 +46,49 @@ func main() {
 }
 
 type site struct {
+	header *bytes.Buffer
+	footer *bytes.Buffer
+
+	writes    chan write
+	errs      chan error
 	exitError error
-	src       string
-	dist      string
-	header    string
-	footer    string
+
+	src  string
+	dist string
+}
+
+type write struct {
+	target string
+	data   []byte
 }
 
 func (s *site) gen() error {
-	err := filepath.WalkDir(s.src, s.walk)
+	_, err := os.Stat(s.dist)
+	if os.IsNotExist(err) {
+		err = os.MkdirAll(s.dist, os.ModePerm)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func(wg *sync.WaitGroup) {
+		defer wg.Done()
+		writeOut(s.writes, s.errs)
+	}(&wg)
+
+	err = filepath.WalkDir(s.src, s.walk)
 	if err != nil {
 		err = s.exitError
 	}
+
+	close(s.writes)
+	close(s.errs)
+
+	wg.Wait()
 
 	return err
 }
@@ -74,24 +112,32 @@ func (s *site) walk(path string, d fs.DirEntry, e error) error {
 
 	switch filepath.Base(path) {
 	case "_header.html":
-		fmt.Println("found header!! xxxxxxxxxxxxx")
-		data, err := os.ReadFile(path)
+		h, err := os.Open(path)
 		if err != nil {
 			s.exitError = err
 			return fs.SkipAll
 		}
 
-		s.header = string(data)
+		s.header.Reset()
+		_, err = s.header.ReadFrom(h)
+		if err != nil {
+			s.exitError = err
+			return fs.SkipAll
+		}
 
 	case "_footer.html":
-		fmt.Println("found footer!! xxxxxxxxxxxxx")
-		data, err := os.ReadFile(path)
+		f, err := os.Open(path)
 		if err != nil {
 			s.exitError = err
 			return fs.SkipAll
 		}
 
-		s.footer = string(data)
+		s.footer.Reset()
+		_, err = s.footer.ReadFrom(f)
+		if err != nil {
+			s.exitError = err
+			return fs.SkipAll
+		}
 	}
 
 	if filepath.Ext(path) != ".md" {
@@ -104,12 +150,62 @@ func (s *site) walk(path string, d fs.DirEntry, e error) error {
 		return filepath.SkipAll
 	}
 
-	body := ssg.ToHtml(data)
-	html := s.header + string(body) + s.footer
+	target, err := s.targetPath(path)
+	if err != nil {
+		s.exitError = err
+		return filepath.SkipAll
+	}
 
-	fmt.Println()
-	fmt.Println(string(html))
-	fmt.Println()
+	body := ssg.ToHtml(data)
+	w := write{
+		target: target, // TODO: cut path and create dir
+		data:   []byte(s.header.String() + string(body) + s.footer.String()),
+	}
+
+	s.writes <- w
 
 	return nil
+}
+
+func (s *site) targetPath(p string) (string, error) {
+	p = strings.TrimSuffix(p, ".md")
+	p += ".html"
+
+	p, err := filepath.Rel(s.src, p)
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(s.dist, p), nil
+}
+
+func writeOut(writes <-chan write, _ chan<- error) {
+	for {
+		w, ok := <-writes
+		if !ok {
+			return
+		}
+
+		fmt.Println("Writing out:", w.target)
+
+		go func() {
+			d := filepath.Dir(w.target)
+			err := os.MkdirAll(d, os.ModePerm)
+			if err != nil {
+				panic(err)
+			}
+
+			f, err := os.OpenFile(w.target, os.O_CREATE|os.O_WRONLY, os.ModePerm)
+			if err != nil {
+				panic(err)
+			}
+
+			defer f.Close()
+
+			_, err = f.Write(w.data)
+			if err != nil {
+				panic(err)
+			}
+		}()
+	}
 }
