@@ -16,14 +16,14 @@ const (
 	header = `
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-</head>
-<body>
+	<head>
+	  <meta charset="UTF-8">
+	</head>
+	<body>
 `
 
 	footer = `
-</body>
+	</body>
 </html>
 `
 )
@@ -32,13 +32,24 @@ func main() {
 	errs := make(chan error)
 	writes := make(chan write)
 
+	src := "artnoi.com/src"
+	dst := "artnoi.com/dist"
+
 	site := site{
-		src:    "artnoi.com/src",
-		dist:   "artnoi.com/dist",
-		header: bytes.NewBufferString(header),
-		footer: bytes.NewBufferString(footer),
+		src:    src,
+		dist:   dst,
 		writes: writes,
 		errs:   errs,
+
+		headers: perDir{
+			defaultValue: bytes.NewBufferString(header),
+			values:       map[string]*bytes.Buffer{},
+		},
+
+		footers: perDir{
+			defaultValue: bytes.NewBufferString(footer),
+			values:       map[string]*bytes.Buffer{},
+		},
 	}
 
 	err := site.gen()
@@ -48,9 +59,8 @@ func main() {
 }
 
 type site struct {
-	header *bytes.Buffer
-	footer *bytes.Buffer
-
+	headers   perDir
+	footers   perDir
 	writes    chan write
 	errs      chan error
 	exitError error
@@ -62,6 +72,11 @@ type site struct {
 type write struct {
 	target string
 	data   []byte
+}
+
+type perDir struct {
+	defaultValue *bytes.Buffer
+	values       map[string]*bytes.Buffer
 }
 
 func (s *site) gen() error {
@@ -112,6 +127,7 @@ func (s *site) walk(path string, d fs.DirEntry, e error) error {
 		return nil
 	}
 
+	dir := filepath.Dir(path)
 	switch filepath.Base(path) {
 	case "_header.html":
 		h, err := os.Open(path)
@@ -120,12 +136,14 @@ func (s *site) walk(path string, d fs.DirEntry, e error) error {
 			return fs.SkipAll
 		}
 
-		s.header.Reset()
-		_, err = s.header.ReadFrom(h)
+		header := bytes.NewBuffer(nil)
+		_, err = header.ReadFrom(h)
 		if err != nil {
 			s.exitError = err
 			return fs.SkipAll
 		}
+
+		s.headers.values[dir] = header
 
 	case "_footer.html":
 		f, err := os.Open(path)
@@ -134,12 +152,14 @@ func (s *site) walk(path string, d fs.DirEntry, e error) error {
 			return fs.SkipAll
 		}
 
-		s.footer.Reset()
-		_, err = s.footer.ReadFrom(f)
+		footer := bytes.NewBuffer(nil)
+		_, err = footer.ReadFrom(f)
 		if err != nil {
 			s.exitError = err
 			return fs.SkipAll
 		}
+
+		s.footers.values[dir] = footer
 	}
 
 	if filepath.Ext(path) != ".md" {
@@ -159,9 +179,41 @@ func (s *site) walk(path string, d fs.DirEntry, e error) error {
 	}
 
 	body := ssg.ToHtml(data)
+
+	header := s.headers.defaultValue
+	footer := s.footers.defaultValue
+
+	max := 0
+	for k, h := range s.headers.values {
+		if !strings.HasPrefix(path, k) {
+			continue
+		}
+
+		if len(k) < max {
+			continue
+		}
+
+		max = len(k)
+		header = h
+	}
+
+	max = 0
+	for k, h := range s.footers.values {
+		if !strings.HasPrefix(path, k) {
+			continue
+		}
+
+		if len(k) < max {
+			continue
+		}
+
+		max = len(k)
+		footer = h
+	}
+
 	w := write{
 		target: target, // TODO: cut path and create dir
-		data:   []byte(s.header.String() + string(body) + s.footer.String()),
+		data:   []byte(header.String() + string(body) + footer.String()),
 	}
 
 	s.writes <- w
