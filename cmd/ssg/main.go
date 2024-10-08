@@ -19,11 +19,13 @@ const (
 <head>
   <meta charset="UTF-8">
 </head>
-<body>`
+<body>
+`
 
 	footer = `
 </body>
-</html>`
+</html>
+`
 )
 
 func main() {
@@ -180,15 +182,21 @@ func (s *site) targetPath(p string) (string, error) {
 }
 
 func writeOut(writes <-chan write, _ chan<- error) {
+	wg := sync.WaitGroup{}
+
 	for {
 		w, ok := <-writes
 		if !ok {
-			return
+			break
 		}
 
-		fmt.Println("Writing out:", w.target)
+		wg.Add(1)
+		go func(w *write) {
+			defer func() {
+				wg.Done()
+				fmt.Println(w.target)
+			}()
 
-		go func() {
 			d := filepath.Dir(w.target)
 			err := os.MkdirAll(d, os.ModePerm)
 			if err != nil {
@@ -206,6 +214,8 @@ func writeOut(writes <-chan write, _ chan<- error) {
 			if err != nil {
 				panic(err)
 			}
-		}()
+		}(&w)
 	}
+
+	wg.Wait()
 }
