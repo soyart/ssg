@@ -32,8 +32,8 @@ func main() {
 	errs := make(chan error)
 	writes := make(chan write)
 
-	src := "artnoi.com/src"
-	dst := "artnoi.com/dist"
+	src := "johndoe.com/src"
+	dst := "johndoe.com/dist"
 
 	site := site{
 		src:    src,
