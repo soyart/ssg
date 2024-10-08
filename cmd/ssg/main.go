@@ -2,6 +2,10 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/soyart/ssg"
 )
@@ -10,68 +14,102 @@ const (
 	header = `
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <title>Artnoi.com</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="keywords" content="artnoi, Prem Phansuriyanon">
-  <meta name="author" content="@artnoi">
   <meta charset="UTF-8">
-  <link href="/style.css" rel="stylesheet">
 </head>
+<body>`
 
-<body>
-  <ul class="navbar">
-    <li><a href="/"><img src="/toplogo.png" alt="Artnoi.com" class="logo">artnoi</a></li>
-    <li class="f-right"><a href="/cheat/">cheat</a></li>
-    <li class="f-right"><a href="/blog/">blog</a></li>
-    <li class="f-right"><a href="/about/">about</a></li>
-  </ul>`
-
-	footer = `<hr>
-<p><a href="#top">Back to top</a></p>
-<hr>
-<footer>
-	<p>Copyright (c) 2019 - 2023 Prem Phansuriyanon</p>
-	<p>Verbatim copying and redistribution of this entire page are permitted provided this notice is preserved</p>
-</footer>
+	footer = `
 </body>
-
 </html>`
-
-	body = `
-	# Henlo, vvorld!
-
-Hi, I'm Prem Phansuriyanon, and I'm running this website.
-
-I'm a self-taught back-end software engineer based in Bangkok.
-
-Here's my quick intro:
-
-- a back-end dev by trade
-
-- really passionate about re-inventing the wheel
-
-- use what I write
-
-- love to share my shitty code projects to the world
-
-See my embarassing code on [my GitHub](https://github.com/soyart).
-
-Or you can read my unpopular opinions on [my Twitter](https://twitter.com/artnoi).
-
-## Credits
-
-The website partially uses monospace [TTF Hack](https://sourcefoundry.org/hack/),
-which is my desktop and terminal font face, with blue-ish color scheme from
-[Iceberg](https://github.com/cocopon/iceberg.vim).
-
-As of Nov 2023, artnoi.com is served using [GitHub Pages](https://docs.github.com/en/pages),
-and built from Markdown using [webtools](https://github.com/soyart/webtools).
-`
 )
 
 func main() {
-	h := ssg.ToHtml([]byte(header + body + footer))
-	fmt.Printf("%s\n", h)
+	site := site{
+		src:    "artnoi.com/src",
+		dist:   "artnoi.com/dist",
+		header: header,
+		footer: footer,
+	}
+
+	err := site.gen()
+	if err != nil {
+		panic(err)
+	}
+}
+
+type site struct {
+	exitError error
+	src       string
+	dist      string
+	header    string
+	footer    string
+}
+
+func (s *site) gen() error {
+	err := filepath.WalkDir(s.src, s.walk)
+	if err != nil {
+		err = s.exitError
+	}
+
+	return err
+}
+
+func (s *site) walk(path string, d fs.DirEntry, e error) error {
+	if d.IsDir() && strings.HasPrefix(path, ".git") {
+		return fs.SkipDir
+	}
+
+	if e != nil {
+		if d == nil { // The dir is not a directory
+			return nil
+		}
+
+		return e
+	}
+
+	if d.IsDir() {
+		return nil
+	}
+
+	switch filepath.Base(path) {
+	case "_header.html":
+		fmt.Println("found header!! xxxxxxxxxxxxx")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			s.exitError = err
+			return fs.SkipAll
+		}
+
+		s.header = string(data)
+
+	case "_footer.html":
+		fmt.Println("found footer!! xxxxxxxxxxxxx")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			s.exitError = err
+			return fs.SkipAll
+		}
+
+		s.footer = string(data)
+	}
+
+	if filepath.Ext(path) != ".md" {
+		return nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		s.exitError = err
+		return filepath.SkipAll
+	}
+
+	body := ssg.ToHtml(data)
+	html := s.header + string(body) + s.footer
+
+	fmt.Println()
+	fmt.Println(string(html))
+	fmt.Println()
+
+	return nil
 }

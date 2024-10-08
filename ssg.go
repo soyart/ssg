@@ -7,12 +7,11 @@ import (
 )
 
 const (
-	MarkdownExtensions = parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock
-	HtmlFlags          = html.CommonFlags | html.HrefTargetBlank
+	MarkdownExtensions = parser.CommonExtensions // | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock
+	HtmlFlags          = html.CommonFlags        // | html.HrefTargetBlank
 )
 
 type ssg struct {
-	logger Logger
 }
 
 func ToHtml(md []byte) []byte {
