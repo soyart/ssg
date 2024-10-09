@@ -29,7 +29,7 @@ This implementation is good for using ssg remotely, because it's just 1 executab
   and will do nothing on the argument given
 
   > But ssg-go still takes `title` as its 3rd argument,
-  > to keep CLI commands of them 2 identical.
+  > so as to be the original ssg's drop-in replacement.
 
 - ssg-go cascades `_header.html` and `_footer.html` down the directory tree
 
