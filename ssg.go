@@ -94,16 +94,7 @@ func (w writeError) Error() string {
 // Walk walks the src directory, and converts Markdown into HTML,
 // which gets stored in s.writes.
 func (s *Ssg) Walk() error {
-	_, err := os.Stat(s.dist)
-	if os.IsNotExist(err) {
-		err = os.MkdirAll(s.dist, os.ModePerm)
-	}
-
-	if err != nil {
-		return err
-	}
-
-	err = filepath.WalkDir(s.src, s.walk)
+	err := filepath.WalkDir(s.src, s.walk)
 	if err == nil {
 		err = s.walkError
 	}
@@ -115,6 +106,15 @@ func (s *Ssg) Walk() error {
 func (s *Ssg) WriteOut() error {
 	if len(s.writes) == 0 {
 		return nil
+	}
+
+	_, err := os.Stat(s.dist)
+	if os.IsNotExist(err) {
+		err = os.MkdirAll(s.dist, os.ModePerm)
+	}
+
+	if err != nil {
+		return err
 	}
 
 	var wErrors []error // write errors
