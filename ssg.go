@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
@@ -136,13 +137,32 @@ func (s *Ssg) WriteOut() error {
 	return nil
 }
 
-func (s *Ssg) Generate() error {
+func (s *Ssg) Generate(baseUrl string) error {
 	err := s.Walk()
 	if err != nil {
 		return err
 	}
 
-	return s.WriteOut()
+	err = s.WriteOut()
+	if err != nil {
+		return err
+	}
+
+	if baseUrl == "" {
+		return nil
+	}
+
+	sitemap, err := s.Sitemap(baseUrl, time.Now())
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(s.dist+"/sitemap.xml", []byte(sitemap), os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
@@ -318,4 +338,53 @@ func writeOut(writes []write, errs chan<- error) {
 	wg.Wait()
 
 	close(errs)
+}
+
+func (s *Ssg) Sitemap(baseUrl string, date time.Time) (string, error) {
+	dateStr := date.Format(time.DateOnly)
+
+	sm := new(strings.Builder)
+	sm.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
+xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+`)
+
+	for i := range s.writes {
+		w := &s.writes[i]
+
+		target, err := filepath.Rel(s.dist, w.target)
+		if err != nil {
+			return sm.String(), err
+		}
+
+		sm.WriteString("<url><loc><")
+		sm.WriteString(baseUrl + "/")
+
+		/* There're 2 possibilities for this
+		1. First is when the HTML is some/path/index.html
+		<url><loc>https://example.com/some/path</loc><lastmod>2024-10-04</lastmod><priority>1.0</priority></url>
+
+		2. Then there is when the HTML is some/path/foo.html
+		<url><loc>https://example.com/some/path/page.html</loc><lastmod>2024-10-04</lastmod><priority>1.0</priority></url>
+		*/
+
+		switch filepath.Base(target) {
+		case "index.html":
+			sm.WriteString(filepath.Dir(target))
+
+		default:
+			sm.WriteString(target)
+		}
+
+		sm.WriteString("><lastmod>")
+		sm.WriteString(dateStr)
+		sm.WriteString("</lastmod><priority>1.0</priority></url>\n")
+	}
+
+	sm.WriteString("</urlset>")
+
+	return sm.String(), nil
 }
