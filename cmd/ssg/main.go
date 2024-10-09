@@ -235,6 +235,7 @@ func (s *site) targetPath(p string) (string, error) {
 
 func writeOut(writes <-chan write, _ chan<- error) {
 	wg := sync.WaitGroup{}
+	guard := make(chan struct{}, 20)
 
 	for {
 		w, ok := <-writes
@@ -242,12 +243,16 @@ func writeOut(writes <-chan write, _ chan<- error) {
 			break
 		}
 
+		guard <- struct{}{}
+
 		wg.Add(1)
 		go func(w *write) {
 			defer func() {
 				wg.Done()
 				fmt.Println(w.target)
 			}()
+
+			<-guard
 
 			d := filepath.Dir(w.target)
 			err := os.MkdirAll(d, os.ModePerm)
