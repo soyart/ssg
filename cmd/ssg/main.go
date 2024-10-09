@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/soyart/ssg"
 )
@@ -29,17 +31,18 @@ const (
 )
 
 func main() {
-	errs := make(chan error)
-	writes := make(chan write)
+	if len(os.Args) < 2 {
+		fmt.Println("expecting at least 1 argument")
+		syscall.Exit(1)
+	}
 
-	src := "johndoe.com/src"
-	dst := "johndoe.com/dist"
+	dir := os.Args[1]
+	src := dir + "/src"
+	dst := dir + "/dist"
 
 	site := site{
-		src:    src,
-		dist:   dst,
-		writes: writes,
-		errs:   errs,
+		src:  src,
+		dist: dst,
 
 		headers: perDir{
 			defaultValue: bytes.NewBufferString(header),
@@ -61,12 +64,10 @@ func main() {
 type site struct {
 	headers   perDir
 	footers   perDir
-	writes    chan write
-	errs      chan error
-	exitError error
-
-	src  string
-	dist string
+	walkError error
+	src       string
+	dist      string
+	writes    []write
 }
 
 type write struct {
@@ -89,25 +90,35 @@ func (s *site) gen() error {
 		return err
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	go func(wg *sync.WaitGroup) {
-		defer wg.Done()
-		writeOut(s.writes, s.errs)
-	}(&wg)
-
 	err = filepath.WalkDir(s.src, s.walk)
+	if err == nil {
+		err = s.walkError
+	}
 	if err != nil {
-		err = s.exitError
+		return err
 	}
 
-	close(s.writes)
-	close(s.errs)
+	var wErrors []error // write errors
+	errChan := make(chan error)
+
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go func(wg *sync.WaitGroup) {
+		defer wg.Done()
+		for err := range errChan {
+			wErrors = append(wErrors, err)
+		}
+	}(wg)
+
+	writeOut(s.writes, errChan)
 
 	wg.Wait()
 
-	return err
+	if len(wErrors) != 0 {
+		return fmt.Errorf("error writing out: %w", errors.Join(wErrors...))
+	}
+
+	return nil
 }
 
 func (s *site) walk(path string, d fs.DirEntry, e error) error {
@@ -132,14 +143,14 @@ func (s *site) walk(path string, d fs.DirEntry, e error) error {
 	case "_header.html":
 		h, err := os.Open(path)
 		if err != nil {
-			s.exitError = err
+			s.walkError = err
 			return fs.SkipAll
 		}
 
 		header := bytes.NewBuffer(nil)
 		_, err = header.ReadFrom(h)
 		if err != nil {
-			s.exitError = err
+			s.walkError = err
 			return fs.SkipAll
 		}
 
@@ -148,14 +159,14 @@ func (s *site) walk(path string, d fs.DirEntry, e error) error {
 	case "_footer.html":
 		f, err := os.Open(path)
 		if err != nil {
-			s.exitError = err
+			s.walkError = err
 			return fs.SkipAll
 		}
 
 		footer := bytes.NewBuffer(nil)
 		_, err = footer.ReadFrom(f)
 		if err != nil {
-			s.exitError = err
+			s.walkError = err
 			return fs.SkipAll
 		}
 
@@ -168,13 +179,13 @@ func (s *site) walk(path string, d fs.DirEntry, e error) error {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		s.exitError = err
+		s.walkError = err
 		return filepath.SkipAll
 	}
 
 	target, err := s.targetPath(path)
 	if err != nil {
-		s.exitError = err
+		s.walkError = err
 		return filepath.SkipAll
 	}
 
@@ -184,39 +195,35 @@ func (s *site) walk(path string, d fs.DirEntry, e error) error {
 	footer := s.footers.defaultValue
 
 	max := 0
-	for k, h := range s.headers.values {
-		if !strings.HasPrefix(path, k) {
+	for p, h := range s.headers.values {
+		if !strings.HasPrefix(path, p) {
 			continue
 		}
 
-		if len(k) < max {
+		if len(p) < max {
 			continue
 		}
 
-		max = len(k)
-		header = h
+		header, max = h, len(p)
 	}
 
 	max = 0
-	for k, h := range s.footers.values {
-		if !strings.HasPrefix(path, k) {
+	for p, f := range s.footers.values {
+		if !strings.HasPrefix(path, p) {
 			continue
 		}
 
-		if len(k) < max {
+		if len(p) < max {
 			continue
 		}
 
-		max = len(k)
-		footer = h
+		footer, max = f, len(p)
 	}
 
-	w := write{
-		target: target, // TODO: cut path and create dir
+	s.writes = append(s.writes, write{
+		target: target,
 		data:   []byte(header.String() + string(body) + footer.String()),
-	}
-
-	s.writes <- w
+	})
 
 	return nil
 }
@@ -233,20 +240,15 @@ func (s *site) targetPath(p string) (string, error) {
 	return filepath.Join(s.dist, p), nil
 }
 
-func writeOut(writes <-chan write, _ chan<- error) {
+func writeOut(writes []write, errs chan<- error) {
 	wg := sync.WaitGroup{}
 	guard := make(chan struct{}, 20)
 
-	for {
-		w, ok := <-writes
-		if !ok {
-			break
-		}
-
+	for i := range writes {
+		wg.Add(1)
 		guard <- struct{}{}
 
-		wg.Add(1)
-		go func(w *write) {
+		go func(w *write, wg *sync.WaitGroup) {
 			defer func() {
 				wg.Done()
 				fmt.Println(w.target)
@@ -257,22 +259,27 @@ func writeOut(writes <-chan write, _ chan<- error) {
 			d := filepath.Dir(w.target)
 			err := os.MkdirAll(d, os.ModePerm)
 			if err != nil {
-				panic(err)
+				errs <- err
+				return
 			}
 
 			f, err := os.OpenFile(w.target, os.O_CREATE|os.O_WRONLY, os.ModePerm)
 			if err != nil {
-				panic(err)
+				errs <- err
+				return
 			}
 
 			defer f.Close()
 
 			_, err = f.Write(w.data)
 			if err != nil {
-				panic(err)
+				errs <- err
+				return
 			}
-		}(&w)
+		}(&writes[i], &wg)
 	}
 
 	wg.Wait()
+
+	close(errs)
 }
