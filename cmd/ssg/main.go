@@ -36,26 +36,7 @@ func main() {
 		syscall.Exit(1)
 	}
 
-	dir := os.Args[1]
-	src := dir + "/src"
-	dst := dir + "/dist"
-
-	site := site{
-		src:  src,
-		dist: dst,
-
-		headers: perDir{
-			defaultValue: bytes.NewBufferString(header),
-			values:       map[string]*bytes.Buffer{},
-		},
-
-		footers: perDir{
-			defaultValue: bytes.NewBufferString(footer),
-			values:       map[string]*bytes.Buffer{},
-		},
-	}
-
-	err := site.gen()
+	err := gen(os.Args[1])
 	if err != nil {
 		panic(err)
 	}
@@ -78,6 +59,37 @@ type write struct {
 type perDir struct {
 	defaultValue *bytes.Buffer
 	values       map[string]*bytes.Buffer
+}
+
+type writeError struct {
+	err    error
+	target string
+}
+
+func gen(dir string) error {
+	src := dir + "/src"
+	dst := dir + "/dist"
+
+	site := site{
+		src:  src,
+		dist: dst,
+
+		headers: perDir{
+			defaultValue: bytes.NewBufferString(header),
+			values:       map[string]*bytes.Buffer{},
+		},
+
+		footers: perDir{
+			defaultValue: bytes.NewBufferString(footer),
+			values:       map[string]*bytes.Buffer{},
+		},
+	}
+
+	return site.gen()
+}
+
+func (w writeError) Error() string {
+	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
 }
 
 func (s *site) gen() error {
@@ -259,13 +271,21 @@ func writeOut(writes []write, errs chan<- error) {
 			d := filepath.Dir(w.target)
 			err := os.MkdirAll(d, os.ModePerm)
 			if err != nil {
-				errs <- err
+				errs <- writeError{
+					err:    err,
+					target: w.target,
+				}
+
 				return
 			}
 
 			f, err := os.OpenFile(w.target, os.O_CREATE|os.O_WRONLY, os.ModePerm)
 			if err != nil {
-				errs <- err
+				errs <- writeError{
+					err:    err,
+					target: w.target,
+				}
+
 				return
 			}
 
@@ -273,7 +293,11 @@ func writeOut(writes []write, errs chan<- error) {
 
 			_, err = f.Write(w.data)
 			if err != nil {
-				errs <- err
+				errs <- writeError{
+					err:    err,
+					target: w.target,
+				}
+
 				return
 			}
 		}(&writes[i], &wg)
