@@ -34,11 +34,8 @@ const (
 `
 )
 
-func Gen(dir string) error {
-	src := dir + "/src"
-	dst := dir + "/dist"
-
-	site := site{
+func NewSsg(src, dst string) Ssg {
+	return Ssg{
 		src:  src,
 		dist: dst,
 
@@ -52,8 +49,6 @@ func Gen(dir string) error {
 			values:       make(map[string]*bytes.Buffer),
 		},
 	}
-
-	return site.gen()
 }
 
 func ToHtml(md []byte) []byte {
@@ -65,7 +60,7 @@ func ToHtml(md []byte) []byte {
 	return markdown.Render(node, renderer)
 }
 
-type site struct {
+type Ssg struct {
 	headers   perDir
 	footers   perDir
 	walkError error
@@ -93,7 +88,9 @@ func (w writeError) Error() string {
 	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
 }
 
-func (s *site) gen() error {
+// Walk walks the src directory, and converts Markdown into HTML,
+// which gets stored in s.writes.
+func (s *Ssg) Walk() error {
 	_, err := os.Stat(s.dist)
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(s.dist, os.ModePerm)
@@ -107,8 +104,14 @@ func (s *site) gen() error {
 	if err == nil {
 		err = s.walkError
 	}
-	if err != nil {
-		return err
+
+	return err
+}
+
+// WriteOut concurrently writes out s.writes to their target locations
+func (s *Ssg) WriteOut() error {
+	if len(s.writes) == 0 {
+		return nil
 	}
 
 	var wErrors []error // write errors
@@ -126,7 +129,6 @@ func (s *site) gen() error {
 	writeOut(s.writes, errChan)
 
 	wg.Wait()
-
 	if len(wErrors) != 0 {
 		return fmt.Errorf("error writing out: %w", errors.Join(wErrors...))
 	}
@@ -134,7 +136,16 @@ func (s *site) gen() error {
 	return nil
 }
 
-func (s *site) walk(path string, d fs.DirEntry, e error) error {
+func (s *Ssg) Generate() error {
+	err := s.Walk()
+	if err != nil {
+		return err
+	}
+
+	return s.WriteOut()
+}
+
+func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 	if d.IsDir() && strings.HasPrefix(path, ".git") {
 		return fs.SkipDir
 	}
@@ -241,7 +252,7 @@ func (s *site) walk(path string, d fs.DirEntry, e error) error {
 	return nil
 }
 
-func (s *site) targetPath(p string) (string, error) {
+func (s *Ssg) targetPath(p string) (string, error) {
 	p = strings.TrimSuffix(p, ".md")
 	p += ".html"
 
