@@ -194,36 +194,24 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 	dir := filepath.Dir(path)
 	switch filepath.Base(path) {
 	case "_header.html":
-		h, err := os.Open(path)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			s.walkError = err
 			return fs.SkipAll
 		}
 
-		header := bytes.NewBuffer(nil)
-		_, err = header.ReadFrom(h)
-		if err != nil {
-			s.walkError = err
-			return fs.SkipAll
-		}
-
-		s.headers.values[dir] = header
+		s.headers.values[dir] = bytes.NewBuffer(data)
+		return nil
 
 	case "_footer.html":
-		f, err := os.Open(path)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			s.walkError = err
 			return fs.SkipAll
 		}
 
-		footer := bytes.NewBuffer(nil)
-		_, err = footer.ReadFrom(f)
-		if err != nil {
-			s.walkError = err
-			return fs.SkipAll
-		}
-
-		s.footers.values[dir] = footer
+		s.footers.values[dir] = bytes.NewBuffer(data)
+		return nil
 	}
 
 	ext := filepath.Ext(path)
