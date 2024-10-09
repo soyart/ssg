@@ -15,9 +15,9 @@ func main() {
 	}
 
 	src, dst, _, baseUrl := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
-	site := ssg.NewSsg(src, dst)
 
-	if err := site.Generate(baseUrl); err != nil {
+	s := ssg.New(src, dst)
+	if err := s.Generate(baseUrl); err != nil {
 		panic(err)
 	}
 }

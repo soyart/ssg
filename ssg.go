@@ -35,10 +35,11 @@ const (
 `
 )
 
-func NewSsg(src, dst string) Ssg {
+func New(src, dst string) Ssg {
 	return Ssg{
-		src:  src,
-		dist: dst,
+		src:   src,
+		dist:  dst,
+		htmls: make(setStr),
 
 		headers: perDir{
 			valueDefault: bytes.NewBufferString(HeaderDefault),
@@ -64,6 +65,7 @@ func ToHtml(md []byte) []byte {
 type Ssg struct {
 	headers   perDir
 	footers   perDir
+	htmls     setStr // Used to ignore md files with identical names, as per the original ssg
 	walkError error
 	src       string
 	dist      string
@@ -143,12 +145,17 @@ func (s *Ssg) Generate(baseUrl string) error {
 		return err
 	}
 
+	pront := func(l int) {
+		fmt.Printf("[ssg-go] wrote %d file(s) to %s\n", l, s.dist)
+	}
+
 	err = s.WriteOut()
 	if err != nil {
 		return err
 	}
 
 	if baseUrl == "" {
+		pront(len(s.writes))
 		return nil
 	}
 
@@ -161,6 +168,8 @@ func (s *Ssg) Generate(baseUrl string) error {
 	if err != nil {
 		return err
 	}
+
+	pront(len(s.writes) + 1)
 
 	return nil
 }
@@ -217,7 +226,21 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		s.footers.values[dir] = footer
 	}
 
-	if filepath.Ext(path) != ".md" {
+	ext := filepath.Ext(path)
+	switch ext {
+	case ".html":
+		// Do nothing here
+
+	case ".md":
+		html := strings.TrimSuffix(path, ".md")
+		html += ".html"
+
+		// Check if there's a competing HTML file
+		if s.htmls.contains(html) {
+			return nil
+		}
+
+	default:
 		return nil
 	}
 
@@ -227,14 +250,27 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		return filepath.SkipAll
 	}
 
-	target, err := s.targetPath(path)
+	target, err := s.mirrorPathDist(path, ext)
 	if err != nil {
 		s.walkError = err
 		return filepath.SkipAll
 	}
 
-	body := ToHtml(data)
+	// Copy HTML files as they are
+	if ext == ".html" {
+		s.writes = append(s.writes, write{
+			target: target,
+			data:   data,
+		})
 
+		if s.htmls.insert(path) {
+			return fmt.Errorf("duplicate html file %s", path)
+		}
+
+		return nil
+	}
+
+	body := ToHtml(data)
 	header := s.headers.valueDefault
 	footer := s.footers.valueDefault
 
@@ -272,8 +308,13 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 	return nil
 }
 
-func (s *Ssg) targetPath(p string) (string, error) {
-	p = strings.TrimSuffix(p, ".md")
+// mirrorPathDist mirrors the target HTML file path under s.src to under s.dist
+//
+// i.e. if s.src="foo/src" and s.dist="foo/dist",
+// and p="foo/src/bar/baz.md" ext=".md",
+// then the return value will be foo/dist/bar/baz.html
+func (s *Ssg) mirrorPathDist(p string, ext string) (string, error) {
+	p = strings.TrimSuffix(p, ext)
 	p += ".html"
 
 	p, err := filepath.Rel(s.src, p)
