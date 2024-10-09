@@ -208,6 +208,7 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		}
 
 		s.headers.values[dir] = header
+		return nil
 
 	case "_footer.html":
 		f, err := os.Open(path)
@@ -224,6 +225,7 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		}
 
 		s.footers.values[dir] = footer
+		return nil
 	}
 
 	ext := filepath.Ext(path)
