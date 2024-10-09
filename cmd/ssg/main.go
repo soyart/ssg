@@ -9,15 +9,15 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Println("usage: ssg.sh src dst")
-		// fmt.Println("usage: ssg.sh src dst title base_url")
+	if len(os.Args) < 5 {
+		fmt.Println("usage: ssg.sh src dst title base_url")
 		syscall.Exit(1)
 	}
 
-	site := ssg.NewSsg(os.Args[1], os.Args[2])
-	err := site.Generate()
-	if err != nil {
+	src, dst, _, baseUrl := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
+
+	s := ssg.New(src, dst)
+	if err := s.Generate(baseUrl); err != nil {
 		panic(err)
 	}
 }
