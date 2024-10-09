@@ -23,6 +23,4 @@ TODO:
 
 - `.ssgignore`
 
-- `sitemap.xml`
-
 - `.files` (maybe 'won't do')

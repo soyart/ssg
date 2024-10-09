@@ -373,7 +373,7 @@ xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 
 		switch filepath.Base(target) {
 		case "index.html":
-			sm.WriteString(filepath.Dir(target))
+			sm.WriteString(filepath.Dir(target) + "/")
 
 		default:
 			sm.WriteString(target)
