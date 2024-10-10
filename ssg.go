@@ -175,26 +175,20 @@ func (s *Ssg) Generate(baseUrl string) error {
 }
 
 func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
-	if d.IsDir() && strings.HasPrefix(path, ".git") {
-		return fs.SkipDir
-	}
-
 	if e != nil {
-		if d == nil { // The dir is not a directory
-			return nil
-		}
-
 		return e
 	}
 
-	if d.IsDir() {
-		return nil
-	}
-
 	base := filepath.Base(path)
+	isDot := strings.HasPrefix(base, ".")
 
-	// Skip dotfiles
-	if strings.HasPrefix(base, ".") {
+	switch {
+	// Skip hidden folders
+	case isDot && d.IsDir():
+		return fs.SkipDir
+
+	// Ignore hidden files and dir
+	case isDot, d.IsDir():
 		return nil
 	}
 
