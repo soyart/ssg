@@ -37,10 +37,10 @@ const (
 
 func New(baseUrl, src, dst string) Ssg {
 	return Ssg{
-		baseUrl: baseUrl,
-		src:     src,
-		dst:     dst,
-		htmls:   make(setStr),
+		baseUrl:   baseUrl,
+		src:       src,
+		dst:       dst,
+		preferred: make(setStr),
 
 		headers: perDir{
 			valueDefault: bytes.NewBufferString(HeaderDefault),
@@ -67,11 +67,11 @@ type Ssg struct {
 	baseUrl   string
 	headers   perDir
 	footers   perDir
-	htmls     setStr // Used to ignore md files with identical names, as with the original ssg
+	preferred setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
 	walkError error
 	src       string
 	dst       string
-	writes    []write
+	dist      []write
 }
 
 type write struct {
@@ -103,22 +103,22 @@ func (s *Ssg) Generate() error {
 		return err
 	}
 
-	err = s.cache()
+	dist, err := s.Dist()
 	if err != nil {
 		return err
 	}
 
-	err = s.writeOut()
+	err = s.WriteOut()
 	if err != nil {
 		return err
 	}
 
 	if s.baseUrl == "" {
-		s.pront(len(s.writes))
+		s.pront(len(dist))
 		return nil
 	}
 
-	sitemap, err := Sitemap(s.dst, s.baseUrl, stat.ModTime(), s.writes)
+	sitemap, err := Sitemap(s.dst, s.baseUrl, stat.ModTime(), s.dist)
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (s *Ssg) Generate() error {
 		return err
 	}
 
-	s.pront(len(s.writes) + 1)
+	s.pront(len(dist) + 1)
 
 	return nil
 }
@@ -145,7 +145,7 @@ func Generate(sites ...Ssg) error {
 
 		stats[s.src] = stat
 
-		err = s.cache()
+		_, err = s.Dist()
 		if err != nil {
 			return fmt.Errorf("error walking in %s: %w", s.src, err)
 		}
@@ -158,17 +158,17 @@ func Generate(sites ...Ssg) error {
 			return fmt.Errorf("ssg-go bug: unexpected missing stat for directory %s (baseUrl='%s')", s.src, s.baseUrl)
 		}
 
-		err := s.writeOut()
+		err := s.WriteOut()
 		if err != nil {
 			return fmt.Errorf("error writing out to %s: %w", s.dst, err)
 		}
 
 		if s.baseUrl == "" {
-			s.pront(len(s.writes))
+			s.pront(len(s.dist))
 			return nil
 		}
 
-		sitemap, err := Sitemap(s.dst, s.baseUrl, stat.ModTime(), s.writes)
+		sitemap, err := Sitemap(s.dst, s.baseUrl, stat.ModTime(), s.dist)
 		if err != nil {
 			return err
 		}
@@ -178,48 +178,66 @@ func Generate(sites ...Ssg) error {
 			return err
 		}
 
-		s.pront(len(s.writes) + 1)
+		s.pront(len(s.dist) + 1)
 	}
 
 	return nil
 }
 
-// cache walks the src directory, and converts Markdown into HTML,
-// which gets stored in-memory in s.writes.
-func (s *Ssg) cache() error {
+// Dist walks the src directory, and converts Markdown into HTML,
+// returning the results as []write.
+//
+// Dist also caches the result in s for [writeOut] later.
+func (s *Ssg) Dist() ([]write, error) {
 	err := filepath.WalkDir(s.src, s.walk)
 	if err == nil {
 		err = s.walkError
 	}
+	if err != nil {
+		return nil, err
+	}
 
-	return err
+	return s.dist, nil
 }
 
-// writeOut concurrently writes out s.writes to their target locations
-func (s *Ssg) writeOut() error {
-	if len(s.writes) == 0 {
+// WriteOut concurrently writes out s.writes to their target locations
+// If targets is empty, WriteOut writes to s.dst
+func (s *Ssg) WriteOut(targets ...string) error {
+	if len(s.dist) == 0 {
 		return nil
 	}
 
-	_, err := os.Stat(s.dst)
-	if os.IsNotExist(err) {
-		err = os.MkdirAll(s.dst, os.ModePerm)
+	if len(targets) == 0 {
+		return s.WriteOut(s.dst)
 	}
 
-	if err != nil {
-		return err
+	for i := range targets {
+		target := targets[i]
+
+		_, err := os.Stat(target)
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(s.dst, os.ModePerm)
+		}
+		if err != nil {
+			return err
+		}
+
+		wg, errs := new(sync.WaitGroup), make(chan error)
+		wg.Add(1)
+		go func() {
+			err = collectErrors(errs, wg)
+		}()
+
+		writeOut(s.dist, errs)
+
+		wg.Wait()
+
+		if err != nil {
+			return err
+		}
 	}
 
-	wg, errs := new(sync.WaitGroup), make(chan error)
-	wg.Add(1)
-	go func() {
-		err = collectErrors(errs, wg)
-	}()
-
-	writeOut(s.writes, errs)
-
-	wg.Wait()
-	return err
+	return nil
 }
 
 func collectErrors(ch <-chan error, wg *sync.WaitGroup) error {
@@ -295,13 +313,13 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		html := strings.TrimSuffix(path, ".md")
 		html += ".html"
 
-		if s.htmls.contains(html) {
+		if s.preferred.contains(html) {
 			return nil
 		}
 
 	// Remember the HTML file, so we can ignore the competing Markdown
 	case ".html":
-		if s.htmls.insert(path) {
+		if s.preferred.insert(path) {
 			return fmt.Errorf("duplicate html file %s", path)
 		}
 
@@ -314,7 +332,7 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 			return err
 		}
 
-		s.writes = append(s.writes, write{
+		s.dist = append(s.dist, write{
 			target: target,
 			data:   data,
 		})
@@ -356,7 +374,7 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		footer, max = f, len(p)
 	}
 
-	s.writes = append(s.writes, write{
+	s.dist = append(s.dist, write{
 		target: target,
 		data:   []byte(header.String() + string(body) + footer.String()),
 	})
