@@ -272,20 +272,6 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		return filepath.SkipAll
 	}
 
-	// Copy HTML files as they are
-	if ext == ".html" {
-		s.writes = append(s.writes, write{
-			target: target,
-			data:   data,
-		})
-
-		if s.htmls.insert(path) {
-			return fmt.Errorf("duplicate html file %s", path)
-		}
-
-		return nil
-	}
-
 	body := ToHtml(data)
 	header := s.headers.valueDefault
 	footer := s.footers.valueDefault
