@@ -327,7 +327,7 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 
 	// Copy files as they are
 	default:
-		target, err := mirrorPath(s.src, s.dst, path, ext, ext)
+		target, err := mirrorPath(s.src, s.dst, path, ext)
 		if err != nil {
 			return err
 		}
@@ -340,7 +340,7 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		return nil
 	}
 
-	target, err := mirrorPath(s.src, s.dst, path, ext, ".html")
+	target, err := mirrorPath(s.src, s.dst, path, ".html")
 	if err != nil {
 		s.walkError = err
 		return err
@@ -385,29 +385,29 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 // mirrorPath mirrors the target HTML file path under src to under dist
 //
 // i.e. if src="foo/src" and dst="foo/dist",
-// and p="foo/src/bar/baz.md" ext=".md" newExt=".html",
+// and path="foo/src/bar/baz.md"  newExt=".html",
 // then the return value will be foo/dist/bar/baz.html
 func mirrorPath(
 	src string,
 	dst string,
-	p string,
-	ext string, // File's current extension
+	path string,
 	newExt string, // File's new extension after mirrored
 ) (
 	string,
 	error,
 ) {
+	ext := filepath.Ext(path)
 	if ext != newExt {
-		p = strings.TrimSuffix(p, ext)
-		p += newExt
+		path = strings.TrimSuffix(path, ext)
+		path += newExt
 	}
 
-	p, err := filepath.Rel(src, p)
+	path, err := filepath.Rel(src, path)
 	if err != nil {
 		return "", err
 	}
 
-	return filepath.Join(dst, p), nil
+	return filepath.Join(dst, path), nil
 }
 
 func writeOut(writes []write, errs chan<- error) {
