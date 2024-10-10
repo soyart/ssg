@@ -191,7 +191,6 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		return nil
 	}
 
-	dir := filepath.Dir(path)
 	switch filepath.Base(path) {
 	case "_header.html":
 		data, err := os.ReadFile(path)
@@ -200,7 +199,9 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 			return fs.SkipAll
 		}
 
+		dir := filepath.Dir(path)
 		s.headers.values[dir] = bytes.NewBuffer(data)
+
 		return nil
 
 	case "_footer.html":
@@ -210,7 +211,9 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 			return fs.SkipAll
 		}
 
+		dir := filepath.Dir(path)
 		s.footers.values[dir] = bytes.NewBuffer(data)
+
 		return nil
 	}
 
