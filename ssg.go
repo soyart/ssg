@@ -421,7 +421,7 @@ xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 		1. First is when the HTML is some/path/index.html
 		<url><loc>https://example.com/some/path</loc><lastmod>2024-10-04</lastmod><priority>1.0</priority></url>
 
-		2. Then there is when the HTML is some/path/foo.html
+		2. Then there is when the HTML is some/path/page.html
 		<url><loc>https://example.com/some/path/page.html</loc><lastmod>2024-10-04</lastmod><priority>1.0</priority></url>
 		*/
 
