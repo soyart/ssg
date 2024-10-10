@@ -140,7 +140,12 @@ func (s *Ssg) WriteOut() error {
 }
 
 func (s *Ssg) Generate(baseUrl string) error {
-	err := s.Walk()
+	stat, err := os.Stat(s.src)
+	if err != nil {
+		return err
+	}
+
+	err = s.Walk()
 	if err != nil {
 		return err
 	}
@@ -159,7 +164,7 @@ func (s *Ssg) Generate(baseUrl string) error {
 		return nil
 	}
 
-	sitemap, err := s.Sitemap(baseUrl, time.Now())
+	sitemap, err := s.Sitemap(baseUrl, stat.ModTime())
 	if err != nil {
 		return err
 	}
