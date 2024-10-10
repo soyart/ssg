@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 type Manifest struct {
@@ -16,6 +17,7 @@ type Site struct {
 	Src       string            `json:"src"`
 	Dst       string            `json:"dst"`
 	Links     map[string]string `json:"links"`
+	Copies    map[string]string `json:"copies"`
 	SsgIgnore []string          `json:"ssgignore"`
 }
 
@@ -36,33 +38,58 @@ func ParseManifest(filename string) (Manifest, error) {
 
 func (s *Site) Link() error {
 	dups := make(setStr)
-	for _, dst := range s.Links {
+	for src, dst := range s.Links {
+		if len(src) == 0 {
+			return fmt.Errorf("found empty link src")
+		}
+		if len(dst) == 0 {
+			return fmt.Errorf("found empty link dst")
+		}
 		if dups.insert(dst) {
 			return fmt.Errorf("duplicate link destination '%s'", dst)
 		}
 	}
 
 	for src, dst := range s.Links {
-		statSrc, err := os.Stat(src)
+		ssrc, err := os.Stat(src)
 		if err != nil {
 			return fmt.Errorf("failed to stat link src '%s': %w", src, err)
 		}
 
-		statDst, err := os.Stat(dst)
-		if os.IsNotExist(err) {
-			err = os.MkdirAll(dst, os.ModePerm)
+		if ssrc.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("expecting normal file, found link src symlink '%s'", src)
+		}
+
+		if ssrc.IsDir() {
+			return fmt.Errorf("expecting normal file, found link src directory '%s'", src)
+		}
+
+		sdst, err := os.Stat(dst)
+		if err == nil {
+			if sdst.IsDir() {
+			}
+		}
+
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return fmt.Errorf("failed to stat link dst '%s': %w", dst, err)
+			}
+
+			err = os.MkdirAll(filepath.Dir(dst), os.ModePerm)
+			if err != nil {
+				return fmt.Errorf("fail to prepare dst '%s': %w", dst, err)
+			}
 		}
 
 		if err != nil {
 			return fmt.Errorf("fail to prepare dst '%s': %w", dst, err)
 		}
 
-		_, _ = statSrc, statDst
+		err = os.Symlink(src, dst)
+		if err != nil {
+			return fmt.Errorf("fail to link '%s'->'%s'", src, dst)
+		}
 	}
 
 	return nil
-}
-
-func (m *Manifest) HeaderFile() string {
-	return ""
 }
