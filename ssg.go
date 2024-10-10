@@ -191,7 +191,15 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		return nil
 	}
 
-	switch filepath.Base(path) {
+	base := filepath.Base(path)
+
+	// Skip dotfiles
+	if strings.HasPrefix(base, ".") {
+		return nil
+	}
+
+	// Collect cascading headers
+	switch base {
 	case "_header.html":
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -217,31 +225,49 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		return nil
 	}
 
-	ext := filepath.Ext(path)
-	switch ext {
-	case ".html":
-		// Do nothing here
-
-	case ".md":
-		html := strings.TrimSuffix(path, ".md")
-		html += ".html"
-
-		// Check if there's a competing HTML file
-		if s.htmls.contains(html) {
-			return nil
-		}
-
-	default:
-		return nil
-	}
-
 	data, err := os.ReadFile(path)
 	if err != nil {
 		s.walkError = err
 		return filepath.SkipAll
 	}
 
-	target, err := s.mirrorPathDist(path, ext)
+	ext := filepath.Ext(path)
+
+	switch ext {
+	// Check if there's a competing HTML file
+	case ".md":
+		html := strings.TrimSuffix(path, ".md")
+		html += ".html"
+
+		if s.htmls.contains(html) {
+			return nil
+		}
+
+	// Remember the HTML file, so we can ignore the competing Markdown
+	case ".html":
+		if s.htmls.insert(path) {
+			return fmt.Errorf("duplicate html file %s", path)
+		}
+
+		fallthrough
+
+	// Copy files as they are
+	default:
+		target, err := s.mirrorPathDist(path, ext, ext)
+		if err != nil {
+			s.walkError = err
+			return filepath.SkipAll
+		}
+
+		s.writes = append(s.writes, write{
+			target: target,
+			data:   data,
+		})
+
+		return nil
+	}
+
+	target, err := s.mirrorPathDist(path, ext, ".html")
 	if err != nil {
 		s.walkError = err
 		return filepath.SkipAll
@@ -267,11 +293,11 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 
 	max := 0
 	for p, h := range s.headers.values {
-		if !strings.HasPrefix(path, p) {
+		if len(p) < max {
 			continue
 		}
 
-		if len(p) < max {
+		if !strings.HasPrefix(path, p) {
 			continue
 		}
 
@@ -280,11 +306,11 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 
 	max = 0
 	for p, f := range s.footers.values {
-		if !strings.HasPrefix(path, p) {
+		if len(p) < max {
 			continue
 		}
 
-		if len(p) < max {
+		if !strings.HasPrefix(path, p) {
 			continue
 		}
 
@@ -302,11 +328,13 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 // mirrorPathDist mirrors the target HTML file path under s.src to under s.dist
 //
 // i.e. if s.src="foo/src" and s.dist="foo/dist",
-// and p="foo/src/bar/baz.md" ext=".md",
+// and p="foo/src/bar/baz.md" ext=".md" newExt=".html",
 // then the return value will be foo/dist/bar/baz.html
-func (s *Ssg) mirrorPathDist(p string, ext string) (string, error) {
-	p = strings.TrimSuffix(p, ext)
-	p += ".html"
+func (s *Ssg) mirrorPathDist(p, ext, newExt string) (string, error) {
+	if ext != newExt {
+		p = strings.TrimSuffix(p, ext)
+		p += newExt
+	}
 
 	p, err := filepath.Rel(s.src, p)
 	if err != nil {
