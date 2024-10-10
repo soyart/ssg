@@ -16,8 +16,8 @@ func main() {
 
 	src, dst, _, baseUrl := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
 
-	s := ssg.New(src, dst)
-	if err := s.Generate(baseUrl); err != nil {
+	s := ssg.New(baseUrl, src, dst)
+	if err := s.Generate(); err != nil {
 		panic(err)
 	}
 }

@@ -35,11 +35,12 @@ const (
 `
 )
 
-func New(src, dst string) Ssg {
+func New(baseUrl, src, dst string) Ssg {
 	return Ssg{
-		src:   src,
-		dist:  dst,
-		htmls: make(setStr),
+		baseUrl: baseUrl,
+		src:     src,
+		dist:    dst,
+		htmls:   make(setStr),
 
 		headers: perDir{
 			valueDefault: bytes.NewBufferString(HeaderDefault),
@@ -63,6 +64,7 @@ func ToHtml(md []byte) []byte {
 }
 
 type Ssg struct {
+	baseUrl   string
 	headers   perDir
 	footers   perDir
 	htmls     setStr // Used to ignore md files with identical names, as per the original ssg
@@ -91,9 +93,100 @@ func (w writeError) Error() string {
 	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
 }
 
-// Walk walks the src directory, and converts Markdown into HTML,
-// which gets stored in s.writes.
-func (s *Ssg) Walk() error {
+func (s *Ssg) pront(l int) {
+	fmt.Printf("[ssg-go] wrote %d file(s) to %s\n", l, s.dist)
+}
+
+func (s *Ssg) Generate() error {
+	stat, err := os.Stat(s.src)
+	if err != nil {
+		return err
+	}
+
+	err = s.cache()
+	if err != nil {
+		return err
+	}
+
+	err = s.writeOut()
+	if err != nil {
+		return err
+	}
+
+	if s.baseUrl == "" {
+		s.pront(len(s.writes))
+		return nil
+	}
+
+	sitemap, err := s.Sitemap(s.baseUrl, stat.ModTime())
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(s.dist+"/sitemap.xml", []byte(sitemap), os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	s.pront(len(s.writes) + 1)
+
+	return nil
+}
+
+func Generate(sites ...Ssg) error {
+	stats := make(map[string]fs.FileInfo)
+
+	for i := range sites {
+		s := &sites[i]
+		stat, err := os.Stat(s.src)
+		if err != nil {
+			return err
+		}
+
+		stats[s.src] = stat
+
+		err = s.cache()
+		if err != nil {
+			return fmt.Errorf("error walking in %s: %w", s.src, err)
+		}
+	}
+
+	for i := range sites {
+		s := &sites[i]
+		stat, ok := stats[s.src]
+		if !ok {
+			return fmt.Errorf("ssg-go bug: unexpected missing stat for directory %s (baseUrl='%s')", s.src, s.baseUrl)
+		}
+
+		err := s.writeOut()
+		if err != nil {
+			return fmt.Errorf("error writing out to %s: %w", s.dist, err)
+		}
+
+		if s.baseUrl == "" {
+			s.pront(len(s.writes))
+			return nil
+		}
+
+		sitemap, err := s.Sitemap(s.baseUrl, stat.ModTime())
+		if err != nil {
+			return err
+		}
+
+		err = os.WriteFile(s.dist+"/sitemap.xml", []byte(sitemap), os.ModePerm)
+		if err != nil {
+			return err
+		}
+
+		s.pront(len(s.writes) + 1)
+	}
+
+	return nil
+}
+
+// cache walks the src directory, and converts Markdown into HTML,
+// which gets stored in-memory in s.writes.
+func (s *Ssg) cache() error {
 	err := filepath.WalkDir(s.src, s.walk)
 	if err == nil {
 		err = s.walkError
@@ -102,8 +195,8 @@ func (s *Ssg) Walk() error {
 	return err
 }
 
-// WriteOut concurrently writes out s.writes to their target locations
-func (s *Ssg) WriteOut() error {
+// writeOut concurrently writes out s.writes to their target locations
+func (s *Ssg) writeOut() error {
 	if len(s.writes) == 0 {
 		return nil
 	}
@@ -117,64 +210,28 @@ func (s *Ssg) WriteOut() error {
 		return err
 	}
 
-	var wErrors []error // write errors
-	errChan := make(chan error)
-
-	wg := new(sync.WaitGroup)
+	wg, errs := new(sync.WaitGroup), make(chan error)
 	wg.Add(1)
-	go func(wg *sync.WaitGroup) {
-		defer wg.Done()
-		for err := range errChan {
-			wErrors = append(wErrors, err)
-		}
-	}(wg)
+	go func() {
+		err = collectErrors(errs, wg)
+	}()
 
-	writeOut(s.writes, errChan)
+	writeOut(s.writes, errs)
 
 	wg.Wait()
-	if len(wErrors) != 0 {
-		return fmt.Errorf("error writing out: %w", errors.Join(wErrors...))
-	}
-
-	return nil
+	return err
 }
 
-func (s *Ssg) Generate(baseUrl string) error {
-	stat, err := os.Stat(s.src)
-	if err != nil {
-		return err
+func collectErrors(ch <-chan error, wg *sync.WaitGroup) error {
+	defer wg.Done()
+	var errs []error
+	for err := range ch {
+		errs = append(errs, err)
 	}
 
-	err = s.Walk()
-	if err != nil {
-		return err
+	if len(errs) != 0 {
+		return errors.Join(errs...)
 	}
-
-	pront := func(l int) {
-		fmt.Printf("[ssg-go] wrote %d file(s) to %s\n", l, s.dist)
-	}
-
-	err = s.WriteOut()
-	if err != nil {
-		return err
-	}
-
-	if baseUrl == "" {
-		pront(len(s.writes))
-		return nil
-	}
-
-	sitemap, err := s.Sitemap(baseUrl, stat.ModTime())
-	if err != nil {
-		return err
-	}
-
-	err = os.WriteFile(s.dist+"/sitemap.xml", []byte(sitemap), os.ModePerm)
-	if err != nil {
-		return err
-	}
-
-	pront(len(s.writes) + 1)
 
 	return nil
 }
@@ -278,10 +335,9 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 
 	max := 0
 	for p, h := range s.headers.values {
-		if len(p) < max {
+		if max > len(p) {
 			continue
 		}
-
 		if !strings.HasPrefix(path, p) {
 			continue
 		}
@@ -291,10 +347,9 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 
 	max = 0
 	for p, f := range s.footers.values {
-		if len(p) < max {
+		if max > len(p) {
 			continue
 		}
-
 		if !strings.HasPrefix(path, p) {
 			continue
 		}
