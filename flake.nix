@@ -31,9 +31,7 @@ rec {
             lowdown
           ];
 
-          text = ''
-            ${builtins.readFile ./ssg.sh}
-          '';
+          text = builtins.readFile ./ssg.sh;
 
           meta = {
             inherit description homepage;

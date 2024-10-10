@@ -39,7 +39,7 @@ func New(baseUrl, src, dst string) Ssg {
 	return Ssg{
 		baseUrl: baseUrl,
 		src:     src,
-		dist:    dst,
+		dst:     dst,
 		htmls:   make(setStr),
 
 		headers: perDir{
@@ -67,10 +67,10 @@ type Ssg struct {
 	baseUrl   string
 	headers   perDir
 	footers   perDir
-	htmls     setStr // Used to ignore md files with identical names, as per the original ssg
+	htmls     setStr // Used to ignore md files with identical names, as with the original ssg
 	walkError error
 	src       string
-	dist      string
+	dst       string
 	writes    []write
 }
 
@@ -94,7 +94,7 @@ func (w writeError) Error() string {
 }
 
 func (s *Ssg) pront(l int) {
-	fmt.Printf("[ssg-go] wrote %d file(s) to %s\n", l, s.dist)
+	fmt.Printf("[ssg-go] wrote %d file(s) to %s\n", l, s.dst)
 }
 
 func (s *Ssg) Generate() error {
@@ -118,12 +118,12 @@ func (s *Ssg) Generate() error {
 		return nil
 	}
 
-	sitemap, err := s.Sitemap(s.baseUrl, stat.ModTime())
+	sitemap, err := Sitemap(s.dst, s.baseUrl, stat.ModTime(), s.writes)
 	if err != nil {
 		return err
 	}
 
-	err = os.WriteFile(s.dist+"/sitemap.xml", []byte(sitemap), os.ModePerm)
+	err = os.WriteFile(s.dst+"/sitemap.xml", []byte(sitemap), os.ModePerm)
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func Generate(sites ...Ssg) error {
 
 		err := s.writeOut()
 		if err != nil {
-			return fmt.Errorf("error writing out to %s: %w", s.dist, err)
+			return fmt.Errorf("error writing out to %s: %w", s.dst, err)
 		}
 
 		if s.baseUrl == "" {
@@ -168,12 +168,12 @@ func Generate(sites ...Ssg) error {
 			return nil
 		}
 
-		sitemap, err := s.Sitemap(s.baseUrl, stat.ModTime())
+		sitemap, err := Sitemap(s.dst, s.baseUrl, stat.ModTime(), s.writes)
 		if err != nil {
 			return err
 		}
 
-		err = os.WriteFile(s.dist+"/sitemap.xml", []byte(sitemap), os.ModePerm)
+		err = os.WriteFile(s.dst+"/sitemap.xml", []byte(sitemap), os.ModePerm)
 		if err != nil {
 			return err
 		}
@@ -201,9 +201,9 @@ func (s *Ssg) writeOut() error {
 		return nil
 	}
 
-	_, err := os.Stat(s.dist)
+	_, err := os.Stat(s.dst)
 	if os.IsNotExist(err) {
-		err = os.MkdirAll(s.dist, os.ModePerm)
+		err = os.MkdirAll(s.dst, os.ModePerm)
 	}
 
 	if err != nil {
@@ -260,7 +260,7 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			s.walkError = err
-			return fs.SkipAll
+			return err
 		}
 
 		dir := filepath.Dir(path)
@@ -272,7 +272,7 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			s.walkError = err
-			return fs.SkipAll
+			return err
 		}
 
 		dir := filepath.Dir(path)
@@ -284,7 +284,7 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		s.walkError = err
-		return filepath.SkipAll
+		return err
 	}
 
 	ext := filepath.Ext(path)
@@ -309,10 +309,9 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 
 	// Copy files as they are
 	default:
-		target, err := s.mirrorPathDist(path, ext, ext)
+		target, err := mirrorPath(s.src, s.dst, path, ext, ext)
 		if err != nil {
-			s.walkError = err
-			return filepath.SkipAll
+			return err
 		}
 
 		s.writes = append(s.writes, write{
@@ -323,10 +322,10 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		return nil
 	}
 
-	target, err := s.mirrorPathDist(path, ext, ".html")
+	target, err := mirrorPath(s.src, s.dst, path, ext, ".html")
 	if err != nil {
 		s.walkError = err
-		return filepath.SkipAll
+		return err
 	}
 
 	body := ToHtml(data)
@@ -365,23 +364,32 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 	return nil
 }
 
-// mirrorPathDist mirrors the target HTML file path under s.src to under s.dist
+// mirrorPath mirrors the target HTML file path under src to under dist
 //
-// i.e. if s.src="foo/src" and s.dist="foo/dist",
+// i.e. if src="foo/src" and dst="foo/dist",
 // and p="foo/src/bar/baz.md" ext=".md" newExt=".html",
 // then the return value will be foo/dist/bar/baz.html
-func (s *Ssg) mirrorPathDist(p, ext, newExt string) (string, error) {
+func mirrorPath(
+	src string,
+	dst string,
+	p string,
+	ext string, // File's current extension
+	newExt string, // File's new extension after mirrored
+) (
+	string,
+	error,
+) {
 	if ext != newExt {
 		p = strings.TrimSuffix(p, ext)
 		p += newExt
 	}
 
-	p, err := filepath.Rel(s.src, p)
+	p, err := filepath.Rel(src, p)
 	if err != nil {
 		return "", err
 	}
 
-	return filepath.Join(s.dist, p), nil
+	return filepath.Join(dst, p), nil
 }
 
 func writeOut(writes []write, errs chan<- error) {
@@ -440,7 +448,15 @@ func writeOut(writes []write, errs chan<- error) {
 	close(errs)
 }
 
-func (s *Ssg) Sitemap(baseUrl string, date time.Time) (string, error) {
+func Sitemap(
+	dst string,
+	baseUrl string,
+	date time.Time,
+	writes []write,
+) (
+	string,
+	error,
+) {
 	dateStr := date.Format(time.DateOnly)
 
 	sm := new(strings.Builder)
@@ -452,10 +468,10 @@ http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
 xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 `)
 
-	for i := range s.writes {
-		w := &s.writes[i]
+	for i := range writes {
+		w := &writes[i]
 
-		target, err := filepath.Rel(s.dist, w.target)
+		target, err := filepath.Rel(dst, w.target)
 		if err != nil {
 			return sm.String(), err
 		}

@@ -12,13 +12,17 @@ type Manifest struct {
 }
 
 type Site struct {
-	Name      string            `json:"name"`
-	Url       string            `json:"url"`
-	Src       string            `json:"src"`
-	Dst       string            `json:"dst"`
-	Links     map[string]string `json:"links"`
-	Copies    map[string]string `json:"copies"`
-	SsgIgnore []string          `json:"ssgignore"`
+	Copies   map[string]string `json:"copies"`
+	Links    map[string]string `json:"links"`
+	Replaces map[string]string `json:"replaces"`
+
+	Name string `json:"name"`
+	Url  string `json:"url"`
+	Src  string `json:"src"`
+	Dst  string `json:"dst"`
+
+	// Files to ignore with glob
+	Ignores []string `json:"ssgignore"`
 }
 
 func ParseManifest(filename string) (Manifest, error) {
