@@ -1,2 +1,7 @@
 # Nix build result
 /result
+
+/cmd/debug
+
+/johndoe.com/dist
+/artnoi.com

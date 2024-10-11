@@ -1,0 +1,10 @@
+{
+	"johndoe.com": {
+		"name": "JohnDoe.com",
+		"src": "johndoe.com/src",
+		"dst": "johndoe.com/dst",
+		"links": {
+			"johndoe.com/assets/logo.png": "johndoe.com/src/logo.png"
+		}
+	}
+}
