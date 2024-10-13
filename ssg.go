@@ -72,7 +72,6 @@ type (
 		headers   perDir
 		footers   perDir
 		preferred setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
-		walkError error
 		src       string
 		dst       string
 		dist      []write
@@ -182,17 +181,11 @@ func Generate(sites ...Ssg) error {
 // Build also caches the result in s for [WriteOut] later.
 func (s *Ssg) Build() ([]write, error) {
 	err := filepath.WalkDir(s.src, s.scan)
-	if err == nil {
-		err = s.walkError
-	}
 	if err != nil {
 		return nil, err
 	}
 
 	err = filepath.WalkDir(s.src, s.build)
-	if err == nil {
-		err = s.walkError
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -292,13 +285,11 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 	case "_header.html":
 		data, err := os.ReadFile(path)
 		if err != nil {
-			s.walkError = err
 			return err
 		}
 
 		err = s.headers.add(filepath.Dir(path), bytes.NewBuffer(data))
 		if err != nil {
-			s.walkError = err
 			return err
 		}
 
@@ -307,13 +298,11 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 	case "_footer.html":
 		data, err := os.ReadFile(path)
 		if err != nil {
-			s.walkError = err
 			return err
 		}
 
 		err = s.footers.add(filepath.Dir(path), bytes.NewBuffer(data))
 		if err != nil {
-			s.walkError = err
 			return err
 		}
 
@@ -323,7 +312,8 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 	ext := filepath.Ext(base)
 	if ext == ".html" {
 		if s.preferred.insert(path) {
-			return fmt.Errorf("duplicate html file %s", path)
+			err = fmt.Errorf("duplicate html file %s", path)
+			return err
 		}
 	}
 
@@ -356,7 +346,6 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		s.walkError = err
 		return err
 	}
 
@@ -376,7 +365,6 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	default:
 		target, err := mirrorPath(s.src, s.dst, path, ext)
 		if err != nil {
-			s.walkError = err
 			return err
 		}
 
@@ -390,7 +378,6 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 
 	target, err := mirrorPath(s.src, s.dst, path, ".html")
 	if err != nil {
-		s.walkError = err
 		return err
 	}
 
