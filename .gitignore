@@ -3,5 +3,5 @@
 
 /cmd/debug
 
-/johndoe.com/dist
-/artnoi.com
+/johndoe.com/**
+!/johndoe.com/src

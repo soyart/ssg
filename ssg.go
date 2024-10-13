@@ -17,10 +17,13 @@ import (
 )
 
 const (
-	MarkdownExtensions = parser.CommonExtensions // | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock
-	HtmlFlags          = html.CommonFlags        // | html.HrefTargetBlank
+	MarkdownExtensions = parser.CommonExtensions |
+		parser.Mmark |
+		parser.AutoHeadingIDs
 
-	HeaderDefault = `
+	HtmlFlags = html.CommonFlags
+
+	headerDefault = `
 <!DOCTYPE html>
 <html lang="en">
 	<head>
@@ -29,7 +32,7 @@ const (
 	<body>
 `
 
-	FooterDefault = `
+	footerDefault = `
 	</body>
 </html>
 `
@@ -43,24 +46,24 @@ func New(baseUrl, src, dst string) Ssg {
 		preferred: make(setStr),
 
 		headers: perDir{
-			valueDefault: bytes.NewBufferString(HeaderDefault),
+			valueDefault: bytes.NewBufferString(headerDefault),
 			values:       make(map[string]*bytes.Buffer),
 		},
 
 		footers: perDir{
-			valueDefault: bytes.NewBufferString(FooterDefault),
+			valueDefault: bytes.NewBufferString(footerDefault),
 			values:       make(map[string]*bytes.Buffer),
 		},
 	}
 }
 
 func ToHtml(md []byte) []byte {
-	node := markdown.Parse(md, parser.NewWithExtensions(MarkdownExtensions))
+	root := markdown.Parse(md, parser.NewWithExtensions(MarkdownExtensions))
 	renderer := html.NewRenderer(html.RendererOptions{
 		Flags: HtmlFlags,
 	})
 
-	return markdown.Render(node, renderer)
+	return markdown.Render(root, renderer)
 }
 
 type Ssg struct {
@@ -77,11 +80,6 @@ type Ssg struct {
 type write struct {
 	target string
 	data   []byte
-}
-
-type perDir struct {
-	valueDefault *bytes.Buffer
-	values       map[string]*bytes.Buffer
 }
 
 type writeError struct {
@@ -103,7 +101,7 @@ func (s *Ssg) Generate() error {
 		return err
 	}
 
-	dist, err := s.Dist()
+	dist, err := s.Build()
 	if err != nil {
 		return err
 	}
@@ -145,7 +143,7 @@ func Generate(sites ...Ssg) error {
 
 		stats[s.src] = stat
 
-		_, err = s.Dist()
+		_, err = s.Build()
 		if err != nil {
 			return fmt.Errorf("error walking in %s: %w", s.src, err)
 		}
@@ -184,11 +182,11 @@ func Generate(sites ...Ssg) error {
 	return nil
 }
 
-// Dist walks the src directory, and converts Markdown into HTML,
+// Build walks the src directory, and converts Markdown into HTML,
 // returning the results as []write.
 //
-// Dist also caches the result in s for [writeOut] later.
-func (s *Ssg) Dist() ([]write, error) {
+// Build also caches the result in s for [WriteOut] later.
+func (s *Ssg) Build() ([]write, error) {
 	err := filepath.WalkDir(s.src, s.walk)
 	if err == nil {
 		err = s.walkError
@@ -204,7 +202,7 @@ func (s *Ssg) Dist() ([]write, error) {
 // If targets is empty, WriteOut writes to s.dst
 func (s *Ssg) WriteOut(targets ...string) error {
 	if len(s.dist) == 0 {
-		return nil
+		return fmt.Errorf("nothing to write")
 	}
 
 	if len(targets) == 0 {
@@ -282,7 +280,7 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		}
 
 		dir := filepath.Dir(path)
-		s.headers.values[dir] = bytes.NewBuffer(data)
+		s.headers.add(dir, bytes.NewBuffer(data))
 
 		return nil
 
@@ -294,7 +292,7 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		}
 
 		dir := filepath.Dir(path)
-		s.footers.values[dir] = bytes.NewBuffer(data)
+		s.footers.add(dir, bytes.NewBuffer(data))
 
 		return nil
 	}
@@ -347,32 +345,8 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 	}
 
 	body := ToHtml(data)
-	header := s.headers.valueDefault
-	footer := s.footers.valueDefault
-
-	max := 0
-	for p, h := range s.headers.values {
-		if max > len(p) {
-			continue
-		}
-		if !strings.HasPrefix(path, p) {
-			continue
-		}
-
-		header, max = h, len(p)
-	}
-
-	max = 0
-	for p, f := range s.footers.values {
-		if max > len(p) {
-			continue
-		}
-		if !strings.HasPrefix(path, p) {
-			continue
-		}
-
-		footer, max = f, len(p)
-	}
+	header := s.headers.choose(path)
+	footer := s.footers.choose(path)
 
 	s.dist = append(s.dist, write{
 		target: target,
