@@ -296,7 +296,13 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 			return err
 		}
 
-		s.headers.add(filepath.Dir(path), bytes.NewBuffer(data))
+		err = s.headers.add(filepath.Dir(path), bytes.NewBuffer(data))
+		if err != nil {
+			s.walkError = err
+			return err
+		}
+
+		return nil
 
 	case "_footer.html":
 		data, err := os.ReadFile(path)
@@ -305,7 +311,20 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 			return err
 		}
 
-		s.footers.add(filepath.Dir(path), bytes.NewBuffer(data))
+		err = s.footers.add(filepath.Dir(path), bytes.NewBuffer(data))
+		if err != nil {
+			s.walkError = err
+			return err
+		}
+
+		return nil
+	}
+
+	ext := filepath.Ext(base)
+	if ext == ".html" {
+		if s.preferred.insert(path) {
+			return fmt.Errorf("duplicate html file %s", path)
+		}
 	}
 
 	return nil
@@ -353,18 +372,11 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 			return nil
 		}
 
-	// Remember the HTML file, so we can ignore the competing Markdown
-	case ".html":
-		if s.preferred.insert(path) {
-			return fmt.Errorf("duplicate html file %s", path)
-		}
-
-		fallthrough
-
 	// Copy files as they are
 	default:
 		target, err := mirrorPath(s.src, s.dst, path, ext)
 		if err != nil {
+			s.walkError = err
 			return err
 		}
 
