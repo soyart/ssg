@@ -66,34 +66,28 @@ func ToHtml(md []byte) []byte {
 	return markdown.Render(root, renderer)
 }
 
-type Ssg struct {
-	baseUrl   string
-	headers   perDir
-	footers   perDir
-	preferred setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
-	walkError error
-	src       string
-	dst       string
-	dist      []write
-}
+type (
+	Ssg struct {
+		baseUrl   string
+		headers   perDir
+		footers   perDir
+		preferred setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
+		walkError error
+		src       string
+		dst       string
+		dist      []write
+	}
 
-type write struct {
-	target string
-	data   []byte
-}
+	write struct {
+		target string
+		data   []byte
+	}
 
-type writeError struct {
-	err    error
-	target string
-}
-
-func (w writeError) Error() string {
-	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
-}
-
-func (s *Ssg) pront(l int) {
-	fmt.Printf("[ssg-go] wrote %d file(s) to %s\n", l, s.dst)
-}
+	writeError struct {
+		err    error
+		target string
+	}
+)
 
 func (s *Ssg) Generate() error {
 	stat, err := os.Stat(s.src)
@@ -333,6 +327,14 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 		return nil
 	}
 
+	switch base {
+	case
+		"_header.html",
+		"_footer.html":
+
+		return nil
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		s.walkError = err
@@ -390,6 +392,14 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	})
 
 	return nil
+}
+
+func (s *Ssg) pront(l int) {
+	fmt.Printf("[ssg-go] wrote %d file(s) to %s\n", l, s.dst)
+}
+
+func (w writeError) Error() string {
+	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
 }
 
 // mirrorPath mirrors the target HTML file path under src to under dist
