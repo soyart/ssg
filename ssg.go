@@ -260,6 +260,23 @@ func collectErrors(ch <-chan error, wg *sync.WaitGroup) error {
 	return nil
 }
 
+func isIgnored(base string, d fs.DirEntry) (bool, error) {
+	isDot := strings.HasPrefix(base, ".")
+	isDir := d.IsDir()
+
+	switch {
+	// Skip hidden folders
+	case isDot && isDir:
+		return true, fs.SkipDir
+
+	// Ignore hidden files and dir
+	case isDot, isDir:
+		return true, nil
+	}
+
+	return false, nil
+}
+
 // scan scans the source directory for header and footer files,
 // and anything required to build a page.
 func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
@@ -268,19 +285,15 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 	}
 
 	base := filepath.Base(path)
-	isDot := strings.HasPrefix(base, ".")
-
-	switch {
-	// Skip hidden folders
-	case isDot && d.IsDir():
-		return fs.SkipDir
-
-	// Ignore hidden files and dir
-	case isDot, d.IsDir():
+	ignore, err := isIgnored(base, d)
+	if err != nil {
+		return err
+	}
+	if ignore {
 		return nil
 	}
 
-	// Collect cascading headers
+	// Collect cascading headers and footers
 	switch base {
 	case "_header.html":
 		data, err := os.ReadFile(path)
@@ -289,8 +302,7 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 			return err
 		}
 
-		dir := filepath.Dir(path)
-		s.headers.add(dir, bytes.NewBuffer(data))
+		s.headers.add(filepath.Dir(path), bytes.NewBuffer(data))
 
 	case "_footer.html":
 		data, err := os.ReadFile(path)
@@ -299,8 +311,7 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 			return err
 		}
 
-		dir := filepath.Dir(path)
-		s.footers.add(dir, bytes.NewBuffer(data))
+		s.footers.add(filepath.Dir(path), bytes.NewBuffer(data))
 	}
 
 	return nil
@@ -314,15 +325,11 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	}
 
 	base := filepath.Base(path)
-	isDot := strings.HasPrefix(base, ".")
-
-	switch {
-	// Skip hidden folders
-	case isDot && d.IsDir():
-		return fs.SkipDir
-
-	// Ignore hidden files and dir
-	case isDot, d.IsDir():
+	ignore, err := isIgnored(base, d)
+	if err != nil {
+		return err
+	}
+	if ignore {
 		return nil
 	}
 
@@ -332,7 +339,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 		return err
 	}
 
-	ext := filepath.Ext(path)
+	ext := filepath.Ext(base)
 
 	switch ext {
 	// Check if there's a competing HTML file
