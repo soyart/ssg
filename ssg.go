@@ -187,7 +187,15 @@ func Generate(sites ...Ssg) error {
 //
 // Build also caches the result in s for [WriteOut] later.
 func (s *Ssg) Build() ([]write, error) {
-	err := filepath.WalkDir(s.src, s.walk)
+	err := filepath.WalkDir(s.src, s.scan)
+	if err == nil {
+		err = s.walkError
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	err = filepath.WalkDir(s.src, s.build)
 	if err == nil {
 		err = s.walkError
 	}
@@ -198,7 +206,7 @@ func (s *Ssg) Build() ([]write, error) {
 	return s.dist, nil
 }
 
-// WriteOut concurrently writes out s.writes to their target locations
+// WriteOut concurrently writes out s.writes to their target locations.
 // If targets is empty, WriteOut writes to s.dst
 func (s *Ssg) WriteOut(targets ...string) error {
 	if len(s.dist) == 0 {
@@ -252,7 +260,9 @@ func collectErrors(ch <-chan error, wg *sync.WaitGroup) error {
 	return nil
 }
 
-func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
+// scan scans the source directory for header and footer files,
+// and anything required to build a page.
+func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 	if e != nil {
 		return e
 	}
@@ -282,8 +292,6 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 		dir := filepath.Dir(path)
 		s.headers.add(dir, bytes.NewBuffer(data))
 
-		return nil
-
 	case "_footer.html":
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -293,7 +301,28 @@ func (s *Ssg) walk(path string, d fs.DirEntry, e error) error {
 
 		dir := filepath.Dir(path)
 		s.footers.add(dir, bytes.NewBuffer(data))
+	}
 
+	return nil
+}
+
+// build finds and converts Markdown files to HTML,
+// and assembles it with header and footer.
+func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
+	if e != nil {
+		return e
+	}
+
+	base := filepath.Base(path)
+	isDot := strings.HasPrefix(base, ".")
+
+	switch {
+	// Skip hidden folders
+	case isDot && d.IsDir():
+		return fs.SkipDir
+
+	// Ignore hidden files and dir
+	case isDot, d.IsDir():
 		return nil
 	}
 
