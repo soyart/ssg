@@ -39,8 +39,8 @@ const (
 `
 
 	keyTitleFromTag    = ":title "
-	placeholderFromH1  = "{{from-h1}}"
-	placeholderFromTag = "{{from-tag}}"
+	placeholderFromH1  = "<title>{{from-h1}}</title>"
+	placeholderFromTag = "<title>{{from-tag}}</title>"
 )
 
 func New(src, dst, title, baseUrl string) Ssg {
@@ -303,11 +303,11 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 
 		var from from
 		switch {
-		case bytes.Contains(data, []byte("<title>{{from-tag}}</title>")):
-			from = fromTag
-
-		case bytes.Contains(data, []byte("<title>{{from-h1}}</title>")):
+		case bytes.Contains(data, []byte(placeholderFromH1)):
 			from = fromH1
+
+		case bytes.Contains(data, []byte(placeholderFromTag)):
+			from = fromTag
 		}
 
 		err = s.headers.add(filepath.Dir(path), header{
@@ -421,7 +421,10 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 
 		l := len(keyTitleFromTag)
 		title := data[start+l : start+newLine]
+		line := data[start : start+newLine+1]
+
 		headerText = strings.Replace(headerText, placeholderFromTag, string(title), 1)
+		data = bytes.Replace(data, line, nil, 1)
 	}
 
 	body := ToHtml(data)

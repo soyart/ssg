@@ -37,12 +37,8 @@ const (
 	fromTag
 )
 
-func (h *headers) choose(path string) header {
-	return choose(path, h.d, h.values)
-}
-
-func (f *footers) choose(path string) *bytes.Buffer {
-	return choose(path, f.d, f.values)
+func (p perDir[T]) choose(path string) T {
+	return choose(path, p.d, p.values)
 }
 
 // choose chooses which map value should be used for the given path.
