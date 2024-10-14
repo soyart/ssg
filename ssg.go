@@ -411,17 +411,17 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	headerText := h.String()
 	switch h.titleFrom {
 	case fromTag:
-		start := bytes.Index(data, []byte(keyTitleFromTag))
-		if start == -1 {
+		lineStart := bytes.Index(data, []byte(keyTitleFromTag))
+		if lineStart == -1 {
 			headerText = strings.Replace(headerText, placeholderFromTag, s.title, 1)
 			break
 		}
 
-		newLine := bytes.Index(data[start:], []byte("\n"))
+		lineEnd := bytes.Index(data[lineStart:], []byte("\n"))
 
 		l := len(keyTitleFromTag)
-		title := data[start+l : start+newLine]
-		line := data[start : start+newLine+1]
+		title := data[lineStart+l : lineStart+lineEnd]
+		line := data[lineStart : lineStart+lineEnd+1]
 
 		headerText = strings.Replace(headerText, placeholderFromTag, string(title), 1)
 		data = bytes.Replace(data, line, nil, 1)
