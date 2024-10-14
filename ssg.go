@@ -101,42 +101,6 @@ type (
 	}
 )
 
-func (s *Ssg) Generate() error {
-	stat, err := os.Stat(s.src)
-	if err != nil {
-		return err
-	}
-
-	dist, err := s.Build()
-	if err != nil {
-		return err
-	}
-
-	err = s.WriteOut()
-	if err != nil {
-		return err
-	}
-
-	if s.baseUrl == "" {
-		s.pront(len(dist))
-		return nil
-	}
-
-	sitemap, err := Sitemap(s.dst, s.baseUrl, stat.ModTime(), s.dist)
-	if err != nil {
-		return err
-	}
-
-	err = os.WriteFile(s.dst+"/sitemap.xml", []byte(sitemap), os.ModePerm)
-	if err != nil {
-		return err
-	}
-
-	s.pront(len(dist) + 1)
-
-	return nil
-}
-
 func Generate(sites ...Ssg) error {
 	stats := make(map[string]fs.FileInfo)
 
@@ -184,6 +148,42 @@ func Generate(sites ...Ssg) error {
 
 		s.pront(len(s.dist) + 1)
 	}
+
+	return nil
+}
+
+func (s *Ssg) Generate() error {
+	stat, err := os.Stat(s.src)
+	if err != nil {
+		return err
+	}
+
+	dist, err := s.Build()
+	if err != nil {
+		return err
+	}
+
+	err = s.WriteOut()
+	if err != nil {
+		return err
+	}
+
+	if s.baseUrl == "" {
+		s.pront(len(dist))
+		return nil
+	}
+
+	sitemap, err := Sitemap(s.dst, s.baseUrl, stat.ModTime(), s.dist)
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(s.dst+"/sitemap.xml", []byte(sitemap), os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	s.pront(len(dist) + 1)
 
 	return nil
 }
