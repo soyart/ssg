@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	MarkdownExtensions = parser.CommonExtensions |
+	SsgExtensions = parser.CommonExtensions |
 		parser.Mmark |
 		parser.AutoHeadingIDs
 
@@ -26,9 +26,9 @@ const (
 	headerDefault = `
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-	  <meta charset="UTF-8">
-	</head>
+<head>
+<meta charset="UTF-8">
+</head>
 	<body>
 `
 
@@ -45,38 +45,36 @@ func New(baseUrl, src, dst string) Ssg {
 		dst:       dst,
 		preferred: make(setStr),
 
-		headers: perDir{
-			valueDefault: bytes.NewBufferString(headerDefault),
-			values:       make(map[string]*bytes.Buffer),
+		headers: headers{
+			perDir: perDir[header]{
+				d:      header{},
+				values: make(map[string]header),
+			},
 		},
 
-		footers: perDir{
-			valueDefault: bytes.NewBufferString(footerDefault),
-			values:       make(map[string]*bytes.Buffer),
+		footers: footers{
+			perDir: perDir[*bytes.Buffer]{
+				d:      bytes.NewBufferString(footerDefault),
+				values: make(map[string]*bytes.Buffer),
+			},
 		},
 	}
 }
 
 func ToHtml(md []byte) []byte {
-	root := markdown.Parse(md, parser.NewWithExtensions(MarkdownExtensions))
-
+	root := markdown.Parse(md, parser.NewWithExtensions(SsgExtensions))
 	renderer := html.NewRenderer(html.RendererOptions{
 		Flags: HtmlFlags,
 	})
 
-	rendererCustom := NewRenderer(
-		renderer,
-		"<meta charset=\"UTF-8\">",
-	)
-
-	return markdown.Render(root, rendererCustom)
+	return markdown.Render(root, renderer)
 }
 
 type (
 	Ssg struct {
 		baseUrl   string
-		headers   perDir
-		footers   perDir
+		headers   headers
+		footers   footers
 		preferred setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
 		src       string
 		dst       string
@@ -294,7 +292,20 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 			return err
 		}
 
-		err = s.headers.add(filepath.Dir(path), bytes.NewBuffer(data))
+		var from from
+		switch {
+		case bytes.Contains(data, []byte("<title>{{from-tag}}</title>")):
+			from = fromTag
+
+		case bytes.Contains(data, []byte("<title>{{from-h1}}</title>")):
+			from = fromH1
+		}
+
+		err = s.headers.add(filepath.Dir(path), header{
+			Buffer:    bytes.NewBuffer(data),
+			titleFrom: from,
+		})
+
 		if err != nil {
 			return err
 		}
