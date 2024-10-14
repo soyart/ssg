@@ -28,6 +28,7 @@ const (
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<title>{{from-h1}}</title>
 </head>
 	<body>
 `
@@ -398,13 +399,29 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 		return err
 	}
 
-	body := ToHtml(data)
-	header := s.headers.choose(path)
-	footer := s.footers.choose(path)
+	h := s.headers.choose(path)
+	f := s.footers.choose(path)
 
+	headerText := h.String()
+
+	switch h.titleFrom {
+	case fromH1:
+		startTag := bytes.Index(data, []byte("# "))
+		endTag := bytes.Index(data[startTag:], []byte("\n"))
+		title := headerText[startTag:endTag]
+		headerText = strings.Replace(headerText, "{{from-h1}}", title, 1)
+
+	case fromTag:
+		startTag := bytes.Index(data, []byte(":title "))
+		endTag := bytes.Index(data[startTag:], []byte("\n"))
+		title := headerText[startTag:endTag]
+		headerText = strings.Replace(headerText, "{{from-tag}}", title, 1)
+	}
+
+	body := ToHtml(data)
 	s.dist = append(s.dist, write{
 		target: target,
-		data:   []byte(header.String() + string(body) + footer.String()),
+		data:   []byte(headerText + string(body) + f.String()),
 	})
 
 	return nil
