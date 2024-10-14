@@ -59,11 +59,17 @@ func New(baseUrl, src, dst string) Ssg {
 
 func ToHtml(md []byte) []byte {
 	root := markdown.Parse(md, parser.NewWithExtensions(MarkdownExtensions))
+
 	renderer := html.NewRenderer(html.RendererOptions{
 		Flags: HtmlFlags,
 	})
 
-	return markdown.Render(root, renderer)
+	rendererCustom := NewRenderer(
+		renderer,
+		"<meta charset=\"UTF-8\">",
+	)
+
+	return markdown.Render(root, rendererCustom)
 }
 
 type (
