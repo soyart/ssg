@@ -7,24 +7,53 @@ import (
 )
 
 type (
+	from int
+
 	// perDir tracks files under directory in a trie-like fashion.
-	perDir struct {
-		valueDefault *bytes.Buffer
-		values       map[string]*bytes.Buffer
+	perDir[T any] struct {
+		d      T
+		values map[string]T
+	}
+
+	headers struct {
+		perDir[header]
+	}
+
+	footers struct {
+		perDir[*bytes.Buffer]
+	}
+
+	header struct {
+		*bytes.Buffer
+		titleFrom from
 	}
 
 	setStr map[string]struct{}
 )
 
-// choose chooses which byte buffer should be used for the given path.
-func (p *perDir) choose(path string) *bytes.Buffer {
-	buf := p.values[path]
-	if buf != nil {
-		return buf
+const (
+	fromNone = 0
+	fromH1   = 1 << iota
+	fromTag
+)
+
+func (h *headers) choose(path string) header {
+	return choose(path, h.d, h.values)
+}
+
+func (f *footers) choose(path string) *bytes.Buffer {
+	return choose(path, f.d, f.values)
+}
+
+// choose chooses which map value should be used for the given path.
+func choose[T any](path string, valueDefault T, m map[string]T) T {
+	chosen, ok := m[path]
+	if ok {
+		return chosen
 	}
 
-	buf, max := p.valueDefault, 0
-	for prefix, v := range p.values {
+	chosen, max := valueDefault, 0
+	for prefix, v := range m {
 		l := len(prefix)
 		if max > l {
 			continue
@@ -33,19 +62,20 @@ func (p *perDir) choose(path string) *bytes.Buffer {
 			continue
 		}
 
-		buf, max = v, l
+		chosen, max = v, l
 	}
 
-	return buf
+	return chosen
+
 }
 
-func (p *perDir) add(path string, buf *bytes.Buffer) error {
+func (p *perDir[T]) add(path string, v T) error {
 	_, ok := p.values[path]
 	if ok {
 		return fmt.Errorf("found duplicate path '%s'", path)
 	}
 
-	p.values[path] = buf
+	p.values[path] = v
 	return nil
 }
 

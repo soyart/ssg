@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	MarkdownExtensions = parser.CommonExtensions |
+	SsgExtensions = parser.CommonExtensions |
 		parser.Mmark |
 		parser.AutoHeadingIDs
 
@@ -26,9 +26,10 @@ const (
 	headerDefault = `
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-	  <meta charset="UTF-8">
-	</head>
+<head>
+<meta charset="UTF-8">
+<title>{{from-h1}}</title>
+</head>
 	<body>
 `
 
@@ -36,29 +37,39 @@ const (
 	</body>
 </html>
 `
+
+	keyTitleFromTag    = ":title "
+	placeholderFromH1  = "{{from-h1}}"
+	placeholderFromTag = "{{from-tag}}"
 )
 
-func New(baseUrl, src, dst string) Ssg {
+func New(src, dst, title, baseUrl string) Ssg {
 	return Ssg{
-		baseUrl:   baseUrl,
-		src:       src,
-		dst:       dst,
+		src:     src,
+		dst:     dst,
+		title:   title,
+		baseUrl: baseUrl,
+
 		preferred: make(setStr),
 
-		headers: perDir{
-			valueDefault: bytes.NewBufferString(headerDefault),
-			values:       make(map[string]*bytes.Buffer),
+		headers: headers{
+			perDir: perDir[header]{
+				d:      header{},
+				values: make(map[string]header),
+			},
 		},
 
-		footers: perDir{
-			valueDefault: bytes.NewBufferString(footerDefault),
-			values:       make(map[string]*bytes.Buffer),
+		footers: footers{
+			perDir: perDir[*bytes.Buffer]{
+				d:      bytes.NewBufferString(footerDefault),
+				values: make(map[string]*bytes.Buffer),
+			},
 		},
 	}
 }
 
 func ToHtml(md []byte) []byte {
-	root := markdown.Parse(md, parser.NewWithExtensions(MarkdownExtensions))
+	root := markdown.Parse(md, parser.NewWithExtensions(SsgExtensions))
 	renderer := html.NewRenderer(html.RendererOptions{
 		Flags: HtmlFlags,
 	})
@@ -68,12 +79,14 @@ func ToHtml(md []byte) []byte {
 
 type (
 	Ssg struct {
-		baseUrl   string
-		headers   perDir
-		footers   perDir
+		src     string
+		dst     string
+		title   string
+		baseUrl string
+
+		headers   headers
+		footers   footers
 		preferred setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
-		src       string
-		dst       string
 		dist      []write
 	}
 
@@ -288,7 +301,19 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 			return err
 		}
 
-		err = s.headers.add(filepath.Dir(path), bytes.NewBuffer(data))
+		var from from
+		switch {
+		case bytes.Contains(data, []byte("<title>{{from-tag}}</title>")):
+			from = fromTag
+
+		case bytes.Contains(data, []byte("<title>{{from-h1}}</title>")):
+			from = fromH1
+		}
+
+		err = s.headers.add(filepath.Dir(path), header{
+			Buffer:    bytes.NewBuffer(data),
+			titleFrom: from,
+		})
 		if err != nil {
 			return err
 		}
@@ -337,9 +362,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	}
 
 	switch base {
-	case
-		"_header.html",
-		"_footer.html":
+	case "_header.html", "_footer.html":
 
 		return nil
 	}
@@ -381,13 +404,30 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 		return err
 	}
 
-	body := ToHtml(data)
-	header := s.headers.choose(path)
-	footer := s.footers.choose(path)
+	h := s.headers.choose(path)
+	f := s.footers.choose(path)
 
+	// Inject header title
+	headerText := h.String()
+	switch h.titleFrom {
+	case fromTag:
+		start := bytes.Index(data, []byte(keyTitleFromTag))
+		if start == -1 {
+			headerText = strings.Replace(headerText, placeholderFromTag, s.title, 1)
+			break
+		}
+
+		newLine := bytes.Index(data[start:], []byte("\n"))
+
+		l := len(keyTitleFromTag)
+		title := data[start+l : start+newLine]
+		headerText = strings.Replace(headerText, placeholderFromTag, string(title), 1)
+	}
+
+	body := ToHtml(data)
 	s.dist = append(s.dist, write{
 		target: target,
-		data:   []byte(header.String() + string(body) + footer.String()),
+		data:   []byte(headerText + string(body) + f.String()),
 	})
 
 	return nil
