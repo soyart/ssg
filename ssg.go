@@ -43,31 +43,6 @@ const (
 	placeholderFromTag = "<title>{{from-tag}}</title>"
 )
 
-func New(src, dst, title, baseUrl string) Ssg {
-	return Ssg{
-		src:     src,
-		dst:     dst,
-		title:   title,
-		baseUrl: baseUrl,
-
-		preferred: make(setStr),
-
-		headers: headers{
-			perDir: perDir[header]{
-				d:      header{},
-				values: make(map[string]header),
-			},
-		},
-
-		footers: footers{
-			perDir: perDir[*bytes.Buffer]{
-				d:      bytes.NewBufferString(footerDefault),
-				values: make(map[string]*bytes.Buffer),
-			},
-		},
-	}
-}
-
 func ToHtml(md []byte) []byte {
 	root := markdown.Parse(md, parser.NewWithExtensions(SsgExtensions))
 	renderer := html.NewRenderer(html.RendererOptions{
@@ -100,6 +75,31 @@ type (
 		target string
 	}
 )
+
+func New(src, dst, title, baseUrl string) Ssg {
+	return Ssg{
+		src:     src,
+		dst:     dst,
+		title:   title,
+		baseUrl: baseUrl,
+
+		preferred: make(setStr),
+
+		headers: headers{
+			perDir: perDir[header]{
+				d:      header{},
+				values: make(map[string]header),
+			},
+		},
+
+		footers: footers{
+			perDir: perDir[*bytes.Buffer]{
+				d:      bytes.NewBufferString(footerDefault),
+				values: make(map[string]*bytes.Buffer),
+			},
+		},
+	}
+}
 
 func Generate(sites ...Ssg) error {
 	stats := make(map[string]fs.FileInfo)
@@ -260,7 +260,7 @@ func collectErrors(ch <-chan error, wg *sync.WaitGroup) error {
 	return nil
 }
 
-func isIgnored(base string, d fs.DirEntry) (bool, error) {
+func shouldIgnore(base string, d fs.DirEntry) (bool, error) {
 	isDot := strings.HasPrefix(base, ".")
 	isDir := d.IsDir()
 
@@ -285,7 +285,7 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 	}
 
 	base := filepath.Base(path)
-	ignore, err := isIgnored(base, d)
+	ignore, err := shouldIgnore(base, d)
 	if err != nil {
 		return err
 	}
@@ -353,7 +353,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	}
 
 	base := filepath.Base(path)
-	ignore, err := isIgnored(base, d)
+	ignore, err := shouldIgnore(base, d)
 	if err != nil {
 		return err
 	}
