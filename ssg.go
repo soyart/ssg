@@ -38,7 +38,7 @@ const (
 </html>
 `
 
-	keyTitleFromTag    = ":title"
+	keyTitleFromTag    = ":title "
 	placeholderFromH1  = "{{from-h1}}"
 	placeholderFromTag = "{{from-tag}}"
 )
