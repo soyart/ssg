@@ -23,13 +23,93 @@ This implementation is good for using ssg remotely, because it's just 1 executab
 
 - `.files` (maybe 'won't do')
 
+## Usage
+
+```sh
+ssg <src> <dst> <title> <url>
+```
+
+ssg reads Markdown files from `src`, prepends it with `_header.html`,
+and appends it with content of `_footer.html`. The output files are mirrored
+into `dst`. Files or directories whose names start with `.` are skipped.
+
+If we have `foo.html` and `foo.md`, the HTML wins.
+
+Files with extensions other than `.md` will simply be copied
+into mirrored `dst`.
+
+ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
+
 ### Differences between ssg and ssg-go
 
-- ssg-go does not extract title from H1 tag,
-  and will do nothing on the argument given
+- Like the original, ssg-go accepts a CLI parameter `title` (3rd arg)
+  that will be used as default `<title>` tag inside `<head>` (*head title*).
 
-  > But ssg-go still takes `title` as its 3rd argument,
-  > so as to be the original ssg's drop-in replacement.
+  ssg-go also parses `_header.go` for title replacement placeholder. Currently,
+  ssg-go recognizes 2 placeholders:
+
+  - `{{from-h1}}`
+
+    This will prompt ssg-go to use the first `<h1>` tag value as head title.
+
+  - `{{from-tag}}`
+
+    This will prompt ssg-go to find the first line starting with `:title`,
+    and use it as the document head title.
+
+  For example, consider the following header template and a Markdown:
+
+  ```html
+  <!-- _header.html -->
+
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+  <meta charset="UTF-8">
+  <title>{{from-tag}}</title>
+  </head>
+  <body>
+  ```
+
+  ```markdown
+  Mar 24 2024
+
+  :title Real Header
+
+  # Some Header 2
+
+  Some para
+  ```
+
+  ```html
+  <!-- _footer.html -->
+
+  </body>
+  </html>
+  ```
+
+  This is the generated HTML equivalent:
+
+  ```html
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+  <meta charset="UTF-8">
+  <title>Real Header</title>
+  </head>
+  <body>
+  <p>Mar 24 2024</p>
+  <h1>Some Header 2</p>
+  <p>Some para</p>
+  </body>
+  </html>
+  ```
+
+  Note how `{{from-tag}}` in `_header.html` will cause ssg-go to use `Real Header`
+  as the document head title.
+
+  On the other hand, the `{{from-h1}}` will cause ssg-go to use `Some Header 2`
+  as the document head title.
 
 - ssg-go cascades `_header.html` and `_footer.html` down the directory tree
 

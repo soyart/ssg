@@ -57,10 +57,10 @@ func ToHtml(md []byte) []byte {
 
 type (
 	Ssg struct {
-		src     string
-		dst     string
-		title   string
-		baseUrl string
+		src   string
+		dst   string
+		title string
+		url   string
 
 		headers   headers
 		footers   footers
@@ -79,12 +79,12 @@ type (
 	}
 )
 
-func New(src, dst, title, baseUrl string) Ssg {
+func New(src, dst, title, url string) Ssg {
 	return Ssg{
-		src:     src,
-		dst:     dst,
-		title:   title,
-		baseUrl: baseUrl,
+		src:   src,
+		dst:   dst,
+		title: title,
+		url:   url,
 
 		preferred: make(setStr),
 
@@ -126,7 +126,7 @@ func Generate(sites ...Ssg) error {
 		s := &sites[i]
 		stat, ok := stats[s.src]
 		if !ok {
-			return fmt.Errorf("ssg-go bug: unexpected missing stat for directory %s (baseUrl='%s')", s.src, s.baseUrl)
+			return fmt.Errorf("ssg-go bug: unexpected missing stat for directory %s (url='%s')", s.src, s.url)
 		}
 
 		err := s.WriteOut()
@@ -134,12 +134,12 @@ func Generate(sites ...Ssg) error {
 			return fmt.Errorf("error writing out to %s: %w", s.dst, err)
 		}
 
-		if s.baseUrl == "" {
+		if s.url == "" {
 			s.pront(len(s.dist))
 			return nil
 		}
 
-		sitemap, err := Sitemap(s.dst, s.baseUrl, stat.ModTime(), s.dist)
+		sitemap, err := Sitemap(s.dst, s.url, stat.ModTime(), s.dist)
 		if err != nil {
 			return err
 		}
@@ -171,12 +171,12 @@ func (s *Ssg) Generate() error {
 		return err
 	}
 
-	if s.baseUrl == "" {
+	if s.url == "" {
 		s.pront(len(dist))
 		return nil
 	}
 
-	sitemap, err := Sitemap(s.dst, s.baseUrl, stat.ModTime(), s.dist)
+	sitemap, err := Sitemap(s.dst, s.url, stat.ModTime(), s.dist)
 	if err != nil {
 		return err
 	}
@@ -583,7 +583,7 @@ func writeOut(writes []write, errs chan<- error) {
 
 func Sitemap(
 	dst string,
-	baseUrl string,
+	url string,
 	date time.Time,
 	writes []write,
 ) (
@@ -610,7 +610,7 @@ xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 		}
 
 		sm.WriteString("<url><loc><")
-		sm.WriteString(baseUrl + "/")
+		sm.WriteString(url + "/")
 
 		/* There're 2 possibilities for this
 		1. First is when the HTML is some/path/index.html

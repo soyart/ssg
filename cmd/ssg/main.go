@@ -14,10 +14,10 @@ func main() {
 		syscall.Exit(1)
 	}
 
-	src, dst, title, baseUrl := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
-	s := ssg.New(src, dst, title, baseUrl)
+	src, dst, title, url := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
+	s := ssg.New(src, dst, title, url)
 	if err := s.Generate(); err != nil {
-		fmt.Println("error with", "src", src, "dst", dst, "title", title, "baseUrl", baseUrl)
+		fmt.Println("error with", "src", src, "dst", dst, "title", title, "url", url)
 		panic(err)
 	}
 }
