@@ -39,8 +39,10 @@ const (
 `
 
 	keyTitleFromTag    = ":title "
-	placeholderFromH1  = "<title>{{from-h1}}</title>"
-	placeholderFromTag = "<title>{{from-tag}}</title>"
+	targetFromH1       = "{{from-h1}}"
+	targetFromTag      = "{{from-tag}}"
+	placeholderFromH1  = "<title>" + targetFromH1 + "</title>"
+	placeholderFromTag = "<title>" + targetFromTag + "</title>"
 )
 
 func ToHtml(md []byte) []byte {
@@ -411,26 +413,16 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	headerText := h.String()
 	switch h.titleFrom {
 	case fromTag:
-		lineStart := bytes.Index(data, []byte(keyTitleFromTag))
-		if lineStart == -1 {
-			headerText = strings.Replace(headerText, placeholderFromTag, s.title, 1)
-			break
-		}
-
-		lineEnd := bytes.Index(data[lineStart:], []byte("\n"))
-
-		l := len(keyTitleFromTag)
-		title := data[lineStart+l : lineStart+lineEnd]
-		line := data[lineStart : lineStart+lineEnd+1]
-
-		headerText = strings.Replace(headerText, placeholderFromTag, string(title), 1)
-		data = bytes.Replace(data, line, nil, 1)
+		headerText, data = replaceTitleFromTag(s.title, headerText, data)
 	}
 
-	body := ToHtml(data)
+	out := bytes.NewBufferString(headerText)
+	out.Write(ToHtml(data))
+	out.Write(f.Bytes())
+
 	s.dist = append(s.dist, write{
 		target: target,
-		data:   []byte(headerText + string(body) + f.String()),
+		data:   out.Bytes(),
 	})
 
 	return nil
@@ -442,6 +434,32 @@ func (s *Ssg) pront(l int) {
 
 func (w writeError) Error() string {
 	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
+}
+
+func replaceTitleFromTag(
+	d string, // Default title
+	header string,
+	markdown []byte,
+) (
+	string,
+	[]byte,
+) {
+	start := bytes.Index(markdown, []byte(keyTitleFromTag))
+	if start == -1 {
+		header = strings.Replace(header, targetFromTag, d, 1)
+		return header, markdown
+	}
+
+	end := bytes.Index(markdown[start:], []byte("\n"))
+	l := len(keyTitleFromTag)
+
+	title := markdown[start+l : start+end]
+	line := markdown[start : start+end+1]
+
+	header = strings.Replace(header, targetFromTag, string(title), 1)
+	markdown = bytes.Replace(markdown, line, nil, 1)
+
+	return header, markdown
 }
 
 // mirrorPath mirrors the target HTML file path under src to under dist
