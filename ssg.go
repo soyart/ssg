@@ -38,7 +38,8 @@ const (
 </html>
 `
 
-	keyTitleFromTag    = ":title "
+	keyTitleH1         = "# "      // The first h1 tag is used as document header title
+	keyTitleFromTag    = ":title " // The first line starting with :title will be parsed as document header title
 	targetFromH1       = "{{from-h1}}"
 	targetFromTag      = "{{from-tag}}"
 	placeholderFromH1  = "<title>" + targetFromH1 + "</title>"
@@ -364,7 +365,9 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	}
 
 	switch base {
-	case "_header.html", "_footer.html":
+	case
+		"_header.html",
+		"_footer.html":
 
 		return nil
 	}
@@ -406,19 +409,23 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 		return err
 	}
 
-	h := s.headers.choose(path)
-	f := s.footers.choose(path)
+	header := s.headers.choose(path)
+	footer := s.footers.choose(path)
 
-	// Inject header title
-	headerText := h.String()
-	switch h.titleFrom {
+	// Copy header as string,
+	// so the underlying bytes.Buffer is unchanged and ready for the next file
+	headerText := header.String()
+	switch header.titleFrom {
+	case fromH1:
+		headerText = titleFromH1(s.title, headerText, data)
+
 	case fromTag:
-		headerText, data = replaceTitleFromTag(s.title, headerText, data)
+		headerText, data = titleFromTag(s.title, headerText, data)
 	}
 
 	out := bytes.NewBufferString(headerText)
 	out.Write(ToHtml(data))
-	out.Write(f.Bytes())
+	out.Write(footer.Bytes())
 
 	s.dist = append(s.dist, write{
 		target: target,
@@ -436,8 +443,27 @@ func (w writeError) Error() string {
 	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
 }
 
-func replaceTitleFromTag(
-	d string, // Default title
+// titleFromH1 finds the first h1 in markdown and uses the h1 title
+// to write to <title> tag in header.
+func titleFromH1(d string, header string, markdown []byte) string {
+	start := bytes.Index(markdown, []byte{'#', ' '})
+	if start == -1 {
+		header = strings.Replace(header, "{{from-h1}}", d, 1)
+		return header
+	}
+
+	end := bytes.Index(markdown[start:], []byte{'\n'})
+
+	title := markdown[start+len(keyTitleH1) : start+end]
+	header = strings.Replace(header, "{{from-h1}}", string(title), 1)
+
+	return header
+}
+
+// titleFromTag finds title in markdown and then write it to <title> tag in header.
+// It also deletes the tag line from markdown.
+func titleFromTag(
+	d string,
 	header string,
 	markdown []byte,
 ) (
@@ -450,14 +476,13 @@ func replaceTitleFromTag(
 		return header, markdown
 	}
 
-	end := bytes.Index(markdown[start:], []byte("\n"))
-	l := len(keyTitleFromTag)
+	end := bytes.Index(markdown[start:], []byte{'\n'})
 
-	title := markdown[start+l : start+end]
+	title := markdown[start+len(keyTitleFromTag) : start+end]
 	line := markdown[start : start+end+1]
 
 	header = strings.Replace(header, targetFromTag, string(title), 1)
-	markdown = bytes.Replace(markdown, line, nil, 1)
+	markdown = bytes.Replace(markdown, line, nil, 1) // TODO: fix diff in test
 
 	return header, markdown
 }
