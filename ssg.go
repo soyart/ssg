@@ -443,6 +443,8 @@ func (w writeError) Error() string {
 	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
 }
 
+// TODO: Refactor
+//
 // titleFromH1 finds the first h1 in markdown and uses the h1 title
 // to write to <title> tag in header.
 func titleFromH1(d string, header string, markdown []byte) string {
@@ -452,7 +454,15 @@ func titleFromH1(d string, header string, markdown []byte) string {
 		return header
 	}
 
-	end := bytes.Index(markdown[start:], []byte{'\n'})
+	end := bytes.Index(markdown[start:], []byte{'\n', '\n'})
+	if end == -1 {
+		end = bytes.Index(markdown[start:], []byte{'\n'})
+	}
+
+	if end == -1 {
+		header = strings.Replace(header, "{{from-h1}}", d, 1)
+		return header
+	}
 
 	title := markdown[start+len(keyTitleH1) : start+end]
 	header = strings.Replace(header, "{{from-h1}}", string(title), 1)
@@ -476,7 +486,7 @@ func titleFromTag(
 		return header, markdown
 	}
 
-	end := bytes.Index(markdown[start:], []byte{'\n'})
+	end := bytes.Index(markdown[start:], []byte{'\n', '\n'})
 
 	title := markdown[start+len(keyTitleFromTag) : start+end]
 	line := markdown[start : start+end+1]

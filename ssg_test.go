@@ -23,7 +23,7 @@ func TestTitleFromH1(t *testing.T) {
 Mar 24 1998
 
 # Some h1
-					
+
 Some para`,
 			expected: `
 <!DOCTYPE html>
@@ -71,7 +71,7 @@ Mar 24 1998
 :title My own title
 
 # Some h1
-					
+
 Some para`,
 			expectedHead: `
 <!DOCTYPE html>
@@ -82,6 +82,7 @@ Some para`,
 </head>`,
 			expectedMarkdown: `
 Mar 24 1998
+
 
 # Some h1
 
