@@ -57,7 +57,7 @@ ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
     This will prompt ssg-go to find the first line starting with `:title`,
     and use it as the document head title.
 
-  For example, consider the following header template and a Markdown:
+  For example, consider the following header/footer templates and a Markdown page:
 
   ```html
   <!-- _header.html -->
@@ -71,7 +71,16 @@ ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
   <body>
   ```
 
+  ```html
+  <!-- _footer.html -->
+
+  </body>
+  </html>
+   ```
+
   ```markdown
+  <!-- some/path/foo.md -->
+  
   Mar 24 2024
 
   :title Real Header
@@ -81,14 +90,7 @@ ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
   Some para
   ```
 
-  ```html
-  <!-- _footer.html -->
-
-  </body>
-  </html>
-  ```
-
-  This is the generated HTML equivalent:
+  This is the generated HTML equivalent, in `${dst}/some/path/foo.html`:
 
   ```html
   <!DOCTYPE html>
