@@ -55,6 +55,65 @@ func ToHtml(md []byte) []byte {
 	return markdown.Render(root, renderer)
 }
 
+func Sitemap(
+	dst string,
+	url string,
+	date time.Time,
+	writes []write,
+) (
+	string,
+	error,
+) {
+	dateStr := date.Format(time.DateOnly)
+
+	sm := new(strings.Builder)
+	sm.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
+xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+`)
+
+	for i := range writes {
+		w := &writes[i]
+
+		target, err := filepath.Rel(dst, w.target)
+		if err != nil {
+			return sm.String(), err
+		}
+
+		sm.WriteString("<url><loc><")
+		sm.WriteString(url)
+		sm.WriteRune('/')
+
+		/* There're 2 possibilities for this
+		1. First is when the HTML is some/path/index.html
+		<url><loc>https://example.com/some/path/</loc><lastmod>2024-10-04</lastmod><priority>1.0</priority></url>
+
+		2. Then there is when the HTML is some/path/page.html
+		<url><loc>https://example.com/some/path/page.html</loc><lastmod>2024-10-04</lastmod><priority>1.0</priority></url>
+		*/
+
+		switch filepath.Base(target) {
+		case "index.html":
+			sm.WriteString(filepath.Dir(target))
+			sm.WriteRune('/')
+
+		default:
+			sm.WriteString(target)
+		}
+
+		sm.WriteString("><lastmod>")
+		sm.WriteString(dateStr)
+		sm.WriteString("</lastmod><priority>1.0</priority></url>\n")
+	}
+
+	sm.WriteString("</urlset>")
+
+	return sm.String(), nil
+}
+
 type (
 	Ssg struct {
 		src   string
@@ -579,61 +638,4 @@ func writeOut(writes []write, errs chan<- error) {
 	wg.Wait()
 
 	close(errs)
-}
-
-func Sitemap(
-	dst string,
-	url string,
-	date time.Time,
-	writes []write,
-) (
-	string,
-	error,
-) {
-	dateStr := date.Format(time.DateOnly)
-
-	sm := new(strings.Builder)
-	sm.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
-<urlset
-xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
-http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
-xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-`)
-
-	for i := range writes {
-		w := &writes[i]
-
-		target, err := filepath.Rel(dst, w.target)
-		if err != nil {
-			return sm.String(), err
-		}
-
-		sm.WriteString("<url><loc><")
-		sm.WriteString(url + "/")
-
-		/* There're 2 possibilities for this
-		1. First is when the HTML is some/path/index.html
-		<url><loc>https://example.com/some/path</loc><lastmod>2024-10-04</lastmod><priority>1.0</priority></url>
-
-		2. Then there is when the HTML is some/path/page.html
-		<url><loc>https://example.com/some/path/page.html</loc><lastmod>2024-10-04</lastmod><priority>1.0</priority></url>
-		*/
-
-		switch filepath.Base(target) {
-		case "index.html":
-			sm.WriteString(filepath.Dir(target) + "/")
-
-		default:
-			sm.WriteString(target)
-		}
-
-		sm.WriteString("><lastmod>")
-		sm.WriteString(dateStr)
-		sm.WriteString("</lastmod><priority>1.0</priority></url>\n")
-	}
-
-	sm.WriteString("</urlset>")
-
-	return sm.String(), nil
 }
