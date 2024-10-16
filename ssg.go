@@ -59,7 +59,7 @@ func Sitemap(
 	dst string,
 	url string,
 	date time.Time,
-	writes []write,
+	outputs []OutputFile,
 ) (
 	string,
 	error,
@@ -75,10 +75,10 @@ http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
 xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 `)
 
-	for i := range writes {
-		w := &writes[i]
+	for i := range outputs {
+		o := &outputs[i]
 
-		target, err := filepath.Rel(dst, w.target)
+		target, err := filepath.Rel(dst, o.target)
 		if err != nil {
 			return sm.String(), err
 		}
@@ -124,10 +124,10 @@ type (
 		headers   headers
 		footers   footers
 		preferred setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
-		dist      []write
+		dist      []OutputFile
 	}
 
-	write struct {
+	OutputFile struct {
 		target string
 		data   []byte
 	}
@@ -254,7 +254,7 @@ func (s *Ssg) Generate() error {
 // returning the results as []write.
 //
 // Build also caches the result in s for [WriteOut] later.
-func (s *Ssg) Build() ([]write, error) {
+func (s *Ssg) Build() ([]OutputFile, error) {
 	err := filepath.WalkDir(s.src, s.scan)
 	if err != nil {
 		return nil, err
@@ -268,7 +268,9 @@ func (s *Ssg) Build() ([]write, error) {
 	return s.dist, nil
 }
 
-// WriteOut concurrently writes out s.writes to their target locations.
+// WriteOut blocks and concurrently writes out s.writes
+// to their target locations.
+//
 // If targets is empty, WriteOut writes to s.dst
 func (s *Ssg) WriteOut(targets ...string) error {
 	if len(s.dist) == 0 {
@@ -290,33 +292,10 @@ func (s *Ssg) WriteOut(targets ...string) error {
 			return err
 		}
 
-		wg, errs := new(sync.WaitGroup), make(chan error)
-		wg.Add(1)
-		go func() {
-			err = collectErrors(errs, wg)
-		}()
-
-		writeOut(s.dist, errs)
-
-		wg.Wait()
-
+		err = writeOut(s.dist)
 		if err != nil {
 			return err
 		}
-	}
-
-	return nil
-}
-
-func collectErrors(ch <-chan error, wg *sync.WaitGroup) error {
-	defer wg.Done()
-	var errs []error
-	for err := range ch {
-		errs = append(errs, err)
-	}
-
-	if len(errs) != 0 {
-		return errors.Join(errs...)
 	}
 
 	return nil
@@ -455,7 +434,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 			return err
 		}
 
-		s.dist = append(s.dist, write{
+		s.dist = append(s.dist, OutputFile{
 			target: target,
 			data:   data,
 		})
@@ -486,7 +465,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	out.Write(ToHtml(data))
 	out.Write(footer.Bytes())
 
-	s.dist = append(s.dist, write{
+	s.dist = append(s.dist, OutputFile{
 		target: target,
 		data:   out.Bytes(),
 	})
@@ -495,7 +474,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 }
 
 func (s *Ssg) pront(l int) {
-	fmt.Printf("[ssg-go] wrote %d file(s) to %s\n", l, s.dst)
+	fmt.Fprintf(os.Stdout, "[ssg-go] wrote %d file(s) to %s\n", l, s.dst)
 }
 
 func (w writeError) Error() string {
@@ -584,24 +563,43 @@ func mirrorPath(
 	return filepath.Join(dst, path), nil
 }
 
-func writeOut(writes []write, errs chan<- error) {
-	wg := sync.WaitGroup{}
-	guard := make(chan struct{}, 20)
+// writeOut blocks and writes concurrently to output locations.
+func writeOut(writes []OutputFile) error {
+	wgErrs := new(sync.WaitGroup)
+	errs := make(chan writeError)
 
+	var err error
+	wgErrs.Add(1)
+	go func(wg *sync.WaitGroup) {
+		defer wg.Done()
+
+		var wErrs []error
+
+		for err := range errs {
+			wErrs = append(wErrs, err)
+		}
+
+		err = errors.Join(wErrs...)
+	}(wgErrs)
+
+	wgWrites := new(sync.WaitGroup)
+	guard := make(chan struct{}, 20)
 	for i := range writes {
-		wg.Add(1)
+		wgWrites.Add(1)
 		guard <- struct{}{}
 
-		go func(w *write, wg *sync.WaitGroup) {
+		go func(w *OutputFile, wg *sync.WaitGroup) {
+			var err error
+
 			defer func() {
 				wg.Done()
-				fmt.Println(w.target)
+				fmt.Fprintf(os.Stdout, "%s\n", w.target)
 			}()
 
 			<-guard
 
 			d := filepath.Dir(w.target)
-			err := os.MkdirAll(d, os.ModePerm)
+			err = os.MkdirAll(d, os.ModePerm)
 			if err != nil {
 				errs <- writeError{
 					err:    err,
@@ -611,7 +609,7 @@ func writeOut(writes []write, errs chan<- error) {
 				return
 			}
 
-			f, err := os.OpenFile(w.target, os.O_CREATE|os.O_WRONLY, os.ModePerm)
+			f, err := os.OpenFile(w.target, os.O_RDWR|os.O_CREATE, os.ModePerm)
 			if err != nil {
 				errs <- writeError{
 					err:    err,
@@ -632,10 +630,12 @@ func writeOut(writes []write, errs chan<- error) {
 
 				return
 			}
-		}(&writes[i], &wg)
+		}(&writes[i], wgWrites)
 	}
 
-	wg.Wait()
-
+	wgWrites.Wait()
 	close(errs)
+
+	wgErrs.Wait()
+	return err
 }
