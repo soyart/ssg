@@ -68,7 +68,7 @@ func (p *perDir[T]) add(path string, v T) error {
 	return nil
 }
 
-func (p perDir[T]) choose(path string) T {
+func (p *perDir[T]) choose(path string) T {
 	return choose(path, p.defaultValue, p.values)
 }
 
