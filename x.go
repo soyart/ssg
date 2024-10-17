@@ -32,8 +32,8 @@ type (
 )
 
 const (
-	fromNone = 0
-	fromH1   = 1 << iota
+	fromNone from = 0
+	fromH1        = 1 << iota
 	fromTag
 )
 
