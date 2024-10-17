@@ -416,12 +416,12 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 		return nil
 	}
 
-	ext := filepath.Ext(base)
-	if ext == ".html" {
-		if s.preferred.insert(path) {
-			err = fmt.Errorf("duplicate html file %s", path)
-			return err
-		}
+	if filepath.Ext(base) != ".html" {
+		return nil
+	}
+
+	if s.preferred.insert(path) {
+		return fmt.Errorf("duplicate html file %s", path)
 	}
 
 	return nil
