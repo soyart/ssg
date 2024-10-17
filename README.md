@@ -19,8 +19,6 @@ This implementation is good for using ssg remotely, because it's just 1 executab
 
 ### TODO for ssg-go
 
-- `.ssgignore`
-
 - `.files` (maybe 'won't do')
 
 ## Usage
@@ -33,7 +31,9 @@ ssg reads Markdown files from `src`, prepends it with `_header.html`,
 and appends it with content of `_footer.html`. The output files are mirrored
 into `dst`. Files or directories whose names start with `.` are skipped.
 
-If we have `foo.html` and `foo.md`, the HTML wins.
+Files listed in `${src}/.ssgignore` are also ignored.
+
+If we have `foo.html` and `foo.md`, the HTML file wins.
 
 Files with extensions other than `.md` will simply be copied
 into mirrored `dst`.
