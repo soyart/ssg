@@ -58,6 +58,16 @@ func newPerDir[T any](defaultValue T) perDir[T] {
 	}
 }
 
+func (p *perDir[T]) add(path string, v T) error {
+	_, ok := p.values[path]
+	if ok {
+		return fmt.Errorf("found duplicate path '%s'", path)
+	}
+
+	p.values[path] = v
+	return nil
+}
+
 func (p perDir[T]) choose(path string) T {
 	return choose(path, p.defaultValue, p.values)
 }
@@ -84,16 +94,6 @@ func choose[T any](path string, valueDefault T, m map[string]T) T {
 
 	return chosen
 
-}
-
-func (p *perDir[T]) add(path string, v T) error {
-	_, ok := p.values[path]
-	if ok {
-		return fmt.Errorf("found duplicate path '%s'", path)
-	}
-
-	p.values[path] = v
-	return nil
 }
 
 func (s setStr) insert(v string) bool {
