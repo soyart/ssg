@@ -11,8 +11,8 @@ type (
 
 	// perDir tracks files under directory in a trie-like fashion.
 	perDir[T any] struct {
-		d      T
-		values map[string]T
+		defaultValue T
+		values       map[string]T
 	}
 
 	headers struct {
@@ -37,8 +37,29 @@ const (
 	fromTag
 )
 
+func newHeaders(defaultHeader string) headers {
+	return headers{
+		perDir: newPerDir(header{
+			Buffer: bytes.NewBufferString(defaultHeader),
+		}),
+	}
+}
+
+func newFooters(defaultFooter string) footers {
+	return footers{
+		perDir: newPerDir(bytes.NewBufferString(defaultFooter)),
+	}
+}
+
+func newPerDir[T any](defaultValue T) perDir[T] {
+	return perDir[T]{
+		defaultValue: defaultValue,
+		values:       make(map[string]T),
+	}
+}
+
 func (p perDir[T]) choose(path string) T {
-	return choose(path, p.d, p.values)
+	return choose(path, p.defaultValue, p.values)
 }
 
 // choose chooses which map value should be used for the given path.

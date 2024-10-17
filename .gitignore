@@ -3,5 +3,5 @@
 
 /cmd/debug
 
-/johndoe.com/**
+/johndoe.com/*
 !/johndoe.com/src

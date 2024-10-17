@@ -1,6 +1,7 @@
 package ssg
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -23,18 +24,16 @@ const (
 
 	HtmlFlags = html.CommonFlags
 
-	headerDefault = `
-<!DOCTYPE html>
+	headerDefault = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>{{from-h1}}</title>
 </head>
-	<body>
+<body>
 `
 
-	footerDefault = `
-	</body>
+	footerDefault = `</body>
 </html>
 `
 
@@ -45,6 +44,49 @@ const (
 	placeholderFromH1  = "<title>" + targetFromH1 + "</title>"
 	placeholderFromTag = "<title>" + targetFromTag + "</title>"
 )
+
+type (
+	Ssg struct {
+		src        string
+		dst        string
+		title      string
+		url        string
+		ssgignores setStr
+
+		headers   headers
+		footers   footers
+		preferred setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
+		dist      []OutputFile
+	}
+
+	OutputFile struct {
+		target string
+		data   []byte
+	}
+
+	writeError struct {
+		err    error
+		target string
+	}
+)
+
+func New(src, dst, title, url string) Ssg {
+	ignores, err := prepare(src, dst)
+	if err != nil {
+		panic(err)
+	}
+
+	return Ssg{
+		src:        src,
+		dst:        dst,
+		title:      title,
+		url:        url,
+		ssgignores: ignores,
+		preferred:  make(setStr),
+		headers:    newHeaders(headerDefault),
+		footers:    newFooters(footerDefault),
+	}
+}
 
 func ToHtml(md []byte) []byte {
 	root := markdown.Parse(md, parser.NewWithExtensions(SsgExtensions))
@@ -114,53 +156,43 @@ xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 	return sm.String(), nil
 }
 
-type (
-	Ssg struct {
-		src   string
-		dst   string
-		title string
-		url   string
-
-		headers   headers
-		footers   footers
-		preferred setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
-		dist      []OutputFile
+func prepare(src, dst string) (setStr, error) {
+	if src == "" {
+		return nil, fmt.Errorf("empty src")
 	}
 
-	OutputFile struct {
-		target string
-		data   []byte
+	if dst == "" {
+		return nil, fmt.Errorf("empty dst")
 	}
 
-	writeError struct {
-		err    error
-		target string
+	if src == dst {
+		return nil, fmt.Errorf("src is identical to dst: '%s'", src)
 	}
-)
 
-func New(src, dst, title, url string) Ssg {
-	return Ssg{
-		src:   src,
-		dst:   dst,
-		title: title,
-		url:   url,
+	b, err := os.ReadFile(filepath.Join(src, ".ssgignore"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 
-		preferred: make(setStr),
-
-		headers: headers{
-			perDir: perDir[header]{
-				d:      header{},
-				values: make(map[string]header),
-			},
-		},
-
-		footers: footers{
-			perDir: perDir[*bytes.Buffer]{
-				d:      bytes.NewBufferString(footerDefault),
-				values: make(map[string]*bytes.Buffer),
-			},
-		},
+		return nil, err
 	}
+
+	ignores := make(setStr)
+
+	s := bufio.NewScanner(bytes.NewBuffer(b))
+	for s.Scan() {
+		ignore := s.Text()
+		ignore = filepath.Join(src, ignore)
+
+		if ignores.contains(ignore) {
+			return nil, fmt.Errorf("duplicate ssgignore entry: '%s'", ignore)
+		}
+
+		ignores.insert(ignore)
+	}
+
+	return ignores, nil
 }
 
 func Generate(sites ...Ssg) error {
@@ -301,18 +333,29 @@ func (s *Ssg) WriteOut(targets ...string) error {
 	return nil
 }
 
-func shouldIgnore(base string, d fs.DirEntry) (bool, error) {
+func shouldIgnore(ignores setStr, path, base string, d fs.DirEntry) (bool, error) {
 	isDot := strings.HasPrefix(base, ".")
 	isDir := d.IsDir()
 
 	switch {
-	// Skip hidden folders
+	case base == ".ssgignore":
+		return true, nil
+
 	case isDot && isDir:
 		return true, fs.SkipDir
 
 	// Ignore hidden files and dir
 	case isDot, isDir:
 		return true, nil
+
+	case ignores.contains(path):
+		return true, nil
+	}
+
+	for ignored := range ignores {
+		if strings.HasPrefix(path, ignored) {
+			return true, nil
+		}
 	}
 
 	return false, nil
@@ -326,7 +369,7 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 	}
 
 	base := filepath.Base(path)
-	ignore, err := shouldIgnore(base, d)
+	ignore, err := shouldIgnore(s.ssgignores, path, base, d)
 	if err != nil {
 		return err
 	}
@@ -394,7 +437,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	}
 
 	base := filepath.Base(path)
-	ignore, err := shouldIgnore(base, d)
+	ignore, err := shouldIgnore(s.ssgignores, path, base, d)
 	if err != nil {
 		return err
 	}

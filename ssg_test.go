@@ -1,6 +1,77 @@
 package ssg
 
-import "testing"
+import (
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestPrepare(t *testing.T) {
+	root := "./johndoe.com"
+	src := filepath.Join(root, "/src")
+
+	ignores, err := prepare(src, "some/dir")
+	if err != nil {
+		t.Errorf("unexpected error from prepare: %v", err)
+	}
+
+	if l := len(ignores); l != 1 {
+		t.Fatalf("unexpected length of ssgignore (expecting 1): %d", l)
+	}
+
+	if !ignores.contains(filepath.Join(src, "/foo/ignored.html")) {
+		t.Fatalf("expecting foo/ignored.html in ssgignore")
+	}
+}
+
+func TestScan(t *testing.T) {
+	root := "./johndoe.com"
+	src := filepath.Join(root, "/src")
+	dst := filepath.Join(root, "/dst")
+	title := "JohnDoe.com"
+	url := "https://johndoe.com"
+
+	ssg := New(src, dst, title, url)
+	err := filepath.WalkDir(root, ssg.scan)
+	if err != nil {
+		t.Errorf("unexpected error from scan: %v", err)
+	}
+
+	if !ssg.preferred.contains(filepath.Join(src, "/blog/index.html")) {
+		t.Fatalf("missing preferred html file /blog/index.html")
+	}
+
+	for i := range ssg.dist {
+		o := &ssg.dist[i]
+
+		if strings.HasSuffix(o.target, "_header.html") {
+			t.Fatalf("unexpected _header.html output in '%s'", o.target)
+		}
+		if strings.HasSuffix(o.target, "_footer.html") {
+			t.Fatalf("unexpected _footer.html output in '%s'", o.target)
+		}
+	}
+
+	headers := map[string]from{
+		"/_header.html":           fromH1,
+		"/blog/_header.html":      fromTag,
+		"/blog/2023/_header.html": fromNone,
+	}
+
+	for h, from := range headers {
+		filename := filepath.Join(src, h)
+		dirname := filepath.Dir(filename)
+
+		header, ok := ssg.headers.perDir.values[dirname]
+		if !ok {
+			t.Fatalf("missing header '%s' for dir '%s'", filename, dirname)
+		}
+
+		if header.titleFrom != from {
+			t.Fatalf("unexpected from '%d', expecting %d", header.titleFrom, from)
+		}
+	}
+}
 
 func TestTitleFromH1(t *testing.T) {
 	type testCase struct {
