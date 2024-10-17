@@ -104,6 +104,30 @@ Some para`,
 <title>Some h1</title>
 </head>`,
 		},
+		{
+			head: `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{{from-h1}}</title>
+</head>`,
+			markdown: `
+Mar 24 1998
+
+## Some h2
+
+# Some h1
+
+Some para`,
+			expected: `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Some h1</title>
+</head>`,
+		},
 	}
 
 	for i := range tests {
@@ -139,7 +163,7 @@ func TestTitleFromTag(t *testing.T) {
 			markdown: `
 Mar 24 1998
 
-:title My own title
+:title My title
 
 # Some h1
 
@@ -149,11 +173,42 @@ Some para`,
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>My own title</title>
+<title>My title</title>
 </head>`,
 			expectedMarkdown: `
 Mar 24 1998
 
+# Some h1
+
+Some para`,
+		},
+		{
+			head: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{{from-tag}}</title>
+</head>`,
+			markdown: `
+Mar 24 1998
+
+	:title Not actually title
+
+:title This is the title
+
+# Some h1
+
+Some para`,
+			expectedHead: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>This is the title</title>
+</head>`,
+			expectedMarkdown: `
+Mar 24 1998
+
+	:title Not actually title
 
 # Some h1
 
@@ -169,9 +224,11 @@ Some para`,
 			t.Logf("Actual:\nSTART===\n%s\nEND===", head)
 			t.Logf("len(expected) = %d, len(actual) = %d", len(tc.expectedHead), len(head))
 
-			t.Fatalf("unexpected value for case %d", i+1)
+			t.Fatalf("unexpected substituted header value for case %d", i+1)
 		}
+
 		if md := string(markdown); md != tc.expectedMarkdown {
+			t.Logf("Original:\nSTART===\n%s\nEND===", tc.markdown)
 			t.Logf("Expected:\nSTART===\n%s\nEND===", tc.expectedMarkdown)
 			t.Logf("Actual:\nSTART===\n%s\nEND===", md)
 			t.Logf("len(expected) = %d, len(actual) = %d", len(tc.expectedMarkdown), len(markdown))
@@ -182,7 +239,7 @@ Some para`,
 				t.Logf("%d: diff=%v actual='%c', expected='%c'", i, e != a, e, a)
 			}
 
-			t.Fatalf("unexpected value for case %d", i+1)
+			t.Fatalf("unexpected modified markdown value for case %d", i+1)
 		}
 	}
 }

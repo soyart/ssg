@@ -16,13 +16,7 @@ type Site struct {
 	Links    map[string]string `json:"links"`
 	Replaces map[string]string `json:"replaces"`
 
-	Name string `json:"name"`
-	Url  string `json:"url"`
-	Src  string `json:"src"`
-	Dst  string `json:"dst"`
-
-	// Files to ignore with glob
-	Ignores []string `json:"ssgignore"`
+	Ssg
 }
 
 func ParseManifest(filename string) (Manifest, error) {

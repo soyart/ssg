@@ -47,16 +47,16 @@ const (
 
 type (
 	Ssg struct {
-		src        string
-		dst        string
-		title      string
-		url        string
-		ssgignores setStr
+		Src   string `json:"src"`
+		Dst   string `json:"dst"`
+		Title string `json:"title"`
+		Url   string `json:"url"`
 
-		headers   headers
-		footers   footers
-		preferred setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
-		dist      []OutputFile
+		ssgignores setStr
+		headers    headers
+		footers    footers
+		preferred  setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
+		dist       []OutputFile
 	}
 
 	OutputFile struct {
@@ -77,10 +77,10 @@ func New(src, dst, title, url string) Ssg {
 	}
 
 	return Ssg{
-		src:        src,
-		dst:        dst,
-		title:      title,
-		url:        url,
+		Src:        src,
+		Dst:        dst,
+		Title:      title,
+		Url:        url,
 		ssgignores: ignores,
 		preferred:  make(setStr),
 		headers:    newHeaders(headerDefault),
@@ -125,9 +125,8 @@ xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 			return sm.String(), err
 		}
 
-		sm.WriteString("<url><loc><")
-		sm.WriteString(url)
-		sm.WriteRune('/')
+		opening := fmt.Sprintf("<url><loc>%s/", url)
+		sm.WriteString(opening)
 
 		/* There're 2 possibilities for this
 		1. First is when the HTML is some/path/index.html
@@ -146,9 +145,8 @@ xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 			sm.WriteString(target)
 		}
 
-		sm.WriteString("><lastmod>")
-		sm.WriteString(dateStr)
-		sm.WriteString("</lastmod><priority>1.0</priority></url>\n")
+		closing := fmt.Sprintf("><lastmod>%s</lastmod><priority>1.0</priority></url>\n", dateStr)
+		sm.WriteString(closing)
 	}
 
 	sm.WriteString("</urlset>")
@@ -200,42 +198,42 @@ func Generate(sites ...Ssg) error {
 
 	for i := range sites {
 		s := &sites[i]
-		stat, err := os.Stat(s.src)
+		stat, err := os.Stat(s.Src)
 		if err != nil {
 			return err
 		}
 
-		stats[s.src] = stat
+		stats[s.Src] = stat
 
 		_, err = s.Build()
 		if err != nil {
-			return fmt.Errorf("error walking in %s: %w", s.src, err)
+			return fmt.Errorf("error walking in %s: %w", s.Src, err)
 		}
 	}
 
 	for i := range sites {
 		s := &sites[i]
-		stat, ok := stats[s.src]
+		stat, ok := stats[s.Src]
 		if !ok {
-			return fmt.Errorf("ssg-go bug: unexpected missing stat for directory %s (url='%s')", s.src, s.url)
+			return fmt.Errorf("ssg-go bug: unexpected missing stat for directory %s (url='%s')", s.Src, s.Url)
 		}
 
 		err := s.WriteOut()
 		if err != nil {
-			return fmt.Errorf("error writing out to %s: %w", s.dst, err)
+			return fmt.Errorf("error writing out to %s: %w", s.Dst, err)
 		}
 
-		if s.url == "" {
+		if s.Url == "" {
 			s.pront(len(s.dist))
 			return nil
 		}
 
-		sitemap, err := Sitemap(s.dst, s.url, stat.ModTime(), s.dist)
+		sitemap, err := Sitemap(s.Dst, s.Url, stat.ModTime(), s.dist)
 		if err != nil {
 			return err
 		}
 
-		err = os.WriteFile(s.dst+"/sitemap.xml", []byte(sitemap), os.ModePerm)
+		err = os.WriteFile(s.Dst+"/sitemap.xml", []byte(sitemap), os.ModePerm)
 		if err != nil {
 			return err
 		}
@@ -247,7 +245,7 @@ func Generate(sites ...Ssg) error {
 }
 
 func (s *Ssg) Generate() error {
-	stat, err := os.Stat(s.src)
+	stat, err := os.Stat(s.Src)
 	if err != nil {
 		return err
 	}
@@ -262,17 +260,17 @@ func (s *Ssg) Generate() error {
 		return err
 	}
 
-	if s.url == "" {
+	if s.Url == "" {
 		s.pront(len(dist))
 		return nil
 	}
 
-	sitemap, err := Sitemap(s.dst, s.url, stat.ModTime(), s.dist)
+	sitemap, err := Sitemap(s.Dst, s.Url, stat.ModTime(), s.dist)
 	if err != nil {
 		return err
 	}
 
-	err = os.WriteFile(s.dst+"/sitemap.xml", []byte(sitemap), os.ModePerm)
+	err = os.WriteFile(s.Dst+"/sitemap.xml", []byte(sitemap), os.ModePerm)
 	if err != nil {
 		return err
 	}
@@ -287,12 +285,12 @@ func (s *Ssg) Generate() error {
 //
 // Build also caches the result in s for [WriteOut] later.
 func (s *Ssg) Build() ([]OutputFile, error) {
-	err := filepath.WalkDir(s.src, s.scan)
+	err := filepath.WalkDir(s.Src, s.scan)
 	if err != nil {
 		return nil, err
 	}
 
-	err = filepath.WalkDir(s.src, s.build)
+	err = filepath.WalkDir(s.Src, s.build)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +308,7 @@ func (s *Ssg) WriteOut(targets ...string) error {
 	}
 
 	if len(targets) == 0 {
-		return s.WriteOut(s.dst)
+		return s.WriteOut(s.Dst)
 	}
 
 	for i := range targets {
@@ -318,7 +316,7 @@ func (s *Ssg) WriteOut(targets ...string) error {
 
 		_, err := os.Stat(target)
 		if os.IsNotExist(err) {
-			err = os.MkdirAll(s.dst, os.ModePerm)
+			err = os.MkdirAll(s.Dst, os.ModePerm)
 		}
 		if err != nil {
 			return err
@@ -472,7 +470,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 
 	// Copy files as they are
 	default:
-		target, err := mirrorPath(s.src, s.dst, path, ext)
+		target, err := mirrorPath(s.Src, s.Dst, path, ext)
 		if err != nil {
 			return err
 		}
@@ -485,7 +483,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 		return nil
 	}
 
-	target, err := mirrorPath(s.src, s.dst, path, ".html")
+	target, err := mirrorPath(s.Src, s.Dst, path, ".html")
 	if err != nil {
 		return err
 	}
@@ -498,10 +496,10 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	headerText := header.String()
 	switch header.titleFrom {
 	case fromH1:
-		headerText = titleFromH1(s.title, headerText, data)
+		headerText = titleFromH1(s.Title, headerText, data)
 
 	case fromTag:
-		headerText, data = titleFromTag(s.title, headerText, data)
+		headerText, data = titleFromTag(s.Title, headerText, data)
 	}
 
 	out := bytes.NewBufferString(headerText)
@@ -517,7 +515,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 }
 
 func (s *Ssg) pront(l int) {
-	fmt.Fprintf(os.Stdout, "[ssg-go] wrote %d file(s) to %s\n", l, s.dst)
+	fmt.Fprintf(os.Stdout, "[ssg-go] wrote %d file(s) to %s\n", l, s.Dst)
 }
 
 func (w writeError) Error() string {
@@ -533,6 +531,13 @@ func titleFromH1(d string, header string, markdown []byte) string {
 	if start == -1 {
 		header = strings.Replace(header, "{{from-h1}}", d, 1)
 		return header
+	}
+
+	if start > 0 {
+		// Probably h2, h3, ...
+		if markdown[start-1] != '\n' {
+			return titleFromH1(d, header, markdown[start+1:])
+		}
 	}
 
 	end := bytes.Index(markdown[start:], []byte{'\n', '\n'})
@@ -561,21 +566,41 @@ func titleFromTag(
 	string,
 	[]byte,
 ) {
-	start := bytes.Index(markdown, []byte(keyTitleFromTag))
-	if start == -1 {
-		header = strings.Replace(header, targetFromTag, d, 1)
+	s := bufio.NewScanner(bytes.NewBuffer(markdown))
+	k := []byte(keyTitleFromTag)
+	for s.Scan() {
+		line := trimRightWhitespace(s.Bytes())
+		if !bytes.HasPrefix(line, k) {
+			continue
+		}
+
+		parts := bytes.Split(line, k)
+		if len(parts) != 2 {
+			continue
+		}
+
+		title := parts[1]
+
+		header = strings.Replace(header, targetFromTag, string(title), 1)
+		markdown = bytes.Replace(markdown, append(line, []byte{'\n', '\n'}...), nil, 1) // TODO: fix diff in test
+
 		return header, markdown
 	}
 
-	end := bytes.Index(markdown[start:], []byte{'\n', '\n'})
-
-	title := markdown[start+len(keyTitleFromTag) : start+end]
-	line := markdown[start : start+end+1]
-
-	header = strings.Replace(header, targetFromTag, string(title), 1)
-	markdown = bytes.Replace(markdown, line, nil, 1) // TODO: fix diff in test
-
+	// Remove target and leave empty string
+	header = strings.Replace(header, targetFromTag, d, 1)
 	return header, markdown
+}
+
+func trimRightWhitespace(b []byte) []byte {
+	return bytes.TrimRightFunc(b, func(r rune) bool {
+		switch r {
+		case ' ', '\t':
+			return true
+		}
+
+		return false
+	})
 }
 
 // mirrorPath mirrors the target HTML file path under src to under dist
