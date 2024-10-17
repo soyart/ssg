@@ -493,16 +493,16 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 
 	// Copy header as string,
 	// so the underlying bytes.Buffer is unchanged and ready for the next file
-	headerText := header.String()
+	headerText := []byte(header.String())
 	switch header.titleFrom {
 	case fromH1:
-		headerText = titleFromH1(s.Title, headerText, data)
+		headerText = titleFromH1([]byte(s.Title), headerText, data)
 
 	case fromTag:
-		headerText, data = titleFromTag(s.Title, headerText, data)
+		headerText, data = titleFromTag([]byte(s.Title), headerText, data)
 	}
 
-	out := bytes.NewBufferString(headerText)
+	out := bytes.NewBuffer(headerText)
 	out.Write(ToHtml(data))
 	out.Write(footer.Bytes())
 
@@ -522,14 +522,15 @@ func (w writeError) Error() string {
 	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
 }
 
-// TODO: Refactor
+// TODO: Refactor to use scanner
 //
 // titleFromH1 finds the first h1 in markdown and uses the h1 title
 // to write to <title> tag in header.
-func titleFromH1(d string, header string, markdown []byte) string {
+func titleFromH1(d []byte, header []byte, markdown []byte) []byte {
 	start := bytes.Index(markdown, []byte{'#', ' '})
+	t := []byte(targetFromH1)
 	if start == -1 {
-		header = strings.Replace(header, "{{from-h1}}", d, 1)
+		header = bytes.Replace(header, t, d, 1)
 		return header
 	}
 
@@ -546,12 +547,12 @@ func titleFromH1(d string, header string, markdown []byte) string {
 	}
 
 	if end == -1 {
-		header = strings.Replace(header, "{{from-h1}}", d, 1)
+		header = bytes.Replace(header, t, d, 1)
 		return header
 	}
 
 	title := markdown[start+len(keyTitleH1) : start+end]
-	header = strings.Replace(header, "{{from-h1}}", string(title), 1)
+	header = bytes.Replace(header, t, title, 1)
 
 	return header
 }
@@ -559,15 +560,16 @@ func titleFromH1(d string, header string, markdown []byte) string {
 // titleFromTag finds title in markdown and then write it to <title> tag in header.
 // It also deletes the tag line from markdown.
 func titleFromTag(
-	d string,
-	header string,
+	d []byte,
+	header []byte,
 	markdown []byte,
 ) (
-	string,
+	[]byte,
 	[]byte,
 ) {
 	s := bufio.NewScanner(bytes.NewBuffer(markdown))
 	k := []byte(keyTitleFromTag)
+	t := []byte(targetFromTag)
 	for s.Scan() {
 		line := trimRightWhitespace(s.Bytes())
 		if !bytes.HasPrefix(line, k) {
@@ -581,14 +583,15 @@ func titleFromTag(
 
 		title := parts[1]
 
-		header = strings.Replace(header, targetFromTag, string(title), 1)
+		header = bytes.Replace(header, t, title, 1)
 		markdown = bytes.Replace(markdown, append(line, []byte{'\n', '\n'}...), nil, 1) // TODO: fix diff in test
 
 		return header, markdown
 	}
 
-	// Remove target and leave empty string
-	header = strings.Replace(header, targetFromTag, d, 1)
+	// Remove target and use default header string
+	header = bytes.Replace(header, t, []byte(d), 1)
+
 	return header, markdown
 }
 
