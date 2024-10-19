@@ -1,10 +1,11 @@
 {
 	"johndoe.com": {
 		"name": "JohnDoe.com",
+		"url": "https://johndoe.com",
 		"src": "johndoe.com/src",
 		"dst": "johndoe.com/dst",
 		"links": {
-			"johndoe.com/assets/logo.png": "johndoe.com/src/logo.png"
+			"./assets/style.css": "johndoe.com/src/style.css"
 		}
 	}
 }
