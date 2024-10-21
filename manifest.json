@@ -5,7 +5,11 @@
 		"src": "johndoe.com/src",
 		"dst": "johndoe.com/dst",
 		"links": {
-			"./assets/style.css": "johndoe.com/src/style.css"
+			"./assets/style.css": {
+				"target": "johndoe.com/src/style.css",
+				"force": true
+			},
+			"./assets/some.txt": "johndoe.com/src/some-txt.txt"
 		}
 	}
 }

@@ -2,22 +2,38 @@ package ssg
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 )
 
 type Manifest map[string]Site
 
 type Site struct {
-	Copies   map[string]string `json:"copies"`
-	Links    map[string]string `json:"links"`
-	Replaces map[string]string `json:"replaces"`
+	LinksJson  map[string]interface{} `json:"links"`
+	Links      map[string]TargetForce `json:"-"`
+	CopiesJson map[string]interface{} `json:"copies"`
+	Copies     map[string]TargetForce `json:"-"`
 
 	logger *slog.Logger `json:"-"`
 
-	Ssg `json:""`
+	Ssg
+}
+
+type TargetForce struct {
+	Target string `json:"target"`
+	Force  bool   `json:"force"`
+}
+
+func (t TargetForce) String() string {
+	if t.Force {
+		return fmt.Sprintf("%s (force)", t.Target)
+	}
+
+	return t.Target
 }
 
 type stage int
@@ -58,7 +74,7 @@ func Main() {
 
 	manifest, err := ParseManifest(manifestPath)
 	if err != nil {
-		logger.Error("failed to parse manifest")
+		logger.Error("failed to parse manifest", "error", err)
 		panic(err)
 	}
 
@@ -91,7 +107,71 @@ func ParseManifest(filename string) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("failed to parse JSON from file '%s': %w", filename, err)
 	}
 
+	for k, site := range m {
+		links := make(map[string]TargetForce)
+		err := decodeTargetsForce(site.LinksJson, links)
+		if err != nil {
+			return Manifest{}, err
+		}
+
+		copies := make(map[string]TargetForce)
+		err = decodeTargetsForce(site.CopiesJson, copies)
+		if err != nil {
+			return Manifest{}, err
+		}
+
+		site.Links, site.Copies = links, copies
+
+		m[k] = site
+	}
+
 	return m, nil
+}
+
+func decodeTargetsForce(m map[string]interface{}, target map[string]TargetForce) error {
+	for k, entry := range m {
+		link, err := decodeTargetForce(entry)
+		if err != nil {
+			return err
+		}
+
+		target[k] = link
+	}
+
+	return nil
+}
+
+func decodeTargetForce(entry interface{}) (TargetForce, error) {
+	switch data := entry.(type) {
+	case string:
+		return TargetForce{Target: data}, nil
+
+	case map[string]interface{}:
+		targetRaw, ok := data["target"]
+		if !ok {
+			return TargetForce{}, errors.New("missing key 'target'")
+		}
+		target, ok := targetRaw.(string)
+		if !ok {
+			return TargetForce{}, fmt.Errorf("invalid data type for field 'target', expecting string, got '%s'", reflect.TypeOf(targetRaw).String())
+		}
+
+		l := TargetForce{Target: target}
+
+		forceRaw, ok := data["force"]
+		if !ok {
+			return l, nil
+		}
+		force, ok := forceRaw.(bool)
+		if !ok {
+			return TargetForce{}, fmt.Errorf("invalid data type for field 'target', expecting string, got '%s'", reflect.TypeOf(forceRaw).String())
+		}
+
+		l.Force = force
+		return l, nil
+	}
+
+	return TargetForce{}, fmt.Errorf("bad entry data shape: '%v'", entry)
 }
 
 func (s *Site) Link() error {
@@ -104,11 +184,11 @@ func (s *Site) Link() error {
 		if len(lsrc) == 0 {
 			return fmt.Errorf("found empty link src")
 		}
-		if len(ldst) == 0 {
+		if len(ldst.Target) == 0 {
 			return fmt.Errorf("found empty link dst")
 		}
 
-		if dups.insert(ldst) {
+		if dups.insert(ldst.Target) {
 			return fmt.Errorf("duplicate link destination '%s'", ldst)
 		}
 
@@ -128,7 +208,7 @@ func (s *Site) Link() error {
 			return fmt.Errorf("[link] expecting normal file, found link src directory '%s'", lsrc)
 		}
 
-		sdst, err := os.Stat(ldst)
+		sdst, err := os.Stat(ldst.Target)
 		if err == nil {
 			if sdst.IsDir() {
 				logger.Debug("dst is dir")
@@ -142,7 +222,7 @@ func (s *Site) Link() error {
 				return fmt.Errorf("failed to stat link dst '%s': %w", ldst, err)
 			}
 
-			err = os.MkdirAll(filepath.Dir(ldst), os.ModePerm)
+			err = os.MkdirAll(filepath.Dir(ldst.Target), os.ModePerm)
 			if err != nil {
 				return fmt.Errorf("fail to prepare dst '%s': %w", ldst, err)
 			}
@@ -151,10 +231,21 @@ func (s *Site) Link() error {
 
 	for lsrc, ldst := range s.Links {
 		logger := logger.With("src", lsrc, "dst", lsrc, "phase", "symlink")
-		err := os.Symlink(lsrc, ldst)
+
+		err := os.Symlink(lsrc, ldst.Target)
 		if err != nil {
-			logger.Error("fail to do symlink")
-			return fmt.Errorf("[link] fail to link '%s'->'%s': %w", lsrc, ldst, err)
+			if ldst.Force && os.IsExist(err) {
+				err = os.Remove(ldst.Target)
+				if err == nil {
+					err = os.Symlink(lsrc, ldst.Target)
+				}
+				if err == nil {
+					continue
+				}
+			}
+
+			logger.Error("fail to make symlink")
+			return fmt.Errorf("[link] fail to link: %w", err)
 		}
 
 		logger.Info("ok")
