@@ -70,9 +70,9 @@ func Main() {
 		With("manifest", manifestPath)
 
 	slog.SetDefault(logger)
-	slog.Info("starting")
 
-	manifest, err := ParseManifest(manifestPath)
+	slog.Info("parsing manifest")
+	manifest, err := NewManifest(manifestPath)
 	if err != nil {
 		logger.Error("failed to parse manifest", "error", err)
 		panic(err)
@@ -91,20 +91,22 @@ func Main() {
 
 var loglevel = new(slog.LevelVar)
 
-func ParseManifest(filename string) (Manifest, error) {
-	slog.Info("parsing manifest")
-
+func NewManifest(filename string) (Manifest, error) {
 	b, err := os.ReadFile(filename)
 	if err != nil {
 		slog.Error("failed to read manifest file")
 		return Manifest{}, fmt.Errorf("failed to read manifest from file '%s': %w", filename, err)
 	}
 
+	return ParseManifest(b)
+}
+
+func ParseManifest(manifestJson []byte) (Manifest, error) {
 	var m Manifest
-	err = json.Unmarshal(b, &m)
+	err := json.Unmarshal(manifestJson, &m)
 	if err != nil {
 		slog.Error("failed to unmarshal json")
-		return Manifest{}, fmt.Errorf("failed to parse JSON from file '%s': %w", filename, err)
+		return Manifest{}, err
 	}
 
 	for k, site := range m {
@@ -121,11 +123,11 @@ func ParseManifest(filename string) (Manifest, error) {
 		}
 
 		site.Links, site.Copies = links, copies
-
 		m[k] = site
 	}
 
 	return m, nil
+
 }
 
 func decodeTargetsForce(m map[string]interface{}, target map[string]TargetForce) error {
