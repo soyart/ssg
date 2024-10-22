@@ -26,12 +26,9 @@ jobs:
       - name: Build ssg-go
         run: 'nix build .#ssg-go'
 
-      - name: Upload binaries
-        uses: actions/upload-artifact@v4
+      - name: Release binaries
+        uses: skx/github-action-publish-binaries@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: ssg-go
-          path: |
-            result/bin/ssg
-            result/bin/ssg-manifest
+          args: 'result/bin/*'
