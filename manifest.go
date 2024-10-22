@@ -408,8 +408,6 @@ func cp(src string, dst WriteTarget) error {
 		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
-
-		return nil
 	}
 
 	b, err := os.ReadFile(src)
