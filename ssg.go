@@ -356,6 +356,19 @@ func shouldIgnore(ignores setStr, path, base string, d fs.DirEntry) (bool, error
 		}
 	}
 
+	// Ignore symlink
+	stat, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return true, nil
+		}
+
+		return false, err
+	}
+	if fileIs(stat, os.ModeSymlink) {
+		return true, nil
+	}
+
 	return false, nil
 }
 

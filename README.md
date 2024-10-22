@@ -138,3 +138,17 @@ ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
   - `/blog/index.md` will use `/blog/_header.html`
 
   - `/blog/2023/baz/index.md` will use `/blog/2023/_header.html`
+
+## Manifests
+
+My original use case for ssg was with a shell wrapper that facilitates
+building multiple sites.
+
+The wrapper tool used to have a declarative manifest that specifies
+source, destination, files to link or copy, and cleaning up garbage.
+
+This is also implemented by [`Manifest`](./manifest.go), and accessible
+via [`soyweb`](./cmd/soyweb/) binary.
+
+See `manifest.json` as example, or clone this repo and run `./cmd/soyweb/`
+to see its effects.
