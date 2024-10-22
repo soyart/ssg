@@ -144,7 +144,7 @@ The wrapper tool used to have a declarative manifest that specifies
 source, destination, files to link or copy, and cleaning up garbage.
 
 This is also implemented by [`Manifest`](./manifest.go), and accessible
-via [`soyweb`](./cmd/soyweb/) binary.
+via [`ssg-manifest`](./cmd/ssg-manifest/) binary.
 
 See `manifest.json` as example, or clone this repo and run `./cmd/soyweb/`
 to see its effects.

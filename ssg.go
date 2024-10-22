@@ -324,6 +324,11 @@ func (s *Ssg) WriteOut() error {
 			return err
 		}
 
+		if filepath.Ext(path) == ".html" {
+			path = strings.TrimSuffix(path, ".html")
+			path += ".md"
+		}
+
 		files.WriteString("./")
 		files.WriteString(path)
 		files.WriteRune('\n')

@@ -27,7 +27,7 @@ type WriteTarget struct {
 
 type stage int
 
-type soywebError struct {
+type manifestError struct {
 	err   error
 	key   string
 	msg   string
@@ -41,7 +41,7 @@ const (
 	stageBuild
 )
 
-func (s soywebError) Error() string {
+func (s manifestError) Error() string {
 	return fmt.Errorf("[%s %s] %s: %w", s.stage, s.key, s.msg, s.err).Error()
 }
 
@@ -157,7 +157,7 @@ func BuildManifest(manifestPath string) error {
 				continue
 			}
 			if err != nil {
-				return soywebError{
+				return manifestError{
 					err:   err,
 					key:   key,
 					msg:   "failed to cleanup",
@@ -174,7 +174,7 @@ func BuildManifest(manifestPath string) error {
 
 		err := site.Copy()
 		if err != nil {
-			return soywebError{
+			return manifestError{
 				err:   err,
 				key:   key,
 				msg:   "failed to copy",
@@ -190,7 +190,7 @@ func BuildManifest(manifestPath string) error {
 
 		err := site.Ssg.Generate()
 		if err != nil {
-			return soywebError{
+			return manifestError{
 				err:   err,
 				key:   key,
 				msg:   "failed to build",
