@@ -3,6 +3,8 @@ package ssg
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
+	"os"
 	"strings"
 )
 
@@ -106,4 +108,8 @@ func (s setStr) insert(v string) bool {
 func (s setStr) contains(v string) bool {
 	_, ok := s[v]
 	return ok
+}
+
+func fileIs(f os.FileInfo, mode fs.FileMode) bool {
+	return f.Mode()&mode != 0
 }

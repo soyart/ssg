@@ -9,9 +9,7 @@
 			"./assets/style.css": {
 				"target": "johndoe.com/src/style.css",
 				"force": true
-			}
-		},
-		"links": {
+			},
 			"./assets/some.txt": "johndoe.com/src/some-txt.txt"
 		}
 	}

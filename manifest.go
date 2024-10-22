@@ -15,7 +15,6 @@ type Manifest map[string]Site
 
 type Site struct {
 	logger *slog.Logger           `json:"-"`
-	Links  map[string]WriteTarget `json:"-"`
 	Copies map[string]WriteTarget `json:"-"`
 	Ssg
 	CleanUp bool `json:"cleanup"`
@@ -30,25 +29,30 @@ type stage int
 
 type soywebError struct {
 	err   error
+	key   string
 	msg   string
 	stage stage
 }
 
+const (
+	stageCollect stage = iota << 1
+	stageCleanUp
+	stageCopy
+	stageBuild
+)
+
+func (s soywebError) Error() string {
+	return fmt.Errorf("[%s %s] %s: %w", s.stage, s.key, s.msg, s.err).Error()
+}
+
 func (s *Site) UnmarshalJSON(b []byte) error {
 	var tmp struct {
-		Links  map[string]interface{} `json:"links"`
 		Copies map[string]interface{} `json:"copies"`
 		Ssg
 		CleanUp bool `json:"cleanup"`
 	}
 
 	err := json.Unmarshal(b, &tmp)
-	if err != nil {
-		return err
-	}
-
-	links := make(map[string]WriteTarget)
-	err = decodeTargetsForce(tmp.Links, links)
 	if err != nil {
 		return err
 	}
@@ -60,7 +64,6 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 	}
 
 	*s = Site{
-		Links:   links,
 		CleanUp: tmp.CleanUp,
 		Copies:  copies,
 		Ssg:     New(tmp.Src, tmp.Dst, tmp.Title, tmp.Url),
@@ -79,17 +82,21 @@ func (t WriteTarget) String() string {
 
 func (s stage) String() string {
 	switch s {
-	case stageLink:
-		return "stage-link"
+	case stageCollect:
+		return "collect"
+
+	case stageCleanUp:
+		return "cleanup"
+
+	case stageCopy:
+		return "copy"
+
+	case stageBuild:
+		return "build"
 	}
 
-	return "bad stage"
+	return "BAD_STAGE"
 }
-
-const (
-	stageCopy stage = iota << 1
-	stageLink
-)
 
 func Build(manifestPath string) error {
 	loglevel.Set(slog.LevelDebug)
@@ -97,7 +104,7 @@ func Build(manifestPath string) error {
 	logger := slog.New(slog.NewJSONHandler(
 		os.Stdout,
 		&slog.HandlerOptions{
-			AddSource: false,
+			AddSource: true,
 			Level:     loglevel,
 		})).
 		With("manifest", manifestPath)
@@ -132,19 +139,6 @@ func Build(manifestPath string) error {
 			logger.Error("duplicate write target", "src", src, "target", dst.Target)
 			return fmt.Errorf("duplicate write target '%s'", dst.Target)
 		}
-
-		for src, dst := range site.Links {
-			if !dups.insert(dst.Target) {
-				if targets[key].insert(dst.Target) {
-					panic("unexpected duplicate")
-				}
-
-				continue
-			}
-
-			logger.Error("duplicate write target", "src", src, "target", dst.Target)
-			return fmt.Errorf("duplicate write target '%s'", dst.Target)
-		}
 	}
 
 	// Cleanup
@@ -163,7 +157,12 @@ func Build(manifestPath string) error {
 				continue
 			}
 			if err != nil {
-				return fmt.Errorf("[cleanup] failed to remove '%s': %w", target, err)
+				return soywebError{
+					err:   err,
+					key:   key,
+					msg:   "failed to cleanup",
+					stage: stageCleanUp,
+				}
 			}
 		}
 	}
@@ -175,18 +174,12 @@ func Build(manifestPath string) error {
 
 		err := site.Copy()
 		if err != nil {
-			return err
-		}
-	}
-
-	// Link
-	for key, site := range m {
-		logger := logger.WithGroup("link").With("key", key, "url", site.Url)
-		site.logger = logger
-
-		err := site.Link()
-		if err != nil {
-			return err
+			return soywebError{
+				err:   err,
+				key:   key,
+				msg:   "failed to copy",
+				stage: stageCopy,
+			}
 		}
 	}
 
@@ -197,7 +190,12 @@ func Build(manifestPath string) error {
 
 		err := site.Ssg.Generate()
 		if err != nil {
-			return err
+			return soywebError{
+				err:   err,
+				key:   key,
+				msg:   "failed to build",
+				stage: stageCleanUp,
+			}
 		}
 	}
 
@@ -275,40 +273,40 @@ func (s *Site) Copy() error {
 		logger := logger.With("phase", "scan", "cpSrc", cpSrc, "cpDst", cpDst)
 
 		if len(cpSrc) == 0 {
-			return fmt.Errorf("[copy] found empty copy src")
+			return fmt.Errorf("found empty copy src")
 		}
 		if len(cpDst.Target) == 0 {
-			return fmt.Errorf("[copy] found empty copy dst")
+			return fmt.Errorf("found empty copy dst")
 		}
 
 		ssrc, err := os.Stat(cpSrc)
 		if err != nil {
 			logger.Error("failed to stat copy src")
-			return fmt.Errorf("[copy] failed to stat copy src: '%s'", cpSrc)
+			return fmt.Errorf("failed to stat copy src: '%s'", cpSrc)
 		}
 
 		if fileIs(ssrc, os.ModeSymlink) {
 			logger.Error("copy src is symlink")
-			return fmt.Errorf("[copy] copy src is symlink: '%s'", cpSrc)
+			return fmt.Errorf("copy src is symlink: '%s'", cpSrc)
 		}
 
 		sdst, err := os.Stat(cpDst.Target)
 		if err == nil {
 			if sdst.IsDir() {
 				logger.Debug("dst is dir")
-				return fmt.Errorf("[copy] copy dst is dir")
+				return fmt.Errorf("copy dst is dir: '%s'", cpDst)
 			}
 		}
 
 		if err != nil {
 			if !os.IsNotExist(err) {
 				logger.Error("failed to stat copy dst", "error", err)
-				return fmt.Errorf("[copy] failed to stat copy dst '%s': %w", cpDst.Target, err)
+				return fmt.Errorf("failed to stat copy dst '%s': %w", cpDst, err)
 			}
 
 			err = os.MkdirAll(filepath.Dir(cpDst.Target), os.ModePerm)
 			if err != nil {
-				return fmt.Errorf("[copy] fail to prepare copy dst '%s': %w", cpDst.Target, err)
+				return fmt.Errorf("fail to prepare copy dst '%s': %w", cpDst, err)
 			}
 		}
 
@@ -324,7 +322,7 @@ func (s *Site) Copy() error {
 			err := cpRecurse(cpSrc, cpDst)
 			if err != nil {
 				logger.Error("failed to copy directory")
-				return fmt.Errorf("[copy] failed to copy directory '%s'", cpSrc)
+				return fmt.Errorf("failed to copy directory '%s'", cpSrc)
 			}
 
 			continue
@@ -333,90 +331,11 @@ func (s *Site) Copy() error {
 		err := cp(cpSrc, cpDst)
 		if err != nil {
 			logger.Error("failed to copy file")
-			return fmt.Errorf("[copy] failed to copy file '%s'", cpSrc)
+			return fmt.Errorf("failed to copy file '%s'", cpSrc)
 		}
 	}
 
 	return nil
-}
-
-func (s *Site) Link() error {
-	logger := s.logger
-
-	for lnSrc, lnDst := range s.Links {
-		logger.With("lnSrc", lnSrc, "lnDst", lnDst, "phase", "scan")
-
-		if len(lnSrc) == 0 {
-			return fmt.Errorf("[link] found empty link src")
-		}
-		if len(lnDst.Target) == 0 {
-			return fmt.Errorf("[link] found empty link dst")
-		}
-
-		ssrc, err := os.Stat(lnSrc)
-		if err != nil {
-			logger.Error("failed to stat link src", "error", err)
-			return fmt.Errorf("[link] failed to stat src '%s': %w", lnSrc, err)
-		}
-
-		if fileIs(ssrc, os.ModeSymlink) {
-			logger.Error("file is not synlink", "mode", ssrc.Mode())
-			return fmt.Errorf("[link] expecting normal file, found link src symlink '%s'", lnSrc)
-		}
-
-		if ssrc.IsDir() {
-			logger.Error("file is dir")
-			return fmt.Errorf("[link] expecting normal file, found link src directory '%s'", lnSrc)
-		}
-
-		sdst, err := os.Stat(lnDst.Target)
-		if err == nil {
-			if sdst.IsDir() {
-				logger.Debug("dst is dir")
-				return fmt.Errorf("[link] dst is dir")
-			}
-		}
-
-		if err != nil {
-			if !os.IsNotExist(err) {
-				logger.Error("failed to stat link dst", "error", err)
-				return fmt.Errorf("failed to stat link dst '%s': %w", lnDst, err)
-			}
-
-			err = os.MkdirAll(filepath.Dir(lnDst.Target), os.ModePerm)
-			if err != nil {
-				return fmt.Errorf("fail to prepare link dst '%s': %w", lnDst, err)
-			}
-		}
-	}
-
-	for lsrc, ldst := range s.Links {
-		logger := logger.With("src", lsrc, "dst", lsrc, "phase", "symlink")
-
-		err := os.Symlink(lsrc, ldst.Target)
-		if err != nil {
-			if ldst.Force && os.IsExist(err) {
-				err = os.Remove(ldst.Target)
-				if err == nil {
-					err = os.Symlink(lsrc, ldst.Target)
-				}
-				if err == nil {
-					continue
-				}
-			}
-
-			logger.Error("fail to make symlink")
-			return fmt.Errorf("[link] fail to link: %w", err)
-		}
-
-		logger.Info("ok")
-	}
-
-	return nil
-}
-
-func fileIs(f os.FileInfo, mode fs.FileMode) bool {
-	return f.Mode()&mode != 0
 }
 
 func cp(src string, dst WriteTarget) error {
