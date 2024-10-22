@@ -4,11 +4,13 @@
 		"url": "https://johndoe.com",
 		"src": "johndoe.com/src",
 		"dst": "johndoe.com/dst",
-		"links": {
+		"copies": {
 			"./assets/style.css": {
 				"target": "johndoe.com/src/style.css",
 				"force": true
-			},
+			}
+		},
+		"links": {
 			"./assets/some.txt": "johndoe.com/src/some-txt.txt"
 		}
 	}

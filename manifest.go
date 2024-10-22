@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -13,13 +14,14 @@ import (
 type Manifest map[string]Site
 
 type Site struct {
-	Links  map[string]TargetForce `json:"-"`
-	Copies map[string]TargetForce `json:"-"`
 	logger *slog.Logger           `json:"-"`
+	Links  map[string]WriteTarget `json:"-"`
+	Copies map[string]WriteTarget `json:"-"`
 	Ssg
+	CleanUp bool `json:"cleanup"`
 }
 
-type TargetForce struct {
+type WriteTarget struct {
 	Target string `json:"target"`
 	Force  bool   `json:"force"`
 }
@@ -37,34 +39,37 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 		Links  map[string]interface{} `json:"links"`
 		Copies map[string]interface{} `json:"copies"`
 		Ssg
+		CleanUp bool `json:"cleanup"`
 	}
+
 	err := json.Unmarshal(b, &tmp)
 	if err != nil {
 		return err
 	}
 
-	links := make(map[string]TargetForce)
+	links := make(map[string]WriteTarget)
 	err = decodeTargetsForce(tmp.Links, links)
 	if err != nil {
 		return err
 	}
 
-	copies := make(map[string]TargetForce)
+	copies := make(map[string]WriteTarget)
 	err = decodeTargetsForce(tmp.Copies, copies)
 	if err != nil {
 		return err
 	}
 
 	*s = Site{
-		Links:  links,
-		Copies: copies,
-		Ssg:    tmp.Ssg,
+		Links:   links,
+		CleanUp: tmp.CleanUp,
+		Copies:  copies,
+		Ssg:     tmp.Ssg,
 	}
 
 	return nil
 }
 
-func (t TargetForce) String() string {
+func (t WriteTarget) String() string {
 	if t.Force {
 		return fmt.Sprintf("%s (force)", t.Target)
 	}
@@ -86,8 +91,7 @@ const (
 	stageLink
 )
 
-func Main() {
-	manifestPath := "./manifest.json"
+func Build(manifestPath string) error {
 	loglevel.Set(slog.LevelDebug)
 
 	logger := slog.New(slog.NewJSONHandler(
@@ -101,21 +105,86 @@ func Main() {
 	slog.SetDefault(logger)
 	slog.Info("parsing manifest")
 
-	manifest, err := NewManifest(manifestPath)
+	m, err := NewManifest(manifestPath)
 	if err != nil {
 		logger.Error("failed to parse manifest", "error", err)
-		panic(err)
+		return err
 	}
 
-	for key, site := range manifest {
-		loggerSite := logger.With("key", key, "url", site.Url)
-		site.logger = loggerSite
+	// Collect and detect duplicate write dups
+	dups := make(setStr)
+	targets := make(map[string]setStr)
+	for key, site := range m {
+		if targets[key] == nil {
+			targets[key] = make(setStr)
+		}
+
+		logger := logger.WithGroup("collect").With("key", key, "url", site.Url)
+		for src, dst := range site.Copies {
+			if !dups.insert(dst.Target) {
+				if targets[key].insert(dst.Target) {
+					panic("unexpected duplicate")
+				}
+
+				continue
+			}
+
+			logger.Error("duplicate write target", "src", src, "target", dst.Target)
+		}
+
+		for src, dst := range site.Links {
+			if targets[key].insert(dst.Target) {
+				panic("unexpected duplicate")
+			}
+
+			logger.Error("duplicate write target", "src", src, "target", dst.Target)
+		}
+	}
+
+	// Cleanup
+	for key, site := range m {
+		if !site.CleanUp {
+			continue
+		}
+
+		logger := logger.WithGroup("cleanup").With("key", key, "url", site.Url)
+		siteTargets := targets[key]
+		for target := range siteTargets {
+			logger.Info("cleaning up", "target", target)
+
+			err := os.Remove(target)
+			if os.IsNotExist(err) {
+				continue
+			}
+			if err != nil {
+				return fmt.Errorf("[cleanup] failed to remove '%s': %w", target, err)
+			}
+		}
+	}
+
+	// Copy
+	for key, site := range m {
+		logger := logger.With("key", key, "url", site.Url)
+		site.logger = logger
+
+		err := site.Copy()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// Link
+	for key, site := range m {
+		logger := logger.With("key", key, "url", site.Url)
+		site.logger = logger
 
 		err := site.Link()
 		if err != nil {
-			loggerSite.Error("failed to link", "error", err)
+			return err
 		}
 	}
+
+	return nil
 }
 
 var loglevel = new(slog.LevelVar)
@@ -135,7 +204,7 @@ func NewManifest(filename string) (Manifest, error) {
 
 	return m, nil
 }
-func decodeTargetsForce(m map[string]interface{}, target map[string]TargetForce) error {
+func decodeTargetsForce(m map[string]interface{}, target map[string]WriteTarget) error {
 	for k, entry := range m {
 		link, err := decodeTargetForce(entry)
 		if err != nil {
@@ -148,22 +217,22 @@ func decodeTargetsForce(m map[string]interface{}, target map[string]TargetForce)
 	return nil
 }
 
-func decodeTargetForce(entry interface{}) (TargetForce, error) {
+func decodeTargetForce(entry interface{}) (WriteTarget, error) {
 	switch data := entry.(type) {
 	case string:
-		return TargetForce{Target: data}, nil
+		return WriteTarget{Target: data}, nil
 
 	case map[string]interface{}:
 		targetRaw, ok := data["target"]
 		if !ok {
-			return TargetForce{}, errors.New("missing key 'target'")
+			return WriteTarget{}, errors.New("missing key 'target'")
 		}
 		target, ok := targetRaw.(string)
 		if !ok {
-			return TargetForce{}, fmt.Errorf("invalid data type for field 'target', expecting string, got '%s'", reflect.TypeOf(targetRaw).String())
+			return WriteTarget{}, fmt.Errorf("invalid data type for field 'target', expecting string, got '%s'", reflect.TypeOf(targetRaw).String())
 		}
 
-		l := TargetForce{Target: target}
+		l := WriteTarget{Target: target}
 
 		forceRaw, ok := data["force"]
 		if !ok {
@@ -171,51 +240,119 @@ func decodeTargetForce(entry interface{}) (TargetForce, error) {
 		}
 		force, ok := forceRaw.(bool)
 		if !ok {
-			return TargetForce{}, fmt.Errorf("invalid data type for field 'target', expecting string, got '%s'", reflect.TypeOf(forceRaw).String())
+			return WriteTarget{}, fmt.Errorf("invalid data type for field 'target', expecting string, got '%s'", reflect.TypeOf(forceRaw).String())
 		}
 
 		l.Force = force
 		return l, nil
 	}
 
-	return TargetForce{}, fmt.Errorf("bad entry data shape: '%v'", entry)
+	return WriteTarget{}, fmt.Errorf("bad entry data shape: '%v'", entry)
+}
+
+func (s *Site) Copy() error {
+	logger := s.logger.WithGroup("copy")
+
+	dirs := make(setStr)
+	for cpSrc, cpDst := range s.Copies {
+		logger := logger.With("phase", "scan", "cpSrc", cpSrc, "cpDst", cpDst)
+
+		if len(cpSrc) == 0 {
+			return fmt.Errorf("[copy] found empty copy src")
+		}
+		if len(cpDst.Target) == 0 {
+			return fmt.Errorf("[copy] found empty copy dst")
+		}
+
+		ssrc, err := os.Stat(cpSrc)
+		if err != nil {
+			logger.Error("failed to stat copy src")
+			return fmt.Errorf("[copy] failed to stat copy src: '%s'", cpSrc)
+		}
+
+		if fileIs(ssrc, os.ModeSymlink) {
+			logger.Error("copy src is symlink")
+			return fmt.Errorf("[copy] copy src is symlink: '%s'", cpSrc)
+		}
+
+		sdst, err := os.Stat(cpDst.Target)
+		if err == nil {
+			if sdst.IsDir() {
+				logger.Debug("dst is dir")
+				return fmt.Errorf("[copy] copy dst is dir")
+			}
+		}
+
+		if err != nil {
+			if !os.IsNotExist(err) {
+				logger.Error("failed to stat copy dst", "error", err)
+				return fmt.Errorf("[copy] failed to stat copy dst '%s': %w", cpDst.Target, err)
+			}
+
+			err = os.MkdirAll(filepath.Dir(cpDst.Target), os.ModePerm)
+			if err != nil {
+				return fmt.Errorf("[copy] fail to prepare copy dst '%s': %w", cpDst.Target, err)
+			}
+		}
+
+		if sdst != nil && sdst.IsDir() {
+			dirs.insert(cpSrc)
+		}
+	}
+
+	for cpSrc, cpDst := range s.Copies {
+		logger := logger.With("phase", "copy", "cpSrc", cpSrc, "cpDst", cpDst)
+
+		if dirs.contains(cpSrc) {
+			err := cpRecurse(cpSrc, cpDst)
+			if err != nil {
+				logger.Error("failed to copy directory")
+				return fmt.Errorf("[copy] failed to copy directory '%s'", cpSrc)
+			}
+
+			continue
+		}
+
+		err := cp(cpSrc, cpDst)
+		if err != nil {
+			logger.Error("failed to copy file")
+			return fmt.Errorf("[copy] failed to copy file '%s'", cpSrc)
+		}
+	}
+
+	return nil
 }
 
 func (s *Site) Link() error {
 	logger := s.logger.WithGroup("link")
 
-	dups := make(setStr)
-	for lsrc, ldst := range s.Links {
-		logger.With("src", lsrc, "dst", ldst, "phase", "scan")
+	for lnSrc, lnDst := range s.Links {
+		logger.With("lnSrc", lnSrc, "lnDst", lnDst, "phase", "scan")
 
-		if len(lsrc) == 0 {
-			return fmt.Errorf("found empty link src")
+		if len(lnSrc) == 0 {
+			return fmt.Errorf("[link] found empty link src")
 		}
-		if len(ldst.Target) == 0 {
-			return fmt.Errorf("found empty link dst")
-		}
-
-		if dups.insert(ldst.Target) {
-			return fmt.Errorf("duplicate link destination '%s'", ldst)
+		if len(lnDst.Target) == 0 {
+			return fmt.Errorf("[link] found empty link dst")
 		}
 
-		ssrc, err := os.Stat(lsrc)
+		ssrc, err := os.Stat(lnSrc)
 		if err != nil {
-			logger.Error("failed to stat src", "error", err)
-			return fmt.Errorf("[link] failed to stat src '%s': %w", lsrc, err)
+			logger.Error("failed to stat link src", "error", err)
+			return fmt.Errorf("[link] failed to stat src '%s': %w", lnSrc, err)
 		}
 
-		if ssrc.Mode()&os.ModeSymlink != 0 {
+		if fileIs(ssrc, os.ModeSymlink) {
 			logger.Error("file is not synlink", "mode", ssrc.Mode())
-			return fmt.Errorf("[link] expecting normal file, found link src symlink '%s'", lsrc)
+			return fmt.Errorf("[link] expecting normal file, found link src symlink '%s'", lnSrc)
 		}
 
 		if ssrc.IsDir() {
 			logger.Error("file is dir")
-			return fmt.Errorf("[link] expecting normal file, found link src directory '%s'", lsrc)
+			return fmt.Errorf("[link] expecting normal file, found link src directory '%s'", lnSrc)
 		}
 
-		sdst, err := os.Stat(ldst.Target)
+		sdst, err := os.Stat(lnDst.Target)
 		if err == nil {
 			if sdst.IsDir() {
 				logger.Debug("dst is dir")
@@ -225,13 +362,13 @@ func (s *Site) Link() error {
 
 		if err != nil {
 			if !os.IsNotExist(err) {
-				logger.Error("failed to stat dst", "error", err)
-				return fmt.Errorf("failed to stat link dst '%s': %w", ldst, err)
+				logger.Error("failed to stat link dst", "error", err)
+				return fmt.Errorf("failed to stat link dst '%s': %w", lnDst, err)
 			}
 
-			err = os.MkdirAll(filepath.Dir(ldst.Target), os.ModePerm)
+			err = os.MkdirAll(filepath.Dir(lnDst.Target), os.ModePerm)
 			if err != nil {
-				return fmt.Errorf("fail to prepare dst '%s': %w", ldst, err)
+				return fmt.Errorf("fail to prepare link dst '%s': %w", lnDst, err)
 			}
 		}
 	}
@@ -259,4 +396,36 @@ func (s *Site) Link() error {
 	}
 
 	return nil
+}
+
+func fileIs(f os.FileInfo, mode fs.FileMode) bool {
+	return f.Mode()&mode != 0
+}
+
+func cp(src string, dst WriteTarget) error {
+	if dst.Force {
+		err := os.Remove(dst.Target)
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+
+		return nil
+	}
+
+	b, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(dst.Target, b, os.ModePerm)
+}
+
+func cpRecurse(src string, dst WriteTarget) error {
+	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+		base := filepath.Base(path)
+		target := filepath.Join(dst.Target, base)
+		dst.Target = target
+
+		return cp(path, dst)
+	})
 }
