@@ -13,19 +13,55 @@ import (
 type Manifest map[string]Site
 
 type Site struct {
-	LinksJson  map[string]interface{} `json:"links"`
-	Links      map[string]TargetForce `json:"-"`
-	CopiesJson map[string]interface{} `json:"copies"`
-	Copies     map[string]TargetForce `json:"-"`
-
-	logger *slog.Logger `json:"-"`
-
+	Links  map[string]TargetForce `json:"-"`
+	Copies map[string]TargetForce `json:"-"`
+	logger *slog.Logger           `json:"-"`
 	Ssg
 }
 
 type TargetForce struct {
 	Target string `json:"target"`
 	Force  bool   `json:"force"`
+}
+
+type stage int
+
+type soywebError struct {
+	err   error
+	msg   string
+	stage stage
+}
+
+func (s *Site) UnmarshalJSON(b []byte) error {
+	var tmp struct {
+		Links  map[string]interface{} `json:"links"`
+		Copies map[string]interface{} `json:"copies"`
+		Ssg
+	}
+	err := json.Unmarshal(b, &tmp)
+	if err != nil {
+		return err
+	}
+
+	links := make(map[string]TargetForce)
+	err = decodeTargetsForce(tmp.Links, links)
+	if err != nil {
+		return err
+	}
+
+	copies := make(map[string]TargetForce)
+	err = decodeTargetsForce(tmp.Copies, copies)
+	if err != nil {
+		return err
+	}
+
+	*s = Site{
+		Links:  links,
+		Copies: copies,
+		Ssg:    tmp.Ssg,
+	}
+
+	return nil
 }
 
 func (t TargetForce) String() string {
@@ -36,18 +72,6 @@ func (t TargetForce) String() string {
 	return t.Target
 }
 
-type stage int
-
-const (
-	stageLink = iota << 1
-)
-
-type soywebError struct {
-	err   error
-	msg   string
-	stage stage
-}
-
 func (s stage) String() string {
 	switch s {
 	case stageLink:
@@ -56,6 +80,11 @@ func (s stage) String() string {
 
 	return "bad stage"
 }
+
+const (
+	stageCopy stage = iota << 1
+	stageLink
+)
 
 func Main() {
 	manifestPath := "./manifest.json"
@@ -70,8 +99,8 @@ func Main() {
 		With("manifest", manifestPath)
 
 	slog.SetDefault(logger)
-
 	slog.Info("parsing manifest")
+
 	manifest, err := NewManifest(manifestPath)
 	if err != nil {
 		logger.Error("failed to parse manifest", "error", err)
@@ -98,38 +127,14 @@ func NewManifest(filename string) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("failed to read manifest from file '%s': %w", filename, err)
 	}
 
-	return ParseManifest(b)
-}
-
-func ParseManifest(manifestJson []byte) (Manifest, error) {
-	var m Manifest
-	err := json.Unmarshal(manifestJson, &m)
+	m := Manifest{}
+	err = json.Unmarshal(b, &m)
 	if err != nil {
-		slog.Error("failed to unmarshal json")
-		return Manifest{}, err
-	}
-
-	for k, site := range m {
-		links := make(map[string]TargetForce)
-		err := decodeTargetsForce(site.LinksJson, links)
-		if err != nil {
-			return Manifest{}, err
-		}
-
-		copies := make(map[string]TargetForce)
-		err = decodeTargetsForce(site.CopiesJson, copies)
-		if err != nil {
-			return Manifest{}, err
-		}
-
-		site.Links, site.Copies = links, copies
-		m[k] = site
+		return Manifest{}, nil
 	}
 
 	return m, nil
-
 }
-
 func decodeTargetsForce(m map[string]interface{}, target map[string]TargetForce) error {
 	for k, entry := range m {
 		link, err := decodeTargetForce(entry)
