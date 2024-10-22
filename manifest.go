@@ -98,7 +98,7 @@ func (s stage) String() string {
 	return "BAD_STAGE"
 }
 
-func Build(manifestPath string) error {
+func BuildManifest(manifestPath string) error {
 	loglevel.Set(slog.LevelDebug)
 
 	logger := slog.New(slog.NewJSONHandler(
