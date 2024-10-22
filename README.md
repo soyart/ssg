@@ -17,10 +17,6 @@ My own implementation, using [github.com/gomarkdown/markdown](https://github.com
 
 This implementation is good for using ssg remotely, because it's just 1 executable.
 
-### TODO for ssg-go
-
-- `.files` (maybe 'won't do')
-
 ## Usage
 
 ```sh

@@ -302,30 +302,36 @@ func (s *Ssg) Build() ([]OutputFile, error) {
 // to their target locations.
 //
 // If targets is empty, WriteOut writes to s.dst
-func (s *Ssg) WriteOut(targets ...string) error {
-	if len(s.dist) == 0 {
-		return fmt.Errorf("nothing to write")
+func (s *Ssg) WriteOut() error {
+	_, err := os.Stat(s.Dst)
+	if os.IsNotExist(err) {
+		err = os.MkdirAll(s.Dst, os.ModePerm)
+	}
+	if err != nil {
+		return err
 	}
 
-	if len(targets) == 0 {
-		return s.WriteOut(s.Dst)
+	err = writeOut(s.dist)
+	if err != nil {
+		return err
 	}
 
-	for i := range targets {
-		target := targets[i]
-
-		_, err := os.Stat(target)
-		if os.IsNotExist(err) {
-			err = os.MkdirAll(s.Dst, os.ModePerm)
-		}
+	files := new(strings.Builder)
+	for i := range s.dist {
+		f := &s.dist[i]
+		path, err := filepath.Rel(s.Dst, f.target)
 		if err != nil {
 			return err
 		}
 
-		err = writeOut(s.dist)
-		if err != nil {
-			return err
-		}
+		files.WriteString("./")
+		files.WriteString(path)
+		files.WriteRune('\n')
+	}
+
+	err = os.WriteFile(filepath.Join(s.Dst, ".files"), []byte(files.String()), os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("error writing .files: %w", err)
 	}
 
 	return nil
