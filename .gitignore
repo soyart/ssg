@@ -1,2 +1,9 @@
 # Nix build result
 /result
+
+/cmd/debug
+
+/johndoe.com/*
+!/johndoe.com/src
+johndoe.com/src/style.css
+johndoe.com/src/some-txt.txt
