@@ -63,7 +63,7 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 		Links:   links,
 		CleanUp: tmp.CleanUp,
 		Copies:  copies,
-		Ssg:     tmp.Ssg,
+		Ssg:     New(tmp.Src, tmp.Dst, tmp.Title, tmp.Url),
 	}
 
 	return nil
@@ -170,7 +170,7 @@ func Build(manifestPath string) error {
 
 	// Copy
 	for key, site := range m {
-		logger := logger.With("key", key, "url", site.Url)
+		logger := logger.WithGroup("copy").With("key", key, "url", site.Url)
 		site.logger = logger
 
 		err := site.Copy()
@@ -181,10 +181,21 @@ func Build(manifestPath string) error {
 
 	// Link
 	for key, site := range m {
-		logger := logger.With("key", key, "url", site.Url)
+		logger := logger.WithGroup("link").With("key", key, "url", site.Url)
 		site.logger = logger
 
 		err := site.Link()
+		if err != nil {
+			return err
+		}
+	}
+
+	// Build
+	for key, site := range m {
+		logger := logger.WithGroup("build").With("key", key, "url", site.Url)
+		logger.Info("building site")
+
+		err := site.Ssg.Generate()
 		if err != nil {
 			return err
 		}
@@ -257,7 +268,7 @@ func decodeTargetForce(entry interface{}) (WriteTarget, error) {
 }
 
 func (s *Site) Copy() error {
-	logger := s.logger.WithGroup("copy")
+	logger := s.logger
 
 	dirs := make(setStr)
 	for cpSrc, cpDst := range s.Copies {
@@ -330,7 +341,7 @@ func (s *Site) Copy() error {
 }
 
 func (s *Site) Link() error {
-	logger := s.logger.WithGroup("link")
+	logger := s.logger
 
 	for lnSrc, lnDst := range s.Links {
 		logger.With("lnSrc", lnSrc, "lnDst", lnDst, "phase", "scan")
