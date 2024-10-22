@@ -1,0 +1,37 @@
+on:
+  release:
+    types: [created]
+
+  push:
+    branches:
+      - master
+      - poc/release
+    tags:
+      - 'v*'
+
+name: Release ssg-go
+jobs:
+  generate:
+    name: Create release-artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@master
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build ssg-go
+        run: 'nix build .#ssg-go'
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: ssg-go
+          path: |
+            result/bin/ssg
+            result/bin/ssg-manifest
