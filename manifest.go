@@ -130,14 +130,20 @@ func Build(manifestPath string) error {
 			}
 
 			logger.Error("duplicate write target", "src", src, "target", dst.Target)
+			return fmt.Errorf("duplicate write target '%s'", dst.Target)
 		}
 
 		for src, dst := range site.Links {
-			if targets[key].insert(dst.Target) {
-				panic("unexpected duplicate")
+			if !dups.insert(dst.Target) {
+				if targets[key].insert(dst.Target) {
+					panic("unexpected duplicate")
+				}
+
+				continue
 			}
 
 			logger.Error("duplicate write target", "src", src, "target", dst.Target)
+			return fmt.Errorf("duplicate write target '%s'", dst.Target)
 		}
 	}
 
@@ -169,7 +175,7 @@ func Build(manifestPath string) error {
 
 		err := site.Copy()
 		if err != nil {
-			panic(err)
+			return err
 		}
 	}
 
