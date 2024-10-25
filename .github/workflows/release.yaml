@@ -51,10 +51,3 @@ jobs:
           asset_path: ./ssg-go.zip
           asset_name: ssg-go.zip
           asset_content_type: application/zip
-
-      - name: Release binaries
-        uses: skx/github-action-publish-binaries@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: 'result/bin/*'
