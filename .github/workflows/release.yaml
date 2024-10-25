@@ -11,7 +11,7 @@ on:
 
 name: Release ssg-go
 jobs:
-  generate:
+  build:
     name: Create release-artifacts
     runs-on: ubuntu-latest
     steps:
@@ -30,14 +30,14 @@ jobs:
         run: |
           zip -r ssg-go.zip result/bin
 
-      - name: Create Release
+      - name: Create release
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag_name: ${{ github.sha }} # TODO: use ref if event is tag push
+          release_name: Release ${{ github.sha }}
           draft: false
           prerelease: false
 
