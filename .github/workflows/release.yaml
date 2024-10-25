@@ -27,6 +27,9 @@ jobs:
       - name: Create directory for x86_64_linux
         run: |
           mkdir ./x86_64_linux
+          echo "check permission"
+          ls -al ./result/bin;
+          ls -al ./x86_64_linux
           cp ./result/bin/* ./x86_64_linux
 
       - name: Zip built binaries for x86_64_linux
