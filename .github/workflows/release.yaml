@@ -27,22 +27,22 @@ jobs:
       - name: Create directory for x86_64_linux
         run: |
           mkdir ./x86_64_linux
-          echo "check permission"
+          echo "debug: check permission"
           ls -al ./result/bin;
           ls -al ./x86_64_linux
-          cp ./result/bin/* ./x86_64_linux
+          cp -a ./result/bin ./x86_64_linux/
 
       - name: Zip built binaries for x86_64_linux
         run: |
           zip -r ssg-go.zip ./x86_64_linux
 
       - name: Build ssg-go for aarch64_darwin
-        run:  'nix build ./ssg-go.darwin.nix'
+        run:  'nix build .#ssg-go-aarch64_darwin'
 
       - name: Include binaries for aarch64_darwin
         run: |
           mkdir ./aarch46_darwin
-          cp ./result/bin/* ./aarch64_darwin
+          cp -a ./result/bin ./aarch64_darwin/
           zip -r ssg.-go.zip ./aarch64_darwin
 
       - name: Create Release

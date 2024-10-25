@@ -57,6 +57,14 @@ rec {
         ssg-go = pkgs.callPackage ./ssg-go.nix {
           inherit pkgs version;
         };
+
+        ssg-go-aarch64_darwin = pkgs.pkgsCross.aarch64-darwin.callPackage ./ssg-go.nix {
+          inherit pkgs version;
+        };
+
+        ssg-go-amd64_darwin = pkgs.pkgsCross.x86_64-darwin.callPackage ./ssg-go.nix {
+          inherit pkgs;
+        };
       });
 
       devShells = forAllSystems ({ pkgs }: {
