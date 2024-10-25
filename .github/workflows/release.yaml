@@ -24,9 +24,23 @@ jobs:
       - name: Build ssg-go from flake
         run: 'nix build .#ssg-go'
 
-      - name: Zip built binaries
+      - name: Create directory for x86_64_linux
         run: |
-          zip -r ssg-go-x86_64_linux.zip result/bin
+          mkdir ./x86_64_linux
+          mv ./result/bin/* ./x86_64_linux
+
+      - name: Zip built binaries for x86_64_linux
+        run: |
+          zip -r ssg-go.zip ./x86_64_linux
+
+      - name: Build ssg-go for aarch64_darwin
+        run:  'nix build ./ssg-go.darwin.nix'
+
+      - name: Include binaries for aarch64_darwin
+        run: |
+          mkdir ./aarch46_darwin
+          mv ./result/bin/* ./aarch64_darwin
+          zip -r ssg.-go.zip ./aarch64_darwin
 
       - name: Create Release
         id: create_release
