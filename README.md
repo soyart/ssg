@@ -137,14 +137,14 @@ ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
 
 ## Manifests
 
-My original use case for ssg was with a shell wrapper that facilitates
-building multiple sites.
+My original use case for ssg was with a [shell wrapper](https://github.com/soyart/webtools)
+that facilitates building multiple sites with ssg.
 
-The wrapper tool used to have a declarative manifest that specifies
-source, destination, files to link or copy, and cleaning up garbage.
+The wrapper tool used to have a declarative JSON manifest that specifies
+source, destination, files to link or copy, and flag for cleaning up garbage.
 
-This is also implemented by [`Manifest`](./manifest.go), and accessible
-via [`ssg-manifest`](./cmd/ssg-manifest/) binary.
+Those functionalirty is now implemented by [`Manifest`](./manifest.go),
+and accessible on the command-line via [`ssg-manifest`](./cmd/ssg-manifest/).
 
-See `manifest.json` as example, or clone this repo and run `./cmd/soyweb/`
+See `manifest.json` as example, or clone this repo and run [`./cmd/ssg-manifest/`]
 to see its effects.
