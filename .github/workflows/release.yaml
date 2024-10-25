@@ -27,7 +27,7 @@ jobs:
       - name: Create directory for x86_64_linux
         run: |
           mkdir ./x86_64_linux
-          mv ./result/bin/* ./x86_64_linux
+          cp ./result/bin/* ./x86_64_linux
 
       - name: Zip built binaries for x86_64_linux
         run: |
@@ -39,7 +39,7 @@ jobs:
       - name: Include binaries for aarch64_darwin
         run: |
           mkdir ./aarch46_darwin
-          mv ./result/bin/* ./aarch64_darwin
+          cp ./result/bin/* ./aarch64_darwin
           zip -r ssg.-go.zip ./aarch64_darwin
 
       - name: Create Release
