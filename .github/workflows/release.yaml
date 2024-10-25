@@ -3,9 +3,9 @@ on:
     types: [created]
 
   push:
-    branches:
-      - master
-      - poc/release
+    # branches:
+    #   - master
+    #   - poc/release
     tags:
       - 'v*'
 
