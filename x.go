@@ -105,9 +105,15 @@ func (s setStr) insert(v string) bool {
 	return ok
 }
 
-func (s setStr) contains(v string) bool {
-	_, ok := s[v]
-	return ok
+func (s setStr) contains(items ...string) bool {
+	for _, v := range items {
+		_, ok := s[v]
+		if !ok {
+			return false
+		}
+	}
+
+	return true
 }
 
 func fileIs(f os.FileInfo, mode fs.FileMode) bool {

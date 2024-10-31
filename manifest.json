@@ -10,7 +10,11 @@
 				"target": "johndoe.com/src/style.css",
 				"force": true
 			},
-			"./assets/some.txt": "johndoe.com/src/some-txt.txt"
+			"./assets/some.txt": "johndoe.com/src/some-txt.txt",
+			"./assets/some": {
+				"force": true,
+				"target": "johndoe.com/src/drop"
+			}
 		}
 	}
 }

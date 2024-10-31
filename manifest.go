@@ -152,8 +152,8 @@ func BuildManifest(manifestPath string) error {
 		for target := range siteTargets {
 			logger.Info("cleaning up", "target", target)
 
-			err := os.Remove(target)
-			if os.IsNotExist(err) {
+			err := remove(target)
+			if err != nil && os.IsNotExist(err) {
 				continue
 			}
 			if err != nil {
@@ -291,13 +291,6 @@ func (s *Site) Copy() error {
 		}
 
 		sdst, err := os.Stat(cpDst.Target)
-		if err == nil {
-			if sdst.IsDir() {
-				logger.Debug("dst is dir")
-				return fmt.Errorf("copy dst is dir: '%s'", cpDst)
-			}
-		}
-
 		if err != nil {
 			if !os.IsNotExist(err) {
 				logger.Error("failed to stat copy dst", "error", err)
@@ -310,37 +303,53 @@ func (s *Site) Copy() error {
 			}
 		}
 
-		if sdst != nil && sdst.IsDir() {
+		if ssrc != nil && ssrc.IsDir() {
 			dirs.insert(cpSrc)
+		}
+		if sdst != nil && sdst.IsDir() {
+			dirs.insert(cpDst.Target)
 		}
 	}
 
 	for cpSrc, cpDst := range s.Copies {
 		logger := logger.With("phase", "copy", "cpSrc", cpSrc, "cpDst", cpDst)
 
-		if dirs.contains(cpSrc) {
-			err := cpRecurse(cpSrc, cpDst)
-			if err != nil {
-				logger.Error("failed to copy directory")
-				return fmt.Errorf("failed to copy directory '%s'", cpSrc)
-			}
-
-			continue
-		}
-
-		err := cp(cpSrc, cpDst)
+		err := copyFiles(dirs, cpSrc, cpDst)
 		if err != nil {
 			logger.Error("failed to copy file")
-			return fmt.Errorf("failed to copy file '%s'", cpSrc)
+			return fmt.Errorf("failed to copy directory '%s'->'%s': %w", cpSrc, cpDst.Target, err)
 		}
 	}
 
 	return nil
 }
 
+func remove(target string) error {
+	stat, err := os.Stat(target)
+	if err != nil {
+		return err
+	}
+
+	if stat.IsDir() {
+		// Remove all children
+		return filepath.WalkDir(target, func(path string, d fs.DirEntry, err error) error {
+			if d == nil {
+				return nil
+			}
+			if d.IsDir() {
+				return nil
+			}
+
+			return os.Remove(path)
+		})
+	}
+
+	return os.Remove(target)
+}
+
 func cp(src string, dst WriteTarget) error {
 	if dst.Force {
-		err := os.Remove(dst.Target)
+		err := remove(dst.Target)
 		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
@@ -348,18 +357,80 @@ func cp(src string, dst WriteTarget) error {
 
 	b, err := os.ReadFile(src)
 	if err != nil {
-		return err
+		return fmt.Errorf("error reading src: %w", err)
 	}
 
-	return os.WriteFile(dst.Target, b, os.ModePerm)
+	dir := filepath.Dir(dst.Target)
+	err = os.MkdirAll(dir, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("error preparing dst directory at '%s': %w", dir, err)
+	}
+
+	err = os.WriteFile(dst.Target, b, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("error writing to dst: %w", err)
+	}
+
+	return nil
 }
 
 func cpRecurse(src string, dst WriteTarget) error {
-	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
-		base := filepath.Base(path)
-		target := filepath.Join(dst.Target, base)
-		dst.Target = target
+	dstRoot := dst.Target
+	err := filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+		if d == nil {
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
 
-		return cp(path, dst)
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+
+		target := filepath.Join(dstRoot, rel)
+
+		slog.Info("cpRecurse", "src", src, "dst", dst, "base", filepath.Base(path), "target", target)
+
+		return cp(path, WriteTarget{
+			Target: target,
+			Force:  false,
+		})
 	})
+	if err != nil {
+		return fmt.Errorf("walkDir failed for src '%s', dst '%s': %w", src, dst.Target, err)
+	}
+
+	return nil
+}
+
+func copyFiles(dirs setStr, src string, dst WriteTarget) error {
+	switch {
+	// Copy dir to dir, with target not yet existing
+	case dirs.contains(src) && !dirs.contains(dst.Target):
+		slog.Debug("copyFiles 1", "src", src, "dst", dst)
+
+		err := os.MkdirAll(dst.Target, os.ModePerm)
+		if err != nil {
+			return fmt.Errorf("failed to prepare dst directory: %w", err)
+		}
+
+		fallthrough
+
+	// Copy dir to dir, with target dir existing
+	case dirs.contains(src, dst.Target):
+		slog.Debug("copyFiles 2", "src", src, "dst", dst)
+		return cpRecurse(src, dst)
+
+	// Copy file to dir, i.e. cp foo.json ./some-dir/
+	// which will just writes out to ./some-dir/foo.json
+	case dirs.contains(dst.Target):
+		slog.Debug("copyFiles 3", "src", src, "dst", dst)
+
+		base := filepath.Base(src)
+		dst.Target = filepath.Join(dst.Target, base)
+	}
+
+	return cp(src, dst)
 }
