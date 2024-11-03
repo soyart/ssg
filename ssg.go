@@ -37,7 +37,7 @@ const (
 </html>
 `
 
-	keyTitleH1         = "# "      // The first h1 tag is used as document header title
+	keyTitleFromH1     = "# "      // The first h1 tag is used as document header title
 	keyTitleFromTag    = ":title " // The first line starting with :title will be parsed as document header title
 	targetFromH1       = "{{from-h1}}"
 	targetFromTag      = "{{from-tag}}"
@@ -546,38 +546,29 @@ func (w writeError) Error() string {
 	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
 }
 
-// TODO: Refactor to use scanner
-//
 // titleFromH1 finds the first h1 in markdown and uses the h1 title
 // to write to <title> tag in header.
 func titleFromH1(d []byte, header []byte, markdown []byte) []byte {
-	start := bytes.Index(markdown, []byte{'#', ' '})
+	s := bufio.NewScanner(bytes.NewBuffer(markdown))
+	k := []byte(keyTitleFromH1)
 	t := []byte(targetFromH1)
-	if start == -1 {
-		header = bytes.Replace(header, t, d, 1)
-		return header
-	}
 
-	if start > 0 {
-		// Probably h2, h3, ...
-		if markdown[start-1] != '\n' {
-			return titleFromH1(d, header, markdown[start+1:])
+	for s.Scan() {
+		line := s.Bytes()
+		if !bytes.HasPrefix(line, k) {
+			continue
 		}
-	}
+		parts := bytes.Split(line, k)
+		if len(parts) != 2 {
+			continue
+		}
 
-	end := bytes.Index(markdown[start:], []byte{'\n', '\n'})
-	if end == -1 {
-		end = bytes.Index(markdown[start:], []byte{'\n'})
-	}
-
-	if end == -1 {
-		header = bytes.Replace(header, t, d, 1)
+		title := parts[1]
+		header = bytes.Replace(header, t, title, 1)
 		return header
 	}
 
-	title := markdown[start+len(keyTitleH1) : start+end]
-	header = bytes.Replace(header, t, title, 1)
-
+	header = bytes.Replace(header, t, d, 1)
 	return header
 }
 
@@ -599,7 +590,6 @@ func titleFromTag(
 		if !bytes.HasPrefix(line, k) {
 			continue
 		}
-
 		parts := bytes.Split(line, k)
 		if len(parts) != 2 {
 			continue
@@ -609,14 +599,13 @@ func titleFromTag(
 		title := parts[1]
 
 		header = bytes.Replace(header, t, title, 1)
-		markdown = bytes.Replace(markdown, append(line, []byte{'\n', '\n'}...), nil, 1) // TODO: fix diff in test
+		markdown = bytes.Replace(markdown, append(line, []byte{'\n', '\n'}...), nil, 1)
 
 		return header, markdown
 	}
 
 	// Remove target and use default header string
 	header = bytes.Replace(header, t, []byte(d), 1)
-
 	return header, markdown
 }
 
