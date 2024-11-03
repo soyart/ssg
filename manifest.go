@@ -42,7 +42,15 @@ const (
 )
 
 func (s manifestError) Error() string {
+	if s.err == nil {
+		return fmt.Sprintf("[%s %s] %s", s.stage, s.key, s.msg)
+	}
+
 	return fmt.Errorf("[%s %s] %s: %w", s.stage, s.key, s.msg, s.err).Error()
+}
+
+func (s manifestError) Unwrap() error {
+	return s.err
 }
 
 func (s *Site) UnmarshalJSON(b []byte) error {
@@ -137,7 +145,12 @@ func BuildManifest(manifestPath string) error {
 			}
 
 			logger.Error("duplicate write target", "src", src, "target", dst.Target)
-			return fmt.Errorf("duplicate write target '%s'", dst.Target)
+			return manifestError{
+				err:   nil,
+				key:   key,
+				msg:   "duplicate write target",
+				stage: stageCollect,
+			}
 		}
 	}
 
@@ -194,7 +207,7 @@ func BuildManifest(manifestPath string) error {
 				err:   err,
 				key:   key,
 				msg:   "failed to build",
-				stage: stageCleanUp,
+				stage: stageBuild,
 			}
 		}
 	}
@@ -395,7 +408,7 @@ func cpRecurse(src string, dst WriteTarget) error {
 
 		return cp(path, WriteTarget{
 			Target: target,
-			Force:  false,
+			Force:  dst.Force,
 		})
 	})
 	if err != nil {
@@ -409,8 +422,6 @@ func copyFiles(dirs setStr, src string, dst WriteTarget) error {
 	switch {
 	// Copy dir to dir, with target not yet existing
 	case dirs.contains(src) && !dirs.contains(dst.Target):
-		slog.Debug("copyFiles 1", "src", src, "dst", dst)
-
 		err := os.MkdirAll(dst.Target, os.ModePerm)
 		if err != nil {
 			return fmt.Errorf("failed to prepare dst directory: %w", err)
@@ -420,14 +431,11 @@ func copyFiles(dirs setStr, src string, dst WriteTarget) error {
 
 	// Copy dir to dir, with target dir existing
 	case dirs.contains(src, dst.Target):
-		slog.Debug("copyFiles 2", "src", src, "dst", dst)
 		return cpRecurse(src, dst)
 
 	// Copy file to dir, i.e. cp foo.json ./some-dir/
 	// which will just writes out to ./some-dir/foo.json
 	case dirs.contains(dst.Target):
-		slog.Debug("copyFiles 3", "src", src, "dst", dst)
-
 		base := filepath.Base(src)
 		dst.Target = filepath.Join(dst.Target, base)
 	}

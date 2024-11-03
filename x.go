@@ -17,6 +17,13 @@ type (
 		values       map[string]T
 	}
 
+	header struct {
+		*bytes.Buffer
+		titleFrom from
+	}
+
+	setStr map[string]struct{}
+
 	headers struct {
 		perDir[header]
 	}
@@ -24,13 +31,6 @@ type (
 	footers struct {
 		perDir[*bytes.Buffer]
 	}
-
-	header struct {
-		*bytes.Buffer
-		titleFrom from
-	}
-
-	setStr map[string]struct{}
 )
 
 const (
