@@ -21,7 +21,7 @@ func main() {
 }
 
 func build(path string) {
-	err := ssg.BuildManifest(path)
+	err := ssg.BuildManifestFromPath(path)
 	if err != nil {
 		panic(err)
 	}

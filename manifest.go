@@ -41,6 +41,8 @@ const (
 	stageBuild
 )
 
+var loglevel = new(slog.LevelVar)
+
 func (s manifestError) Error() string {
 	if s.err == nil {
 		return fmt.Sprintf("[%s %s] %s", s.stage, s.key, s.msg)
@@ -106,26 +108,33 @@ func (s stage) String() string {
 	return "BAD_STAGE"
 }
 
-func BuildManifest(manifestPath string) error {
+func newLogger() *slog.Logger {
 	loglevel.Set(slog.LevelDebug)
-
 	logger := slog.New(slog.NewJSONHandler(
 		os.Stdout,
 		&slog.HandlerOptions{
 			AddSource: true,
 			Level:     loglevel,
-		})).
-		With("manifest", manifestPath)
+		}))
 
+	return logger
+}
+
+func BuildManifestFromPath(path string) error {
+	logger := newLogger().With("manifest", path)
 	slog.SetDefault(logger)
 	slog.Info("parsing manifest")
 
-	m, err := NewManifest(manifestPath)
+	m, err := NewManifest(path)
 	if err != nil {
 		logger.Error("failed to parse manifest", "error", err)
 		return err
 	}
 
+	return Build(m, logger)
+}
+
+func Build(m Manifest, logger *slog.Logger) error {
 	// Collect and detect duplicate write dups
 	dups := make(setStr)
 	targets := make(map[string]setStr)
@@ -164,18 +173,19 @@ func BuildManifest(manifestPath string) error {
 		siteTargets := targets[key]
 		for target := range siteTargets {
 			logger.Info("cleaning up", "target", target)
-
 			err := remove(target)
 			if err != nil && os.IsNotExist(err) {
 				continue
 			}
-			if err != nil {
-				return manifestError{
-					err:   err,
-					key:   key,
-					msg:   "failed to cleanup",
-					stage: stageCleanUp,
-				}
+			if err == nil {
+				continue
+			}
+
+			return manifestError{
+				err:   err,
+				key:   key,
+				msg:   "failed to cleanup",
+				stage: stageCleanUp,
 			}
 		}
 	}
@@ -214,8 +224,6 @@ func BuildManifest(manifestPath string) error {
 
 	return nil
 }
-
-var loglevel = new(slog.LevelVar)
 
 func NewManifest(filename string) (Manifest, error) {
 	b, err := os.ReadFile(filename)
