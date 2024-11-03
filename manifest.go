@@ -412,7 +412,7 @@ func cpRecurse(src string, dst WriteTarget) error {
 
 		target := filepath.Join(dstRoot, rel)
 
-		slog.Info("cpRecurse", "src", src, "dst", dst, "base", filepath.Base(path), "target", target)
+		slog.Debug("cpRecurse", "src", src, "dst", dst, "base", filepath.Base(path), "target", target)
 
 		return cp(path, WriteTarget{
 			Target: target,
