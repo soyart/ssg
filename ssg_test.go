@@ -199,7 +199,7 @@ Mar 24 1998
 
 # Some h1
 
-Some para`,
+Some para  `,
 			expectedHead: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -213,7 +213,7 @@ Mar 24 1998
 
 # Some h1
 
-Some para`,
+Some para  `,
 		},
 	}
 

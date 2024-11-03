@@ -595,7 +595,7 @@ func titleFromTag(
 	k := []byte(keyTitleFromTag)
 	t := []byte(targetFromTag)
 	for s.Scan() {
-		line := trimRightWhitespace(s.Bytes())
+		line := s.Bytes()
 		if !bytes.HasPrefix(line, k) {
 			continue
 		}
@@ -605,6 +605,7 @@ func titleFromTag(
 			continue
 		}
 
+		line = trimRightWhitespace(line)
 		title := parts[1]
 
 		header = bytes.Replace(header, t, title, 1)
