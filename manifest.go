@@ -173,7 +173,7 @@ func Build(m Manifest, logger *slog.Logger) error {
 		siteTargets := targets[key]
 		for target := range siteTargets {
 			logger.Info("cleaning up", "target", target)
-			err := remove(target)
+			err := os.RemoveAll(target)
 			if err != nil && os.IsNotExist(err) {
 				continue
 			}
@@ -345,32 +345,9 @@ func (s *Site) Copy() error {
 	return nil
 }
 
-func remove(target string) error {
-	stat, err := os.Stat(target)
-	if err != nil {
-		return err
-	}
-
-	if stat.IsDir() {
-		// Remove all children
-		return filepath.WalkDir(target, func(path string, d fs.DirEntry, err error) error {
-			if d == nil {
-				return nil
-			}
-			if d.IsDir() {
-				return nil
-			}
-
-			return os.Remove(path)
-		})
-	}
-
-	return os.Remove(target)
-}
-
 func cp(src string, dst WriteTarget) error {
 	if dst.Force {
-		err := remove(dst.Target)
+		err := os.RemoveAll(dst.Target)
 		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
