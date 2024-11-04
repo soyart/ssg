@@ -1,27 +1,65 @@
 package main
 
 import (
-	"os"
+	"github.com/alexflint/go-arg"
 
 	"github.com/soyart/ssg"
 )
 
-func main() {
-	path := "./manifest.json"
-	l := len(os.Args)
+type cli struct {
+	Build     *argBuild `arg:"subcommand:build"`
+	Copy      *struct{} `arg:"subcommand:copy"`
+	Clean     *struct{} `arg:"subcommand:clean"`
+	Manifests []string  `arg:"-m,--manifest" help:"Path to JSON manifest"`
+}
 
-	if l < 2 {
-		build(path)
-		return
+type argBuild struct {
+	NoCleanup bool `arg:"--no-cleanup" help:"Skip cleanup stage"`
+	NoCopy    bool `arg:"--no-copy" help:"Skip scopy stage"`
+	NoBuild   bool `arg:"--no-build" help:"Skip build stage"`
+}
+
+func main() {
+	cli := cli{}
+	arg.MustParse(&cli)
+	cli.run()
+}
+
+func (s *cli) run() {
+	stages := ssg.StagesAll
+
+	if len(s.Manifests) == 0 {
+		s.Manifests = []string{"./manifest.json"}
 	}
 
-	for i := 1; i < l-1; i++ {
-		build(os.Args[i])
+	switch {
+	case s.Copy != nil:
+		stages = ssg.StageCopy
+
+	case s.Clean != nil:
+		stages = ssg.StageCleanUp
+
+	case s.Build != nil:
+		args := s.Build
+
+		if args.NoCleanup {
+			stages &^= ssg.StageCleanUp
+		}
+		if args.NoCopy {
+			stages &^= ssg.StageCopy
+		}
+		if args.NoBuild {
+			stages &^= ssg.StageBuild
+		}
+	}
+
+	for i := range s.Manifests {
+		build(s.Manifests[i], stages)
 	}
 }
 
-func build(path string) {
-	err := ssg.BuildManifestFromPath(path)
+func build(path string, do ssg.Stage) {
+	err := ssg.ApplyManifest(path, do)
 	if err != nil {
 		panic(err)
 	}
