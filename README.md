@@ -143,8 +143,57 @@ that facilitates building multiple sites with ssg.
 The wrapper tool used to have a declarative JSON manifest that specifies
 source, destination, files to link or copy, and flag for cleaning up garbage.
 
-Those functionalirty is now implemented by [`Manifest`](./manifest.go),
+Those capabilities are now implemented by [`Manifest`](./manifest.go),
 and accessible on the command-line via [`ssg-manifest`](./cmd/ssg-manifest/).
 
 See `manifest.json` as example, or clone this repo and run [`./cmd/ssg-manifest/`]
 to see its effects.
+
+### ssg-manifest
+
+ssg-manifest supports 3 subcommands:
+
+- ssg-manifest build
+
+  This is the default subcommand, and can also be involved with `build` subcommand.
+
+  Synopsis:
+
+  ```shell
+  ssg-manifest [build] [--no-cleanup] [--no-copy] [--no-build] [...manifests]
+  ```
+
+  Examples:
+
+  ```shell
+  # Build from ./manifest.json (default path)
+  ssg-manifest
+  ssg-manifest build
+
+  # Build from ./m1.json and ./m2.sjon
+  ssg-manifest ./m1.json ./m2.json
+  ssg-manifest build ./m1.json ./m2.json
+
+  # Build from ./manifest.json without copying
+  ssg-manifest --no-copy
+  ```
+
+- ssg-manifest clean
+
+  Removes target files specified in the manifest's `copies` directive
+
+  Synopsis:
+
+  ```shell
+  ssg-manifest clean [...manifests]
+  ```
+
+- ssg-manifest copy
+
+  Copy files specified in the manifest's `copies` directive
+
+  Synopsis:
+
+  ```shell
+  ssg-manifest copy [...manifests]
+  ```

@@ -7,16 +7,15 @@ import (
 )
 
 type cli struct {
-	Build     *argBuild `arg:"subcommand:build"`
-	Copy      *struct{} `arg:"subcommand:copy"`
-	Clean     *struct{} `arg:"subcommand:clean"`
-	Manifests []string  `arg:"-m,--manifest" help:"Path to JSON manifest"`
-}
+	Build   *struct{} `arg:"subcommand:build"` // Default (no subcommand) is also to build
+	Copy    *struct{} `arg:"subcommand:copy"`
+	Clean   *struct{} `arg:"subcommand:clean"`
+	CleanUp *struct{} `arg:"subcommand:cleanup"` // Same with clean
 
-type argBuild struct {
-	NoCleanup bool `arg:"--no-cleanup" help:"Skip cleanup stage"`
-	NoCopy    bool `arg:"--no-copy" help:"Skip scopy stage"`
-	NoBuild   bool `arg:"--no-build" help:"Skip build stage"`
+	Manifests []string `arg:"-m,--manifest" help:"Path to JSON manifest"`
+	NoCleanup bool     `arg:"--no-cleanup" help:"Skip cleanup stage"`
+	NoCopy    bool     `arg:"--no-copy" help:"Skip scopy stage"`
+	NoBuild   bool     `arg:"--no-build" help:"Skip build stage"`
 }
 
 func main() {
@@ -36,19 +35,20 @@ func (s *cli) run() {
 	case s.Copy != nil:
 		stages = ssg.StageCopy
 
-	case s.Clean != nil:
+	case s.Clean != nil, s.CleanUp != nil:
 		stages = ssg.StageCleanUp
 
 	case s.Build != nil:
-		args := s.Build
+		fallthrough
 
-		if args.NoCleanup {
+	default:
+		if s.NoCleanup {
 			stages &^= ssg.StageCleanUp
 		}
-		if args.NoCopy {
+		if s.NoCopy {
 			stages &^= ssg.StageCopy
 		}
-		if args.NoBuild {
+		if s.NoBuild {
 			stages &^= ssg.StageBuild
 		}
 	}
