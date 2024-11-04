@@ -14,7 +14,6 @@ import (
 type Manifest map[string]Site
 
 type Site struct {
-	logger *slog.Logger           `json:"-"`
 	Copies map[string]WriteTarget `json:"-"`
 	Ssg
 	CleanUp bool `json:"cleanup"`
@@ -243,11 +242,11 @@ func Build(m Manifest, do Stage) error {
 			break
 		}
 
-		logger := old.
+		slog.SetDefault(old.
 			WithGroup("copy").
-			With("key", key, "url", site.Url)
+			With("key", key, "url", site.Url),
+		)
 
-		site.logger = logger
 		if err := site.Copy(); err != nil {
 			return manifestError{
 				err:   err,
@@ -256,6 +255,8 @@ func Build(m Manifest, do Stage) error {
 				stage: StageCopy,
 			}
 		}
+
+		slog.SetDefault(old)
 	}
 
 	// Build
@@ -265,11 +266,11 @@ func Build(m Manifest, do Stage) error {
 			break
 		}
 
-		logger := old.
+		old.
 			WithGroup("build").
-			With("key", key, "url", site.Url)
+			With("key", key, "url", site.Url).
+			Info("building site")
 
-		logger.Info("building site")
 		err := site.Ssg.Generate()
 		if err != nil {
 			return manifestError{
@@ -331,7 +332,7 @@ func decodeTargetForce(entry interface{}) (WriteTarget, error) {
 }
 
 func (s *Site) Copy() error {
-	logger := s.logger
+	logger := slog.Default()
 
 	dirs := make(setStr)
 	for cpSrc, cpDst := range s.Copies {
@@ -433,8 +434,7 @@ func cpRecurse(src string, dst WriteTarget) error {
 
 		target := filepath.Join(dstRoot, rel)
 
-		slog.Debug("cpRecurse", "src", src, "dst", dst, "base", filepath.Base(path), "target", target)
-
+		slog.Debug("cpRecurse", "src", src, "base", filepath.Base(path), "dst", dst, "target", target)
 		return cp(path, WriteTarget{
 			Target: target,
 			Force:  dst.Force,
