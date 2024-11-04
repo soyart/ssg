@@ -1,50 +1,40 @@
 package main
 
 import (
-	"flag"
-	"fmt"
+	"github.com/alexflint/go-arg"
 
 	"github.com/soyart/ssg"
 )
 
-var (
-	noCleanup bool
-	noCopy    bool
-	noBuild   bool
-)
-
-func init() {
-	flag.BoolVar(&noCleanup, "nocleanup", false, "skip cleanup stage")
-	flag.BoolVar(&noCopy, "nocopy", false, "skip build stage")
-	flag.BoolVar(&noBuild, "nobuild", false, "skip copy stage")
-	flag.Parse()
+type mainArg struct {
+	ManifestPath []string `arg:"positional" help:"Path to JSON manifest"`
+	NoCleanup    bool     `arg:"--no-cleanup" help:"Skip cleanup stage"`
+	NoCopy       bool     `arg:"--no-copy" help:"Skip scopy stage"`
+	NoBuild      bool     `arg:"--no-build" help:"Skip build stage"`
 }
 
 func main() {
 	path := "./manifest.json"
-	args := flag.Args()
-	l := len(args)
+	args := mainArg{}
+	arg.MustParse(&args)
 
 	stages := ssg.StagesAll
-	if noCleanup {
-		fmt.Println("nocleanup")
+	if args.NoCleanup {
 		stages &^= ssg.StageCleanUp
 	}
-	if noCopy {
-		fmt.Println("nocopy")
+	if args.NoCopy {
 		stages &^= ssg.StageCopy
 	}
-	if noBuild {
-		fmt.Println("nobuild")
+	if args.NoBuild {
 		stages &^= ssg.StageBuild
 	}
 
-	if l == 0 {
-		args = []string{path}
+	if len(args.ManifestPath) == 0 {
+		args.ManifestPath = []string{path}
 	}
 
-	for i := range args {
-		build(args[i], stages)
+	for i := range args.ManifestPath {
+		build(args.ManifestPath[i], stages)
 	}
 }
 
