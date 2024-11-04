@@ -151,11 +151,15 @@ to see its effects.
 
 ### ssg-manifest
 
-ssg-manifest supports 3 subcommands:
+ssg-manifest reads manifest(s) and apply changes specified in them.
+Because it is a multi-stage application, ssg-manifest supports 3 subcommands
+for better user experience:
 
 - ssg-manifest build
 
-  This is the default subcommand, and can also be involved with `build` subcommand.
+  This is the default subcommand. It can also be invoked with `build` subcommand,
+  for consistency. We can specify skip flags to `build`, which will make ssg-manifest
+  skip some particular stages during application of manifests.
 
   Synopsis:
 
