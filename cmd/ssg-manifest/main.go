@@ -6,40 +6,60 @@ import (
 	"github.com/soyart/ssg"
 )
 
-type mainArg struct {
-	ManifestPath []string `arg:"positional" help:"Path to JSON manifest"`
-	NoCleanup    bool     `arg:"--no-cleanup" help:"Skip cleanup stage"`
-	NoCopy       bool     `arg:"--no-copy" help:"Skip scopy stage"`
-	NoBuild      bool     `arg:"--no-build" help:"Skip build stage"`
+type cli struct {
+	Build     *argBuild `arg:"subcommand:build"`
+	Copy      *struct{} `arg:"subcommand:copy"`
+	Clean     *struct{} `arg:"subcommand:clean"`
+	Manifests []string  `arg:"-m,--manifest" help:"Path to JSON manifest"`
+}
+
+type argBuild struct {
+	NoCleanup bool `arg:"--no-cleanup" help:"Skip cleanup stage"`
+	NoCopy    bool `arg:"--no-copy" help:"Skip scopy stage"`
+	NoBuild   bool `arg:"--no-build" help:"Skip build stage"`
 }
 
 func main() {
-	path := "./manifest.json"
-	args := mainArg{}
-	arg.MustParse(&args)
+	cli := cli{}
+	arg.MustParse(&cli)
+	cli.run()
+}
 
+func (s *cli) run() {
 	stages := ssg.StagesAll
-	if args.NoCleanup {
-		stages &^= ssg.StageCleanUp
-	}
-	if args.NoCopy {
-		stages &^= ssg.StageCopy
-	}
-	if args.NoBuild {
-		stages &^= ssg.StageBuild
+
+	if len(s.Manifests) == 0 {
+		s.Manifests = []string{"./manifest.json"}
 	}
 
-	if len(args.ManifestPath) == 0 {
-		args.ManifestPath = []string{path}
+	switch {
+	case s.Copy != nil:
+		stages = ssg.StageCopy
+
+	case s.Clean != nil:
+		stages = ssg.StageCleanUp
+
+	case s.Build != nil:
+		args := s.Build
+
+		if args.NoCleanup {
+			stages &^= ssg.StageCleanUp
+		}
+		if args.NoCopy {
+			stages &^= ssg.StageCopy
+		}
+		if args.NoBuild {
+			stages &^= ssg.StageBuild
+		}
 	}
 
-	for i := range args.ManifestPath {
-		build(args.ManifestPath[i], stages)
+	for i := range s.Manifests {
+		build(s.Manifests[i], stages)
 	}
 }
 
 func build(path string, do ssg.Stage) {
-	err := ssg.BuildManifestFromPath(path, do)
+	err := ssg.ApplyManifest(path, do)
 	if err != nil {
 		panic(err)
 	}

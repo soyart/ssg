@@ -45,7 +45,7 @@ const (
 
 var loglevel = new(slog.LevelVar)
 
-func BuildManifestFromPath(path string, do Stage) error {
+func ApplyManifest(path string, do Stage) error {
 	logger := newLogger().With("manifest", path)
 	slog.SetDefault(logger)
 	slog.Info("parsing manifest")
@@ -56,7 +56,7 @@ func BuildManifestFromPath(path string, do Stage) error {
 		return err
 	}
 
-	return Build(m, do)
+	return Apply(m, do)
 }
 
 func NewManifest(filename string) (Manifest, error) {
@@ -215,7 +215,7 @@ func cleanup(m Manifest, targets map[string]setStr) error {
 	return nil
 }
 
-func Build(m Manifest, do Stage) error {
+func Apply(m Manifest, do Stage) error {
 	slog.Info("skip",
 		StageCleanUp.String(), willDo(do, StageCleanUp),
 		StageCopy.String(), willDo(do, StageCopy),
