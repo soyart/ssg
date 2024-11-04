@@ -32,7 +32,7 @@ func TestManifest(t *testing.T) {
 		t.Fatalf("cannot remove dst '%s': %v", m.Dst, err)
 	}
 
-	err = BuildManifestFromPath(filename)
+	err = BuildManifestFromPath(filename, StagesAll)
 	if err != nil {
 		t.Fatalf("error building manifest: %v", err)
 	}
