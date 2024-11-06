@@ -2,7 +2,7 @@
 
 This Nix Flake provides 2 implementations of ssg.
 
-## 1. The original POSIX shell ssg
+## POSIX shell ssg (original implementation)
 
 > See also: [romanzolotarev.com](https://romanzolotarev.com/ssg.html)
 
@@ -11,11 +11,12 @@ The original script is copied from [rgz.ee](https://romanzolotarev.com/bin/ssg).
 Through [`flake.nix`](./flake.nix), ssg's runtime dependencies will be included
 in the derivation.
 
-## 2. Go implementation of ssg (ssg-go)
+## Go implementation of ssg (ssg-go)
 
 My own implementation, using [github.com/gomarkdown/markdown](https://github.com/gomarkdown/markdown).
 
-This implementation is good for using ssg remotely, because it's just 1 executable.
+This implementation is good for deploying ssg remotely,
+because it's just 1 Go executable.
 
 ## Usage
 
@@ -155,36 +156,50 @@ ssg-manifest reads manifest(s) and apply changes specified in them.
 Because it is a multi-stage application, ssg-manifest supports 3 subcommands
 for better user experience:
 
-- ssg-manifest build
+- Default mode
 
-  This is the default subcommand. It can also be invoked with `build` subcommand,
-  for consistency. We can specify skip flags to `build`, which will make ssg-manifest
+  It builds `./manifest.json` with all stages.
+
+  Due to the limitation of the CLI library, this default
+  mode takes no arguments.
+
+  ```shell
+  # Build from ./manifest.json (default path)
+  ssg-manifest
+  ```
+- `ssg-manifest build`
+
+  This subcommands build sites from one or multiple manifests.
+
+  We can specify skip flags to `build`, which will make ssg-manifest
   skip some particular stages during application of manifests.
 
   Synopsis:
 
   ```shell
-  ssg-manifest [build] [--no-cleanup] [--no-copy] [--no-build] [...manifests]
+  ssg-manifest build [--no-cleanup] [--no-copy] [--no-build] [...manifests]
   ```
 
   Examples:
 
   ```shell
-  # Build from ./manifest.json (default path)
-  ssg-manifest
+  # Build from ./manifest.json (same with default behavior)
   ssg-manifest build
 
   # Build from ./m1.json and ./m2.sjon
-  ssg-manifest ./m1.json ./m2.json
   ssg-manifest build ./m1.json ./m2.json
 
   # Build from ./manifest.json without copying
-  ssg-manifest --no-copy
+  ssg-manifest build --no-copy
+
+  # Build from ./m1 and ./m2.json
+  # without actually building HTMLs from Markdowns
+  ssg-manifest build --no-build ./m1.json ./m2.json
   ```
 
-- ssg-manifest clean
+- `ssg-manifest clean`
 
-  Removes target files specified in the manifest's `copies` directive
+  Removes target files specified in the manifests' `copies` directive
 
   Synopsis:
 
@@ -192,9 +207,9 @@ for better user experience:
   ssg-manifest clean [...manifests]
   ```
 
-- ssg-manifest copy
+- `ssg-manifest copy`
 
-  Copy files specified in the manifest's `copies` directive
+  Copy files specified in the manifests' `copies` directive
 
   Synopsis:
 

@@ -7,15 +7,25 @@ import (
 )
 
 type cli struct {
-	Build   *struct{} `arg:"subcommand:build"` // Default (no subcommand) is also to build
-	Copy    *struct{} `arg:"subcommand:copy"`
-	Clean   *struct{} `arg:"subcommand:clean"`
-	CleanUp *struct{} `arg:"subcommand:cleanup"` // Same with clean
+	Build   *cmdBuild `arg:"subcommand:build"`
+	Copy    *cmdOther `arg:"subcommand:copy"`
+	Clean   *cmdOther `arg:"subcommand:clean"`   // Same with cleanup
+	CleanUp *cmdOther `arg:"subcommand:cleanup"` // Same with clean
+}
 
-	Manifests []string `arg:"-m,--manifest" help:"Path to JSON manifest"`
-	NoCleanup bool     `arg:"--no-cleanup" help:"Skip cleanup stage"`
-	NoCopy    bool     `arg:"--no-copy" help:"Skip scopy stage"`
-	NoBuild   bool     `arg:"--no-build" help:"Skip build stage"`
+type manifests struct {
+	Manifests []string `arg:"positional" help:"Paths to JSON manifests"`
+}
+
+type cmdBuild struct {
+	manifests
+	NoCleanup bool `arg:"--no-cleanup" help:"Skip cleanup stage"`
+	NoCopy    bool `arg:"--no-copy" help:"Skip scopy stage"`
+	NoBuild   bool `arg:"--no-build" help:"Skip build stage"`
+}
+
+type cmdOther struct {
+	manifests
 }
 
 func main() {
@@ -26,35 +36,39 @@ func main() {
 
 func (s *cli) run() {
 	stages := ssg.StagesAll
-
-	if len(s.Manifests) == 0 {
-		s.Manifests = []string{"./manifest.json"}
-	}
+	var manifests []string
 
 	switch {
-	case s.Copy != nil:
-		stages = ssg.StageCopy
-
-	case s.Clean != nil, s.CleanUp != nil:
-		stages = ssg.StageCleanUp
-
 	case s.Build != nil:
-		fallthrough
-
-	default:
-		if s.NoCleanup {
+		manifests = s.Build.Manifests
+		if s.Build.NoCleanup {
 			stages &^= ssg.StageCleanUp
 		}
-		if s.NoCopy {
+		if s.Build.NoCopy {
 			stages &^= ssg.StageCopy
 		}
-		if s.NoBuild {
+		if s.Build.NoBuild {
 			stages &^= ssg.StageBuild
 		}
+
+	case s.Copy != nil:
+		manifests = s.Copy.Manifests
+		stages = ssg.StageCopy
+
+	case s.Clean != nil:
+		s.CleanUp = s.Clean
+		fallthrough
+
+	case s.CleanUp != nil:
+		manifests = s.CleanUp.Manifests
+		stages = ssg.StageCleanUp
 	}
 
-	for i := range s.Manifests {
-		build(s.Manifests[i], stages)
+	if len(manifests) == 0 {
+		manifests = []string{"./manifest.json"}
+	}
+	for i := range manifests {
+		build(manifests[i], stages)
 	}
 }
 
