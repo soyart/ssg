@@ -1,27 +1,58 @@
 package ssg
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 )
 
-func TestManifest(t *testing.T) {
-	filename := "./manifest.json"
-	siteKey := "johndoe.com"
-
-	manifests, err := NewManifest(filename)
-	if err != nil {
-		t.Fatalf("unexpected error when opening test manifest file: %v", err)
+const (
+	manifestJSON = `
+{
+	"johndoe.com": {
+		"name": "JohnDoe.com",
+		"url": "https://johndoe.com",
+		"src": "testdata/johndoe.com/src",
+		"dst": "testdata/johndoe.com/dst",
+		"cleanup": true,
+		"copies": {
+			"testdata/assets/style.css": {
+				"target": "testdata/johndoe.com/src/style.css",
+				"force": true
+			},
+			"testdata/assets/some.txt": "testdata/johndoe.com/src/some-txt.txt",
+			"testdata/assets/some": {
+				"force": true,
+				"target": "testdata/johndoe.com/src/drop"
+			}
+		}
 	}
+}`
+)
+
+func prefix(p1, p2 string) string {
+	return fmt.Sprintf("%s/%s", p1, p2)
+}
+
+func TestManifest(t *testing.T) {
+	var manifests Manifest
+	err := json.Unmarshal([]byte(manifestJSON), &manifests)
+	if err != nil {
+		t.Fatalf("failed to parse JSON: %v", err.Error())
+	}
+
+	const siteKey = "johndoe.com"
 	m, ok := manifests[siteKey]
 	if !ok {
 		t.Fatalf("missing manifest for siteKey '%s'", siteKey)
 	}
 
+	dir := "testdata"
 	copies := []string{
-		"./assets/style.css",
-		"./assets/some.txt",
-		"./assets/some",
+		prefix(dir, "assets/style.css"),
+		prefix(dir, "assets/some.txt"),
+		prefix(dir, "assets/some"),
 	}
 	for i := range copies {
 		assertExists(t, m.Copies, copies[i])
@@ -32,14 +63,11 @@ func TestManifest(t *testing.T) {
 		t.Fatalf("cannot remove dst '%s': %v", m.Dst, err)
 	}
 
-	err = ApplyManifest(filename, StagesAll)
+	err = Apply(manifests, StagesAll)
 	if err != nil {
 		t.Fatalf("error building manifest: %v", err)
 	}
 
-	// Test copies
-	src := "johndoe.com/src"
-	dst := "johndoe.com/dst"
 	cpDirs := []string{
 		"/drop",
 	}
@@ -50,12 +78,14 @@ func TestManifest(t *testing.T) {
 	}
 
 	for i := range cpDirs {
-		assertFs(t, src+cpDirs[i], true)
-		assertFs(t, dst+cpDirs[i], true)
+		dir := cpDirs[i]
+		assertFs(t, prefix(m.Src, dir), true)
+		assertFs(t, prefix(m.Dst, dir), true)
 	}
 	for i := range cpFiles {
-		assertFs(t, src+cpFiles[i], false)
-		assertFs(t, dst+cpFiles[i], false)
+		file := cpFiles[i]
+		assertFs(t, prefix(m.Src, file), false)
+		assertFs(t, prefix(m.Dst, file), false)
 	}
 
 	err = os.RemoveAll(m.Dst)
@@ -67,6 +97,7 @@ func TestManifest(t *testing.T) {
 func assertExists[K comparable, V any](t *testing.T, m map[K]V, k K) {
 	_, ok := m[k]
 	if !ok {
+		t.Logf("map: %v", m)
 		t.Fatalf("map is missing key %v", k)
 	}
 }

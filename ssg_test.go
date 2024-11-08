@@ -8,7 +8,7 @@ import (
 )
 
 func TestPrepare(t *testing.T) {
-	root := "./johndoe.com"
+	root := "./testdata/johndoe.com"
 	src := filepath.Join(root, "/src")
 
 	ignores, err := prepare(src, "some/dir")
@@ -26,7 +26,7 @@ func TestPrepare(t *testing.T) {
 }
 
 func TestScan(t *testing.T) {
-	root := "./johndoe.com"
+	root := "./testdata/johndoe.com"
 	src := filepath.Join(root, "/src")
 	dst := filepath.Join(root, "/dst")
 	title := "JohnDoe.com"
