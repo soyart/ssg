@@ -316,19 +316,19 @@ func decodeTargetForce(entry interface{}) (WriteTarget, error) {
 			return WriteTarget{}, fmt.Errorf("invalid data type for field 'target', expecting string, got '%s'", reflect.TypeOf(targetRaw).String())
 		}
 
-		l := WriteTarget{Target: target}
+		w := WriteTarget{Target: target}
 
 		forceRaw, ok := data["force"]
 		if !ok {
-			return l, nil
+			return w, nil
 		}
 		force, ok := forceRaw.(bool)
 		if !ok {
-			return WriteTarget{}, fmt.Errorf("invalid data type for field 'target', expecting string, got '%s'", reflect.TypeOf(forceRaw).String())
+			return WriteTarget{}, fmt.Errorf("invalid data type for field 'target', expecting bool, got '%s'", reflect.TypeOf(forceRaw).String())
 		}
 
-		l.Force = force
-		return l, nil
+		w.Force = force
+		return w, nil
 	}
 
 	return WriteTarget{}, fmt.Errorf("bad entry data shape: '%v'", entry)
