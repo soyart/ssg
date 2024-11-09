@@ -694,27 +694,14 @@ func writeOut(writes []OutputFile) error {
 				return
 			}
 
-			f, err := os.OpenFile(w.target, os.O_RDWR|os.O_CREATE, os.ModePerm)
+			err = os.WriteFile(w.target, w.data, os.ModePerm)
 			if err != nil {
 				errs <- writeError{
 					err:    err,
 					target: w.target,
 				}
-
-				return
 			}
 
-			defer f.Close()
-
-			_, err = f.Write(w.data)
-			if err != nil {
-				errs <- writeError{
-					err:    err,
-					target: w.target,
-				}
-
-				return
-			}
 		}(&writes[i], wgWrites)
 	}
 
