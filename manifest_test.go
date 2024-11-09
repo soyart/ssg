@@ -165,9 +165,9 @@ func TestManifest(t *testing.T) {
 			assertExists(t, m.Copies, copies[i])
 		}
 
-		err = os.RemoveAll(m.Dst)
+		err = os.RemoveAll(m.ssg.Dst)
 		if err != nil && !os.IsNotExist(err) {
-			t.Fatalf("[case %d] cannot remove dst '%s': %v", i, m.Dst, err)
+			t.Fatalf("[case %d] cannot remove dst '%s': %v", i, m.ssg.Dst, err)
 		}
 
 		err = Apply(manifests, StagesAll)
@@ -177,16 +177,16 @@ func TestManifest(t *testing.T) {
 
 		for i := range tc.newDirsBoth {
 			dir := tc.newDirsBoth[i]
-			assertFs(t, prefix(m.Src, dir), true)
-			assertFs(t, prefix(m.Dst, dir), true)
+			assertFs(t, prefix(m.ssg.Src, dir), true)
+			assertFs(t, prefix(m.ssg.Dst, dir), true)
 		}
 		for i := range tc.newFilesBoth {
 			file := tc.newFilesBoth[i]
-			assertFs(t, prefix(m.Src, file), false)
-			assertFs(t, prefix(m.Dst, file), false)
+			assertFs(t, prefix(m.ssg.Src, file), false)
+			assertFs(t, prefix(m.ssg.Dst, file), false)
 		}
 
-		err = os.RemoveAll(m.Dst)
+		err = os.RemoveAll(m.ssg.Dst)
 		if err != nil {
 			t.Logf("[case %d] failed to cleaning up directory after", i)
 			break

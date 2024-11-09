@@ -26,9 +26,9 @@ const (
 type Manifest map[string]Site
 
 type Site struct {
-	Copies map[string]WriteTarget `json:"-"`
-	Ssg
-	CleanUp bool `json:"cleanup"`
+	Copies  map[string]WriteTarget `json:"-"`
+	ssg     Ssg                    `json:"-"`
+	CleanUp bool                   `json:"-"`
 }
 
 type WriteTarget struct {
@@ -46,7 +46,7 @@ type manifestError struct {
 var loglevel = new(slog.LevelVar)
 
 func Apply(m Manifest, do Stage) error {
-	slog.Info("skip",
+	slog.Info("stages",
 		StageCleanUp.String(), willDo(do, StageCleanUp),
 		StageCopy.String(), willDo(do, StageCopy),
 		StageBuild.String(), willDo(do, StageBuild),
@@ -74,7 +74,7 @@ func Apply(m Manifest, do Stage) error {
 
 		slog.SetDefault(old.
 			WithGroup("copy").
-			With("key", key, "url", site.Url),
+			With("key", key, "url", site.ssg.Url),
 		)
 
 		if err := site.Copy(); err != nil {
@@ -98,10 +98,10 @@ func Apply(m Manifest, do Stage) error {
 
 		old.
 			WithGroup("build").
-			With("key", key, "url", site.Url).
+			With("key", key, "url", site.ssg.Url).
 			Info("building site")
 
-		err := site.Ssg.Generate()
+		err := site.ssg.Generate()
 		if err != nil {
 			return manifestError{
 				err:   err,
@@ -158,27 +158,30 @@ func (s manifestError) Unwrap() error {
 }
 
 func (s *Site) UnmarshalJSON(b []byte) error {
-	var tmp struct {
-		Copies map[string]interface{} `json:"copies"`
-		Ssg
-		CleanUp bool `json:"cleanup"`
+	var tmpl struct {
+		Copies  map[string]interface{} `json:"copies"`
+		CleanUp bool                   `json:"cleanup"`
+		Src     string                 `json:"src"`
+		Dst     string                 `json:"dst"`
+		Title   string                 `json:"title"`
+		Url     string                 `json:"url"`
 	}
 
-	err := json.Unmarshal(b, &tmp)
+	err := json.Unmarshal(b, &tmpl)
 	if err != nil {
 		return err
 	}
 
 	copies := make(map[string]WriteTarget)
-	err = decodeTargetsForce(tmp.Copies, copies)
+	err = decodeTargetsForce(tmpl.Copies, copies)
 	if err != nil {
 		return err
 	}
 
 	*s = Site{
-		CleanUp: tmp.CleanUp,
+		CleanUp: tmpl.CleanUp,
 		Copies:  copies,
-		Ssg:     New(tmp.Src, tmp.Dst, tmp.Title, tmp.Url),
+		ssg:     New(tmpl.Src, tmpl.Dst, tmpl.Title, tmpl.Url),
 	}
 
 	return nil
@@ -231,7 +234,7 @@ func collect(m Manifest) (map[string]setStr, error) {
 			targets[key] = make(setStr)
 		}
 
-		logger := slog.Default().WithGroup("collect").With("key", key, "url", site.Url)
+		logger := slog.Default().WithGroup("collect").With("key", key, "url", site.ssg.Url)
 		for src, dst := range site.Copies {
 			if !dups.insert(dst.Target) {
 				if targets[key].insert(dst.Target) {
@@ -261,7 +264,7 @@ func cleanup(m Manifest, targets map[string]setStr) error {
 			continue
 		}
 
-		logger := slog.Default().WithGroup("cleanup").With("key", key, "url", site.Url)
+		logger := slog.Default().WithGroup("cleanup").With("key", key, "url", site.ssg.Url)
 		siteTargets := targets[key]
 		for target := range siteTargets {
 			logger.Info("cleaning up", "target", target)

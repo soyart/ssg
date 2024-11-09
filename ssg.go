@@ -47,10 +47,10 @@ const (
 
 type (
 	Ssg struct {
-		Src   string `json:"src"`
-		Dst   string `json:"dst"`
-		Title string `json:"title"`
-		Url   string `json:"url"`
+		Src   string
+		Dst   string
+		Title string
+		Url   string
 
 		ssgignores setStr
 		headers    headers
