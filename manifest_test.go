@@ -7,8 +7,23 @@ import (
 	"testing"
 )
 
-const (
-	manifestJSON = `
+func prefix(p1, p2 string) string {
+	return fmt.Sprintf("%s/%s", p1, p2)
+}
+
+func TestManifest(t *testing.T) {
+	type testCase struct {
+		manifestJSON string
+		siteKey      string
+		dir          string
+		copies       []string
+		newDirsBoth  []string // new dirs in src and dst
+		newFilesBoth []string // new files in src and dst
+	}
+
+	tests := []testCase{
+		{
+			manifestJSON: `
 {
 	"johndoe.com": {
 		"name": "JohnDoe.com",
@@ -28,69 +43,154 @@ const (
 			}
 		}
 	}
-}`
-)
-
-func prefix(p1, p2 string) string {
-	return fmt.Sprintf("%s/%s", p1, p2)
-}
-
-func TestManifest(t *testing.T) {
-	var manifests Manifest
-	err := json.Unmarshal([]byte(manifestJSON), &manifests)
-	if err != nil {
-		t.Fatalf("failed to parse JSON: %v", err.Error())
+}`,
+			siteKey: "johndoe.com",
+			dir:     "testdata",
+			copies: []string{
+				"assets/style.css",
+				"assets/some.txt",
+				"assets/some",
+			},
+			newDirsBoth: []string{
+				"/drop",
+			},
+			newFilesBoth: []string{
+				"/style.css",
+				"/some-txt.txt",
+				"/drop/nested/path/some.env",
+				"/drop/fonts/fake-font.ttf",
+				"/drop/fonts/fake-font-bold.ttf",
+			},
+		},
+		{
+			manifestJSON: `
+{
+	"johndoe.com": {
+		"name": "JohnDoe.com",
+		"url": "https://johndoe.com",
+		"src": "testdata/johndoe.com/src",
+		"dst": "testdata/johndoe.com/dst",
+		"cleanup": true,
+		"copies": {
+			"testdata/assets/style.css": {
+				"target": "testdata/johndoe.com/src/style.css",
+				"force": true
+			},
+			"testdata/assets/some.txt": "testdata/johndoe.com/src/some-txt.txt",
+			"testdata/assets/some/fonts": {
+				"force": true,
+				"target": "testdata/johndoe.com/src/drop"
+			}
+		}
+	}
+}`,
+			siteKey: "johndoe.com",
+			dir:     "testdata",
+			copies: []string{
+				"assets/style.css",
+				"assets/some/fonts",
+			},
+			newDirsBoth: []string{
+				"/drop",
+			},
+			newFilesBoth: []string{
+				"/style.css",
+				"/some-txt.txt",
+				"/drop/fake-font.ttf",
+				"/drop/fake-font-bold.ttf",
+			},
+		},
+		{
+			manifestJSON: `
+{
+	"johndoe.com": {
+		"name": "JohnDoe.com",
+		"url": "https://johndoe.com",
+		"src": "testdata/johndoe.com/src",
+		"dst": "testdata/johndoe.com/dst",
+		"cleanup": true,
+		"copies": {
+			"testdata/assets/style.css": {
+				"target": "testdata/johndoe.com/src/style.css",
+				"force": true
+			},
+			"testdata/assets/some.txt": "testdata/johndoe.com/src/debug/some-txt.txt",
+			"testdata/assets/some/nested/path/some.env": "testdata/johndoe.com/src/assets/env",
+			"testdata/assets/some/fonts": {
+				"force": true,
+				"target": "testdata/johndoe.com/src/assets"
+			}
+		}
+	}
+}`,
+			siteKey: "johndoe.com",
+			dir:     "testdata",
+			copies: []string{
+				"assets/style.css",
+				"assets/some/fonts",
+			},
+			newDirsBoth: []string{
+				"/assets",
+				"/debug",
+			},
+			newFilesBoth: []string{
+				"/style.css",
+				"/debug/some-txt.txt",
+				"/assets/env",
+				"/assets/fake-font.ttf",
+				"/assets/fake-font-bold.ttf",
+			},
+		},
 	}
 
-	const siteKey = "johndoe.com"
-	m, ok := manifests[siteKey]
-	if !ok {
-		t.Fatalf("missing manifest for siteKey '%s'", siteKey)
-	}
+	for i := range tests {
+		tc := &tests[i]
+		var manifests Manifest
+		err := json.Unmarshal([]byte(tc.manifestJSON), &manifests)
+		if err != nil {
+			t.Fatalf("[case %d] failed to parse JSON: %v", i, err.Error())
+		}
 
-	dir := "testdata"
-	copies := []string{
-		prefix(dir, "assets/style.css"),
-		prefix(dir, "assets/some.txt"),
-		prefix(dir, "assets/some"),
-	}
-	for i := range copies {
-		assertExists(t, m.Copies, copies[i])
-	}
+		m, ok := manifests[tc.siteKey]
+		if !ok {
+			t.Fatalf("[case %d] missing manifest for siteKey '%s'", i, tc.siteKey)
+		}
 
-	err = os.RemoveAll(m.Dst)
-	if err != nil && !os.IsNotExist(err) {
-		t.Fatalf("cannot remove dst '%s': %v", m.Dst, err)
-	}
+		copies := make([]string, len(tc.copies))
+		for i := range copies {
+			copies[i] = prefix(tc.dir, tc.copies[i])
+		}
 
-	err = Apply(manifests, StagesAll)
-	if err != nil {
-		t.Fatalf("error building manifest: %v", err)
-	}
+		for i := range copies {
+			assertExists(t, m.Copies, copies[i])
+		}
 
-	cpDirs := []string{
-		"/drop",
-	}
-	cpFiles := []string{
-		"/style.css",
-		"/drop/fonts/fake-font",
-		"/drop/fonts/fake-font-bold",
-	}
+		err = os.RemoveAll(m.Dst)
+		if err != nil && !os.IsNotExist(err) {
+			t.Fatalf("[case %d] cannot remove dst '%s': %v", i, m.Dst, err)
+		}
 
-	for i := range cpDirs {
-		dir := cpDirs[i]
-		assertFs(t, prefix(m.Src, dir), true)
-		assertFs(t, prefix(m.Dst, dir), true)
-	}
-	for i := range cpFiles {
-		file := cpFiles[i]
-		assertFs(t, prefix(m.Src, file), false)
-		assertFs(t, prefix(m.Dst, file), false)
-	}
+		err = Apply(manifests, StagesAll)
+		if err != nil {
+			t.Fatalf("[case %d] error building manifest: %v", i, err)
+		}
 
-	err = os.RemoveAll(m.Dst)
-	if err != nil {
-		t.Logf("failed to cleaning up directory after")
+		for i := range tc.newDirsBoth {
+			dir := tc.newDirsBoth[i]
+			assertFs(t, prefix(m.Src, dir), true)
+			assertFs(t, prefix(m.Dst, dir), true)
+		}
+		for i := range tc.newFilesBoth {
+			file := tc.newFilesBoth[i]
+			assertFs(t, prefix(m.Src, file), false)
+			assertFs(t, prefix(m.Dst, file), false)
+		}
+
+		err = os.RemoveAll(m.Dst)
+		if err != nil {
+			t.Logf("[case %d] failed to cleaning up directory after", i)
+			break
+		}
 	}
 }
 
