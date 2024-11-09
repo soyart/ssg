@@ -119,14 +119,12 @@ xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 
 	for i := range outputs {
 		o := &outputs[i]
-
 		target, err := filepath.Rel(dst, o.target)
 		if err != nil {
 			return sm.String(), err
 		}
 
-		opening := fmt.Sprintf("<url><loc>%s/", url)
-		sm.WriteString(opening)
+		fmt.Fprintf(sm, "<url><loc>%s/", url)
 
 		/* There're 2 possibilities for this
 		1. First is when the HTML is some/path/index.html
@@ -136,17 +134,19 @@ xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 		<url><loc>https://example.com/some/path/page.html</loc><lastmod>2024-10-04</lastmod><priority>1.0</priority></url>
 		*/
 
-		switch filepath.Base(target) {
+		base := filepath.Base(target)
+		switch base {
 		case "index.html":
-			sm.WriteString(filepath.Dir(target))
-			sm.WriteRune('/')
+			d := filepath.Dir(target)
+			if d != "." {
+				fmt.Fprintf(sm, "%s/", d)
+			}
 
 		default:
 			sm.WriteString(target)
 		}
 
-		closing := fmt.Sprintf("><lastmod>%s</lastmod><priority>1.0</priority></url>\n", dateStr)
-		sm.WriteString(closing)
+		fmt.Fprintf(sm, "><lastmod>%s</lastmod><priority>1.0</priority></url>\n", dateStr)
 	}
 
 	sm.WriteString("</urlset>")
@@ -177,12 +177,10 @@ func prepare(src, dst string) (setStr, error) {
 	}
 
 	ignores := make(setStr)
-
 	s := bufio.NewScanner(bytes.NewBuffer(b))
 	for s.Scan() {
 		ignore := s.Text()
 		ignore = filepath.Join(src, ignore)
-
 		if ignores.contains(ignore) {
 			return nil, fmt.Errorf("duplicate ssgignore entry: '%s'", ignore)
 		}
@@ -517,7 +515,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 
 	// Copy header as string,
 	// so the underlying bytes.Buffer is unchanged and ready for the next file
-	headerText := []byte(header.String())
+	headerText := []byte(header.String()) //nolint:gosimple
 	switch header.titleFrom {
 	case fromH1:
 		headerText = titleFromH1([]byte(s.Title), headerText, data)

@@ -76,7 +76,6 @@ func TestScan(t *testing.T) {
 
 func TestTitleFromH1(t *testing.T) {
 	type testCase struct {
-		d        string // Default header
 		head     string
 		markdown string
 		expected string
@@ -145,7 +144,6 @@ Some para`,
 
 func TestTitleFromTag(t *testing.T) {
 	type testCase struct {
-		d                string // Default header
 		head             string
 		markdown         string
 		expectedHead     string

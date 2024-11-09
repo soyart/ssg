@@ -11,6 +11,18 @@ import (
 	"reflect"
 )
 
+type Stage int
+
+const (
+	StageCollect Stage = -1
+	// These stages can be skipped
+	StageCleanUp Stage = 1 << iota
+	StageCopy
+	StageBuild
+
+	StagesAll = StageCollect | StageCleanUp | StageCopy | StageBuild
+)
+
 type Manifest map[string]Site
 
 type Site struct {
@@ -24,8 +36,6 @@ type WriteTarget struct {
 	Force  bool   `json:"force"`
 }
 
-type Stage int
-
 type manifestError struct {
 	err   error
 	key   string
@@ -33,17 +43,77 @@ type manifestError struct {
 	stage Stage
 }
 
-const (
-	StageCollect Stage = -1
-	// These stages can be skipped
-	StageCleanUp Stage = 1 << iota
-	StageCopy
-	StageBuild
-
-	StagesAll = StageCollect | StageCleanUp | StageCopy | StageBuild
-)
-
 var loglevel = new(slog.LevelVar)
+
+func Apply(m Manifest, do Stage) error {
+	slog.Info("skip",
+		StageCleanUp.String(), willDo(do, StageCleanUp),
+		StageCopy.String(), willDo(do, StageCopy),
+		StageBuild.String(), willDo(do, StageBuild),
+	)
+
+	targets, err := collect(m)
+	if err != nil {
+		return err
+	}
+
+	if willDo(do, StageCleanUp) {
+		err = cleanup(m, targets)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Copy
+	old := slog.Default()
+	for key, site := range m {
+		if !willDo(do, StageCopy) {
+			old.Info("skipping stage copy")
+			break
+		}
+
+		slog.SetDefault(old.
+			WithGroup("copy").
+			With("key", key, "url", site.Url),
+		)
+
+		if err := site.Copy(); err != nil {
+			return manifestError{
+				err:   err,
+				key:   key,
+				msg:   "failed to copy",
+				stage: StageCopy,
+			}
+		}
+
+		slog.SetDefault(old)
+	}
+
+	// Build
+	for key, site := range m {
+		if !willDo(do, StageBuild) {
+			old.Info("skipping stage build")
+			break
+		}
+
+		old.
+			WithGroup("build").
+			With("key", key, "url", site.Url).
+			Info("building site")
+
+		err := site.Ssg.Generate()
+		if err != nil {
+			return manifestError{
+				err:   err,
+				key:   key,
+				msg:   "failed to build",
+				stage: StageBuild,
+			}
+		}
+	}
+
+	return nil
+}
 
 func ApplyManifest(path string, do Stage) error {
 	logger := newLogger().With("manifest", path)
@@ -215,76 +285,6 @@ func cleanup(m Manifest, targets map[string]setStr) error {
 	return nil
 }
 
-func Apply(m Manifest, do Stage) error {
-	slog.Info("skip",
-		StageCleanUp.String(), willDo(do, StageCleanUp),
-		StageCopy.String(), willDo(do, StageCopy),
-		StageBuild.String(), willDo(do, StageBuild),
-	)
-
-	targets, err := collect(m)
-	if err != nil {
-		return err
-	}
-
-	if willDo(do, StageCleanUp) {
-		err = cleanup(m, targets)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Copy
-	old := slog.Default()
-	for key, site := range m {
-		if !willDo(do, StageCopy) {
-			old.Info("skipping stage copy")
-			break
-		}
-
-		slog.SetDefault(old.
-			WithGroup("copy").
-			With("key", key, "url", site.Url),
-		)
-
-		if err := site.Copy(); err != nil {
-			return manifestError{
-				err:   err,
-				key:   key,
-				msg:   "failed to copy",
-				stage: StageCopy,
-			}
-		}
-
-		slog.SetDefault(old)
-	}
-
-	// Build
-	for key, site := range m {
-		if !willDo(do, StageBuild) {
-			old.Info("skipping stage build")
-			break
-		}
-
-		old.
-			WithGroup("build").
-			With("key", key, "url", site.Url).
-			Info("building site")
-
-		err := site.Ssg.Generate()
-		if err != nil {
-			return manifestError{
-				err:   err,
-				key:   key,
-				msg:   "failed to build",
-				stage: StageBuild,
-			}
-		}
-	}
-
-	return nil
-}
-
 func decodeTargetsForce(m map[string]interface{}, target map[string]WriteTarget) error {
 	for k, entry := range m {
 		link, err := decodeTargetForce(entry)
@@ -420,6 +420,9 @@ func cp(src string, dst WriteTarget) error {
 func cpRecurse(src string, dst WriteTarget) error {
 	dstRoot := dst.Target
 	err := filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
 		if d == nil {
 			return nil
 		}
