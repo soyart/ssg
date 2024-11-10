@@ -8,20 +8,27 @@ import (
 )
 
 func TestPrepare(t *testing.T) {
-	root := "./testdata/johndoe.com"
-	src := filepath.Join(root, "/src")
-
-	ignores, err := prepare(src, "some/dir")
+	src := "./testdata/johndoe.com/src"
+	ignores, err := prepare(src, "some/destination")
 	if err != nil {
 		t.Errorf("unexpected error from prepare: %v", err)
 	}
 
-	if l := len(ignores); l != 1 {
-		t.Fatalf("unexpected length of ssgignore (expecting 1): %d", l)
+	expected := []string{
+		"testignore/ignored.md",
+		"testignore/ignoreroot",
 	}
 
-	if !ignores.contains(filepath.Join(src, "/foo/ignored.html")) {
-		t.Fatalf("expecting foo/ignored.html in ssgignore")
+	if lenExpected, lenActual := len(expected), len(ignores); lenExpected != lenActual {
+		t.Fatalf("unexpected length of ssgignore (expecting %d): %d", lenExpected, lenActual)
+	}
+	for i := range expected {
+		ignored := expected[i]
+		if ignores.contains(filepath.Join(src, ignored)) {
+			continue
+		}
+
+		t.Fatalf("expecting %s in ssgignore", ignored)
 	}
 }
 
