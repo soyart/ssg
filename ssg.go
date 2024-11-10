@@ -15,6 +15,7 @@ import (
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
 	"github.com/gomarkdown/markdown/parser"
+	"github.com/sabhiram/go-gitignore"
 )
 
 const (
@@ -52,7 +53,7 @@ type (
 		Title string
 		Url   string
 
-		ssgignores setStr
+		ssgignores *ignore.GitIgnore
 		headers    headers
 		footers    footers
 		preferred  setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
@@ -153,7 +154,7 @@ xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 	return sm.String(), nil
 }
 
-func prepare(src, dst string) (setStr, error) {
+func prepare(src, dst string) (*ignore.GitIgnore, error) {
 	if src == "" {
 		return nil, fmt.Errorf("empty src")
 	}
@@ -164,25 +165,13 @@ func prepare(src, dst string) (setStr, error) {
 		return nil, fmt.Errorf("src is identical to dst: '%s'", src)
 	}
 
-	b, err := os.ReadFile(filepath.Join(src, ".ssgignore"))
+	ssgignore := filepath.Join(src, ".ssgignore")
+	ignores, err := ignore.CompileIgnoreFile(ssgignore)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-
-		return nil, err
-	}
-
-	ignores := make(setStr)
-	s := bufio.NewScanner(bytes.NewBuffer(b))
-	for s.Scan() {
-		ignore := s.Text()
-		ignore = filepath.Join(src, ignore)
-		if ignores.contains(ignore) {
-			return nil, fmt.Errorf("duplicate ssgignore entry: '%s'", ignore)
-		}
-
-		ignores.insert(ignore)
+		return nil, fmt.Errorf("failed to parse ssgignore at %s: %w", ssgignore, err)
 	}
 
 	return ignores, nil
@@ -327,7 +316,7 @@ func (s *Ssg) WriteOut() error {
 	return nil
 }
 
-func shouldIgnore(ignores setStr, path, base string, d fs.DirEntry) (bool, error) {
+func shouldIgnore(ignores *ignore.GitIgnore, path, base string, d fs.DirEntry) (bool, error) {
 	isDot := strings.HasPrefix(base, ".")
 	isDir := d.IsDir()
 
@@ -342,15 +331,8 @@ func shouldIgnore(ignores setStr, path, base string, d fs.DirEntry) (bool, error
 	case isDot, isDir:
 		return true, nil
 
-	case ignores.contains(path):
+	case ignores.MatchesPath(path):
 		return true, nil
-	}
-
-	// TODO: handle case where prefix won't work
-	for ignored := range ignores {
-		if strings.HasPrefix(path, ignored) {
-			return true, nil
-		}
 	}
 
 	// Ignore symlink

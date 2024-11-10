@@ -5,32 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/sabhiram/go-gitignore"
 )
-
-func TestPrepare(t *testing.T) {
-	src := "./testdata/johndoe.com/src"
-	ignores, err := prepare(src, "some/destination")
-	if err != nil {
-		t.Errorf("unexpected error from prepare: %v", err)
-	}
-
-	expected := []string{
-		"testignore/ignored.md",
-		"testignore/ignoreroot",
-	}
-
-	if lenExpected, lenActual := len(expected), len(ignores); lenExpected != lenActual {
-		t.Fatalf("unexpected length of ssgignore (expecting %d): %d", lenExpected, lenActual)
-	}
-	for i := range expected {
-		ignored := expected[i]
-		if ignores.contains(filepath.Join(src, ignored)) {
-			continue
-		}
-
-		t.Fatalf("expecting %s in ssgignore", ignored)
-	}
-}
 
 func TestScan(t *testing.T) {
 	root := "./testdata/johndoe.com"
@@ -247,5 +224,99 @@ Some para  `,
 
 			t.Fatalf("unexpected modified markdown value for case %d", i+1)
 		}
+	}
+}
+
+// Test that the library we use actually does what we want it to
+func TestSsgignore(t *testing.T) {
+	type testCase struct {
+		ignores  []string
+		path     string
+		expected bool
+	}
+
+	tests := []testCase{
+		{
+			ignores: []string{
+				"testignore",
+			},
+			path:     "testignore",
+			expected: true,
+		},
+		{
+			ignores: []string{
+				"testignore",
+			},
+			path:     "testignore/",
+			expected: true,
+		},
+		{
+			ignores: []string{
+				"testignore",
+			},
+			path:     "testignore/one",
+			expected: true,
+		},
+		{
+			ignores: []string{
+				"test*",
+			},
+			path:     "testignore/one",
+			expected: true,
+		},
+		{
+			ignores: []string{
+				"testignore",
+				"!prefix/testignore",
+			},
+			path:     "prefix/testignore/",
+			expected: false,
+		},
+		{
+			ignores: []string{
+				"!prefix/testignore",
+				"testignore",
+			},
+			path:     "prefix/testignore/",
+			expected: true,
+		},
+		{
+			ignores: []string{
+				"testignore",
+				"!testignore/important/",
+			},
+			path:     "testignore/important/data",
+			expected: false,
+		},
+		{
+			ignores: []string{
+				"testignore",
+				"!testignore/important*",
+			},
+			path:     "testignore/important/data",
+			expected: false,
+		},
+		{
+			ignores: []string{
+				"testignore/trash/**",
+				"#!testignore/trash/**/keep", // Comment
+			},
+			path:     "testignore/trash/some/path/keep/data",
+			expected: true,
+		},
+	}
+
+	for i := range tests {
+		tc := &tests[i]
+		ignores := ignore.CompileIgnoreLines(tc.ignores...)
+		if ignores == nil {
+			panic("bad ignore lines")
+		}
+		ignored := ignores.MatchesPath(tc.path)
+		if tc.expected == ignored {
+			continue
+		}
+
+		t.Fatalf("[case %d] unexpected ignore value, expecting %v, got %v", i+1, tc.expected, ignored)
 	}
 }
