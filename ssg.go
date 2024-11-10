@@ -150,7 +150,6 @@ xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 	}
 
 	sm.WriteString("</urlset>")
-
 	return sm.String(), nil
 }
 
@@ -158,11 +157,9 @@ func prepare(src, dst string) (setStr, error) {
 	if src == "" {
 		return nil, fmt.Errorf("empty src")
 	}
-
 	if dst == "" {
 		return nil, fmt.Errorf("empty dst")
 	}
-
 	if src == dst {
 		return nil, fmt.Errorf("src is identical to dst: '%s'", src)
 	}
@@ -215,22 +212,18 @@ func Generate(sites ...Ssg) error {
 		if !ok {
 			return fmt.Errorf("ssg-go bug: unexpected missing stat for directory %s (url='%s')", s.Src, s.Url)
 		}
-
 		err := s.WriteOut()
 		if err != nil {
 			return fmt.Errorf("error writing out to %s: %w", s.Dst, err)
 		}
-
 		if s.Url == "" {
 			s.pront(len(s.dist))
 			return nil
 		}
-
 		sitemap, err := Sitemap(s.Dst, s.Url, stat.ModTime(), s.dist)
 		if err != nil {
 			return err
 		}
-
 		err = os.WriteFile(s.Dst+"/sitemap.xml", []byte(sitemap), os.ModePerm)
 		if err != nil {
 			return err
@@ -247,17 +240,14 @@ func (s *Ssg) Generate() error {
 	if err != nil {
 		return err
 	}
-
 	dist, err := s.Build()
 	if err != nil {
 		return err
 	}
-
 	err = s.WriteOut()
 	if err != nil {
 		return err
 	}
-
 	if s.Url == "" {
 		s.pront(len(dist))
 		return nil
@@ -267,14 +257,12 @@ func (s *Ssg) Generate() error {
 	if err != nil {
 		return err
 	}
-
 	err = os.WriteFile(s.Dst+"/sitemap.xml", []byte(sitemap), os.ModePerm)
 	if err != nil {
 		return err
 	}
 
 	s.pront(len(dist) + 1)
-
 	return nil
 }
 
@@ -287,7 +275,6 @@ func (s *Ssg) Build() ([]OutputFile, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	err = filepath.WalkDir(s.Src, s.build)
 	if err != nil {
 		return nil, err
@@ -314,27 +301,26 @@ func (s *Ssg) WriteOut() error {
 		return err
 	}
 
-	files := new(strings.Builder)
+	files := bytes.NewBuffer(nil)
 	for i := range s.dist {
 		f := &s.dist[i]
 		path, err := filepath.Rel(s.Dst, f.target)
 		if err != nil {
 			return err
 		}
-
+		// Replace Markdown extension
 		if filepath.Ext(path) == ".html" {
 			path = strings.TrimSuffix(path, ".html")
 			path += ".md"
 		}
 
-		files.WriteString("./")
-		files.WriteString(path)
-		files.WriteRune('\n')
+		fmt.Fprintf(files, "./%s\n", path)
 	}
 
-	err = os.WriteFile(filepath.Join(s.Dst, ".files"), []byte(files.String()), os.ModePerm)
+	target := filepath.Join(s.Dst, ".files")
+	err = os.WriteFile(target, files.Bytes(), os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("error writing .files: %w", err)
+		return fmt.Errorf("error writing %s: %w", target, err)
 	}
 
 	return nil
@@ -371,9 +357,9 @@ func shouldIgnore(ignores setStr, path, base string, d fs.DirEntry) (bool, error
 		if os.IsNotExist(err) {
 			return true, nil
 		}
-
 		return false, err
 	}
+
 	if fileIs(stat, os.ModeSymlink) {
 		return true, nil
 	}
@@ -398,19 +384,19 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 	}
 
 	// Collect cascading headers and footers
+	placeholderH1 := []byte(placeholderFromH1)
+	placeholderTag := []byte(placeholderFromTag)
 	switch base {
 	case "_header.html":
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-
 		var from from
 		switch {
-		case bytes.Contains(data, []byte(placeholderFromH1)):
+		case bytes.Contains(data, placeholderH1):
 			from = fromH1
-
-		case bytes.Contains(data, []byte(placeholderFromTag)):
+		case bytes.Contains(data, placeholderTag):
 			from = fromTag
 		}
 
@@ -429,7 +415,6 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 		if err != nil {
 			return err
 		}
-
 		err = s.footers.add(filepath.Dir(path), bytes.NewBuffer(data))
 		if err != nil {
 			return err
@@ -441,7 +426,6 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 	if filepath.Ext(base) != ".html" {
 		return nil
 	}
-
 	if s.preferred.insert(path) {
 		return fmt.Errorf("duplicate html file %s", path)
 	}
@@ -485,7 +469,6 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	case ".md":
 		html := strings.TrimSuffix(path, ".md")
 		html += ".html"
-
 		if s.preferred.contains(html) {
 			return nil
 		}
@@ -496,7 +479,6 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 		if err != nil {
 			return err
 		}
-
 		s.dist = append(s.dist, OutputFile{
 			target: target,
 			data:   data,
@@ -598,7 +580,6 @@ func titleFromTag(
 
 		header = bytes.Replace(header, t, title, 1)
 		markdown = bytes.Replace(markdown, append(line, []byte{'\n', '\n'}...), nil, 1)
-
 		return header, markdown
 	}
 
@@ -613,7 +594,6 @@ func trimRightWhitespace(b []byte) []byte {
 		case ' ', '\t':
 			return true
 		}
-
 		return false
 	})
 }
@@ -637,7 +617,6 @@ func mirrorPath(
 		path = strings.TrimSuffix(path, ext)
 		path += newExt
 	}
-
 	path, err := filepath.Rel(src, path)
 	if err != nil {
 		return "", err
@@ -655,14 +634,12 @@ func writeOut(writes []OutputFile) error {
 	wgErrs.Add(1)
 	go func(wg *sync.WaitGroup) {
 		defer wg.Done()
-
 		var wErrs []error
-
 		for err := range errs {
 			wErrs = append(wErrs, err)
 		}
-
 		err = errors.Join(wErrs...)
+
 	}(wgErrs)
 
 	wgWrites := new(sync.WaitGroup)
