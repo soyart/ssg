@@ -28,7 +28,9 @@ ssg reads Markdown files from `src`, prepends it with `_header.html`,
 and appends it with content of `_footer.html`. The output files are mirrored
 into `dst`. Files or directories whose names start with `.` are skipped.
 
-Files listed in `${src}/.ssgignore` are also ignored.
+Files listed in `${src}/.ssgignore` are also ignored in a fashion similar
+to `.gitignore`. To see how `.ssgignore` works in Go implementation, see
+[the test `TestSsgignore`](./ssg_test.go).
 
 If we have `foo.html` and `foo.md`, the HTML file wins.
 

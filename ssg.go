@@ -53,7 +53,7 @@ type (
 		Title string
 		Url   string
 
-		ssgignores *ignore.GitIgnore
+		ssgignores ignorer
 		headers    headers
 		footers    footers
 		preferred  setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
@@ -68,6 +68,14 @@ type (
 	writeError struct {
 		err    error
 		target string
+	}
+
+	ignorerGitignore struct {
+		*ignore.GitIgnore
+	}
+
+	ignorer interface {
+		ignore(path string) bool
 	}
 )
 
@@ -154,7 +162,7 @@ xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 	return sm.String(), nil
 }
 
-func prepare(src, dst string) (*ignore.GitIgnore, error) {
+func prepare(src, dst string) (*ignorerGitignore, error) {
 	if src == "" {
 		return nil, fmt.Errorf("empty src")
 	}
@@ -174,7 +182,7 @@ func prepare(src, dst string) (*ignore.GitIgnore, error) {
 		return nil, fmt.Errorf("failed to parse ssgignore at %s: %w", ssgignore, err)
 	}
 
-	return ignores, nil
+	return &ignorerGitignore{GitIgnore: ignores}, nil
 }
 
 func Generate(sites ...Ssg) error {
@@ -316,7 +324,7 @@ func (s *Ssg) WriteOut() error {
 	return nil
 }
 
-func shouldIgnore(ignores *ignore.GitIgnore, path, base string, d fs.DirEntry) (bool, error) {
+func shouldIgnore(ignores ignorer, path, base string, d fs.DirEntry) (bool, error) {
 	isDot := strings.HasPrefix(base, ".")
 	isDir := d.IsDir()
 
@@ -331,7 +339,7 @@ func shouldIgnore(ignores *ignore.GitIgnore, path, base string, d fs.DirEntry) (
 	case isDot, isDir:
 		return true, nil
 
-	case ignores.MatchesPath(path):
+	case ignores.ignore(path):
 		return true, nil
 	}
 
@@ -349,6 +357,17 @@ func shouldIgnore(ignores *ignore.GitIgnore, path, base string, d fs.DirEntry) (
 	}
 
 	return false, nil
+}
+
+func (i *ignorerGitignore) ignore(path string) bool {
+	if i == nil {
+		return false
+	}
+	if i.GitIgnore == nil {
+		return false
+	}
+
+	return i.MatchesPath(path)
 }
 
 // scan scans the source directory for header and footer files,
