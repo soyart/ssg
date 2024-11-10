@@ -529,9 +529,9 @@ func (w writeError) Error() string {
 // titleFromH1 finds the first h1 in markdown and uses the h1 title
 // to write to <title> tag in header.
 func titleFromH1(d []byte, header []byte, markdown []byte) []byte {
-	s := bufio.NewScanner(bytes.NewBuffer(markdown))
 	k := []byte(keyTitleFromH1)
 	t := []byte(targetFromH1)
+	s := bufio.NewScanner(bytes.NewBuffer(markdown))
 
 	for s.Scan() {
 		line := s.Bytes()
@@ -562,9 +562,10 @@ func titleFromTag(
 	[]byte,
 	[]byte,
 ) {
-	s := bufio.NewScanner(bytes.NewBuffer(markdown))
 	k := []byte(keyTitleFromTag)
 	t := []byte(targetFromTag)
+	s := bufio.NewScanner(bytes.NewBuffer(markdown))
+
 	for s.Scan() {
 		line := s.Bytes()
 		if !bytes.HasPrefix(line, k) {
@@ -627,62 +628,52 @@ func mirrorPath(
 
 // writeOut blocks and writes concurrently to output locations.
 func writeOut(writes []OutputFile) error {
-	wgErrs := new(sync.WaitGroup)
 	errs := make(chan writeError)
-
-	var err error
-	wgErrs.Add(1)
-	go func(wg *sync.WaitGroup) {
-		defer wg.Done()
-		var wErrs []error
-		for err := range errs {
-			wErrs = append(wErrs, err)
-		}
-		err = errors.Join(wErrs...)
-
-	}(wgErrs)
-
-	wgWrites := new(sync.WaitGroup)
+	wg := new(sync.WaitGroup)
 	guard := make(chan struct{}, 20)
+
 	for i := range writes {
-		wgWrites.Add(1)
+		wg.Add(1)
 		guard <- struct{}{}
 
 		go func(w *OutputFile, wg *sync.WaitGroup) {
-			var err error
-
-			defer func() {
-				wg.Done()
-				fmt.Fprintf(os.Stdout, "%s\n", w.target)
-			}()
-
+			defer wg.Done()
 			<-guard
 
-			d := filepath.Dir(w.target)
-			err = os.MkdirAll(d, os.ModePerm)
+			err := os.MkdirAll(filepath.Dir(w.target), os.ModePerm)
 			if err != nil {
 				errs <- writeError{
 					err:    err,
 					target: w.target,
 				}
-
 				return
 			}
-
 			err = os.WriteFile(w.target, w.data, os.ModePerm)
 			if err != nil {
 				errs <- writeError{
 					err:    err,
 					target: w.target,
 				}
+				return
 			}
 
-		}(&writes[i], wgWrites)
+			fmt.Fprintf(os.Stdout, "%s\n", w.target)
+
+		}(&writes[i], wg)
 	}
 
-	wgWrites.Wait()
-	close(errs)
+	go func() {
+		wg.Wait()
+		close(errs)
+	}()
 
-	wgErrs.Wait()
-	return err
+	var wErrs []error
+	for err := range errs { // Blocks here until errs is closed
+		wErrs = append(wErrs, err)
+	}
+	if len(wErrs) > 0 {
+		return errors.Join(wErrs...)
+	}
+
+	return nil
 }
