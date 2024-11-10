@@ -314,6 +314,7 @@ func (s *Ssg) WriteOut() error {
 			path += ".md"
 		}
 
+		fmt.Fprintf(os.Stdout, "%s\n", f.target)
 		fmt.Fprintf(files, "./%s\n", path)
 	}
 
@@ -345,6 +346,7 @@ func shouldIgnore(ignores setStr, path, base string, d fs.DirEntry) (bool, error
 		return true, nil
 	}
 
+	// TODO: handle case where prefix won't work
 	for ignored := range ignores {
 		if strings.HasPrefix(path, ignored) {
 			return true, nil
@@ -656,9 +658,6 @@ func writeOut(writes []OutputFile) error {
 				}
 				return
 			}
-
-			fmt.Fprintf(os.Stdout, "%s\n", w.target)
-
 		}(&writes[i], wg)
 	}
 
