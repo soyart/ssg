@@ -636,12 +636,14 @@ func writeOut(writes []OutputFile) error {
 	guard := make(chan struct{}, 20)
 
 	for i := range writes {
-		wg.Add(1)
 		guard <- struct{}{}
+		wg.Add(1)
 
 		go func(w *OutputFile, wg *sync.WaitGroup) {
-			defer wg.Done()
-			<-guard
+			defer func() {
+				<-guard
+				wg.Done()
+			}()
 
 			err := os.MkdirAll(filepath.Dir(w.target), os.ModePerm)
 			if err != nil {
