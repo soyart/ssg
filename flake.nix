@@ -59,7 +59,7 @@ rec {
 
           pname = "ssg";
           src = ./.;
-          vendorHash = "sha256-7uTw0JuVtwz6uUbNNPqGrUj9mwOtjcvr3NNwetlkUpo=";
+          vendorHash = "sha256-Q4fDv3n+TBdjQDQkBEjrL4rFV51XHdxt/J4QZ+sdKOI=";
           # Go unit tests are already executed by buildGoModule.
           # preBuild would instead be more useful if we want to set Go flags.
           # preBuild = ''
