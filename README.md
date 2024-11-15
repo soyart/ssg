@@ -2,23 +2,23 @@
 
 This Nix Flake provides 2 implementations of ssg.
 
-## POSIX shell ssg (original implementation)
+- POSIX shell ssg
 
-> See also: [romanzolotarev.com](https://romanzolotarev.com/ssg.html)
+  > See also: [romanzolotarev.com](https://romanzolotarev.com/ssg.html)
 
-The original script is copied from [rgz.ee](https://romanzolotarev.com/bin/ssg).
+  The original script is copied from [rgz.ee](https://romanzolotarev.com/bin/ssg).
 
-Through [`flake.nix`](./flake.nix), ssg's runtime dependencies will be included
-in the derivation.
+  Through [`flake.nix`](./flake.nix), ssg's runtime dependencies will be included
+  in the derivation.
 
-## Go implementation of ssg (ssg-go)
+- Go implementation of ssg (ssg-go)
 
-My own implementation, using [github.com/gomarkdown/markdown](https://github.com/gomarkdown/markdown).
+  My own implementation, using [github.com/gomarkdown/markdown](https://github.com/gomarkdown/markdown).
 
-This implementation is good for deploying ssg remotely,
-because it's just 1 Go executable.
+  This implementation is good for deploying ssg remotely,
+  because it's just 1 Go executable.
 
-## Usage
+## Usage for both
 
 ```sh
 ssg <src> <dst> <title> <url>
@@ -39,7 +39,7 @@ into mirrored `dst`.
 
 ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
 
-### Differences between ssg and ssg-go
+## Differences between ssg and ssg-go
 
 - Like the original, ssg-go accepts a CLI parameter `title` (3rd arg)
   that will be used as default `<title>` tag inside `<head>` (*head title*).
@@ -49,12 +49,25 @@ ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
 
   - `{{from-h1}}`
 
-    This will prompt ssg-go to use the first `<h1>` tag value as head title.
+    This will prompt ssg-go to use the first Markdown line starting with `#` value as head title.
+    For example, if this is your Markdown:
+
+    ```markdown
+    ## This is H2
+
+    # This is H1
+
+    : This is also an H1
+
+    This is paragraph
+    ```
+
+    then `This is H1` will be used as the page's title.
 
   - `{{from-tag}}`
 
-    This will prompt ssg-go to find the first line starting with `:title`,
-    and use it as the document head title.
+    Like with `{{from-h1}}`, but finds the first line starting with `:title` instead,
+    i.e. `This is also an H1` from the example above will be used as the page's title.
 
   For example, consider the following header/footer templates and a Markdown page:
 
@@ -137,6 +150,19 @@ ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
   - `/blog/index.md` will use `/blog/_header.html`
 
   - `/blog/2023/baz/index.md` will use `/blog/2023/_header.html`
+
+- ssg-go allows users to configure concurrent write goroutines (green threads).
+
+  ssg-go by default writes 20 files concurrently. This concurrent threads can
+  be configured by setting env `SSG_PARALLEL_WRITES` to a non-zero positive integer.
+
+  If the env value is illegal, ssg-go falls back to 20 concurrent write threads.
+
+  To write outputs sequentially, run:
+
+  ```shell
+  SSG_PARALLEL_WRITES=1 ssg mySrc myDst myTitle myUrl
+  ```
 
 ## Manifests
 

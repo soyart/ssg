@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -44,40 +45,42 @@ const (
 	targetFromTag      = "{{from-tag}}"
 	placeholderFromH1  = "<title>" + targetFromH1 + "</title>"
 	placeholderFromTag = "<title>" + targetFromTag + "</title>"
+
+	parallelWritesEnvKey      = "SSG_PARALLEL_WRITES"
+	parallelWritesDefault int = 20
 )
 
-type (
-	Ssg struct {
-		Src   string
-		Dst   string
-		Title string
-		Url   string
+type Ssg struct {
+	Src   string
+	Dst   string
+	Title string
+	Url   string
 
-		ssgignores ignorer
-		headers    headers
-		footers    footers
-		preferred  setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
-		dist       []OutputFile
-	}
+	ssgignores     ignorer
+	headers        headers
+	footers        footers
+	preferred      setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
+	dist           []OutputFile
+	parallelWrites int
+}
 
-	OutputFile struct {
-		target string
-		data   []byte
-	}
+type OutputFile struct {
+	target string
+	data   []byte
+}
 
-	writeError struct {
-		err    error
-		target string
-	}
+type writeError struct {
+	err    error
+	target string
+}
 
-	ignorerGitignore struct {
-		*ignore.GitIgnore
-	}
+type ignorerGitignore struct {
+	*ignore.GitIgnore
+}
 
-	ignorer interface {
-		ignore(path string) bool
-	}
-)
+type ignorer interface {
+	ignore(path string) bool
+}
 
 func New(src, dst, title, url string) Ssg {
 	ignores, err := prepare(src, dst)
@@ -85,15 +88,23 @@ func New(src, dst, title, url string) Ssg {
 		panic(err)
 	}
 
+	writes := parallelWritesDefault
+	writesEnv := os.Getenv(parallelWritesEnvKey)
+	writesParsed, err := strconv.ParseUint(writesEnv, 10, 32)
+	if err == nil && writesParsed != 0 {
+		writes = int(writesParsed)
+	}
+
 	return Ssg{
-		Src:        src,
-		Dst:        dst,
-		Title:      title,
-		Url:        url,
-		ssgignores: ignores,
-		preferred:  make(setStr),
-		headers:    newHeaders(headerDefault),
-		footers:    newFooters(footerDefault),
+		Src:            src,
+		Dst:            dst,
+		Title:          title,
+		Url:            url,
+		ssgignores:     ignores,
+		preferred:      make(setStr),
+		headers:        newHeaders(headerDefault),
+		footers:        newFooters(footerDefault),
+		parallelWrites: writes,
 	}
 }
 
@@ -293,7 +304,7 @@ func (s *Ssg) WriteOut() error {
 		return err
 	}
 
-	err = writeOut(s.dist)
+	err = writeOut(s.dist, s.parallelWrites)
 	if err != nil {
 		return err
 	}
@@ -311,7 +322,6 @@ func (s *Ssg) WriteOut() error {
 			path += ".md"
 		}
 
-		fmt.Fprintf(os.Stdout, "%s\n", f.target)
 		fmt.Fprintf(files, "./%s\n", path)
 	}
 
@@ -630,10 +640,10 @@ func mirrorPath(
 }
 
 // writeOut blocks and writes concurrently to output locations.
-func writeOut(writes []OutputFile) error {
-	errs := make(chan writeError)
+func writeOut(writes []OutputFile, parallelWrites int) error {
 	wg := new(sync.WaitGroup)
-	guard := make(chan struct{}, 20)
+	errs := make(chan writeError)
+	guard := make(chan struct{}, parallelWrites)
 
 	for i := range writes {
 		guard <- struct{}{}
@@ -661,6 +671,9 @@ func writeOut(writes []OutputFile) error {
 				}
 				return
 			}
+
+			fmt.Fprintln(os.Stdout, w.target)
+
 		}(&writes[i], wg)
 	}
 
