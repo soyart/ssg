@@ -42,7 +42,8 @@ const (
 func newHeaders(defaultHeader string) headers {
 	return headers{
 		perDir: newPerDir(header{
-			Buffer: bytes.NewBufferString(defaultHeader),
+			Buffer:    bytes.NewBufferString(defaultHeader),
+			titleFrom: fromH1,
 		}),
 	}
 }
