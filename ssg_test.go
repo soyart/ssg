@@ -16,7 +16,7 @@ func TestScan(t *testing.T) {
 	title := "JohnDoe.com"
 	url := "https://johndoe.com"
 
-	ssg := New(src, dst, title, url)
+	ssg := NewWithParallelWrites(src, dst, title, url)
 	err := filepath.WalkDir(root, ssg.scan)
 	if err != nil {
 		t.Errorf("unexpected error from scan: %v", err)

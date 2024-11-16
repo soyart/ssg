@@ -181,7 +181,7 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 	*s = Site{
 		CleanUp: tmpl.CleanUp,
 		Copies:  copies,
-		ssg:     New(tmpl.Src, tmpl.Dst, tmpl.Title, tmpl.Url),
+		ssg:     NewWithParallelWrites(tmpl.Src, tmpl.Dst, tmpl.Title, tmpl.Url),
 	}
 
 	return nil
@@ -225,13 +225,13 @@ func newLogger() *slog.Logger {
 	return logger
 }
 
-func collect(m Manifest) (map[string]setStr, error) {
+func collect(m Manifest) (map[string]set, error) {
 	// Collect and detect duplicate write dups
-	dups := make(setStr)
-	targets := make(map[string]setStr)
+	dups := make(set)
+	targets := make(map[string]set)
 	for key, site := range m {
 		if targets[key] == nil {
-			targets[key] = make(setStr)
+			targets[key] = make(set)
 		}
 
 		logger := slog.Default().WithGroup("collect").With("key", key, "url", site.ssg.Url)
@@ -257,7 +257,7 @@ func collect(m Manifest) (map[string]setStr, error) {
 	return targets, nil
 }
 
-func cleanup(m Manifest, targets map[string]setStr) error {
+func cleanup(m Manifest, targets map[string]set) error {
 	// Cleanup
 	for key, site := range m {
 		if !site.CleanUp {
@@ -337,7 +337,7 @@ func decodeTargetForce(entry interface{}) (WriteTarget, error) {
 func (s *Site) Copy() error {
 	logger := slog.Default()
 
-	dirs := make(setStr)
+	dirs := make(set)
 	for cpSrc, cpDst := range s.Copies {
 		logger := logger.With("phase", "scan", "cpSrc", cpSrc, "cpDst", cpDst)
 
@@ -453,7 +453,7 @@ func cpRecurse(src string, dst WriteTarget) error {
 	return nil
 }
 
-func copyFiles(dirs setStr, src string, dst WriteTarget) error {
+func copyFiles(dirs set, src string, dst WriteTarget) error {
 	switch {
 	// Copy dir to dir, with target not yet existing
 	case dirs.contains(src) && !dirs.contains(dst.Target):

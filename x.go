@@ -22,7 +22,7 @@ type (
 		titleFrom from
 	}
 
-	setStr map[string]struct{}
+	set map[string]struct{}
 
 	headers struct {
 		perDir[header]
@@ -99,14 +99,14 @@ func choose[T any](path string, valueDefault T, m map[string]T) T {
 
 }
 
-func (s setStr) insert(v string) bool {
+func (s set) insert(v string) bool {
 	_, ok := s[v]
 	s[v] = struct{}{}
 
 	return ok
 }
 
-func (s setStr) contains(items ...string) bool {
+func (s set) contains(items ...string) bool {
 	for _, v := range items {
 		_, ok := s[v]
 		if !ok {

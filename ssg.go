@@ -59,7 +59,7 @@ type Ssg struct {
 	ssgignores     ignorer
 	headers        headers
 	footers        footers
-	preferred      setStr // Used to prefer html and ignore md files with identical names, as with the original ssg
+	preferred      set // Used to prefer html and ignore md files with identical names, as with the original ssg
 	dist           []OutputFile
 	parallelWrites int
 }
@@ -88,24 +88,29 @@ func New(src, dst, title, url string) Ssg {
 		panic(err)
 	}
 
-	writes := parallelWritesDefault
-	writesEnv := os.Getenv(parallelWritesEnvKey)
-	writesParsed, err := strconv.ParseUint(writesEnv, 10, 32)
-	if err == nil && writesParsed != 0 {
-		writes = int(writesParsed)
-	}
-
 	return Ssg{
 		Src:            src,
 		Dst:            dst,
 		Title:          title,
 		Url:            url,
 		ssgignores:     ignores,
-		preferred:      make(setStr),
+		preferred:      make(set),
 		headers:        newHeaders(headerDefault),
 		footers:        newFooters(footerDefault),
-		parallelWrites: writes,
+		parallelWrites: parallelWritesDefault,
 	}
+}
+
+func NewWithParallelWrites(src, dst, title, url string) Ssg {
+	s := New(src, dst, title, url)
+
+	writesEnv := os.Getenv(parallelWritesEnvKey)
+	writes, err := strconv.ParseUint(writesEnv, 10, 32)
+	if err == nil && writes != 0 {
+		s.parallelWrites = int(writes)
+	}
+
+	return s
 }
 
 func ToHtml(md []byte) []byte {
