@@ -15,7 +15,8 @@ func init() {
 	m.AddFunc(mediaType, html.Minify)
 }
 
-func SsgPipeline(htmlDoc []byte) ([]byte, error) {
+// Minify the whole HTML output
+func SsgPipelineMinifyHtml(htmlDoc []byte) ([]byte, error) {
 	minified := bytes.NewBuffer(nil)
 	err := m.Minify(mediaType, minified, bytes.NewBuffer(htmlDoc))
 	if err != nil {

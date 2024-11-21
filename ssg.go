@@ -66,6 +66,8 @@ type Ssg struct {
 	pipelines func([]byte) ([]byte, error)
 }
 
+type Option func(*Ssg)
+
 type OutputFile struct {
 	target string
 	data   []byte
@@ -250,8 +252,20 @@ func Generate(sites ...Ssg) error {
 	return nil
 }
 
-func (s *Ssg) WithPipeline(f func([]byte) ([]byte, error)) {
-	s.pipelines = f
+func (s *Ssg) With(opts ...Option) {
+	for i := range opts {
+		opts[i](s)
+	}
+}
+
+// Pipeline assigns f to be called on full output of a file
+// which is not ignored, overriden, copied
+// i.e. f will only be applied on files that will be converted
+// by ssg from Markdown to HTML.
+func Pipeline(f func([]byte) ([]byte, error)) Option {
+	return func(s *Ssg) {
+		s.pipelines = f
+	}
 }
 
 func (s *Ssg) Generate() error {
