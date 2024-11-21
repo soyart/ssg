@@ -63,7 +63,8 @@ type Ssg struct {
 	dist           []OutputFile
 	parallelWrites int
 
-	pipelines func([]byte) ([]byte, error)
+	pipeline func(path string, data []byte) ([]byte, error) // Applied to all unignored files
+	hook     func(data []byte) ([]byte, error)              // Applied to converted files
 }
 
 type Option func(*Ssg)
@@ -258,13 +259,17 @@ func (s *Ssg) With(opts ...Option) {
 	}
 }
 
-// Pipeline assigns f to be called on full output of a file
-// which is not ignored, overriden, copied
-// i.e. f will only be applied on files that will be converted
-// by ssg from Markdown to HTML.
-func Pipeline(f func([]byte) ([]byte, error)) Option {
+func Pipeline(f func(string, []byte) ([]byte, error)) Option {
 	return func(s *Ssg) {
-		s.pipelines = f
+		s.pipeline = f
+	}
+}
+
+// Hook assigns f to be called on full output of files
+// that will be converted by ssg from Markdown to HTML.
+func Hook(f func([]byte) ([]byte, error)) Option {
+	return func(s *Ssg) {
+		s.hook = f
 	}
 }
 
@@ -500,6 +505,13 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 		return err
 	}
 
+	if s.pipeline != nil {
+		data, err = s.pipeline(path, data)
+		if err != nil {
+			return fmt.Errorf("hook error when building %s: %w", path, err)
+		}
+	}
+
 	ext := filepath.Ext(base)
 
 	switch ext {
@@ -548,10 +560,10 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	out.Write(ToHtml(data))
 	out.Write(footer.Bytes())
 
-	if s.pipelines != nil {
-		b, err := s.pipelines(out.Bytes())
+	if s.hook != nil {
+		b, err := s.hook(out.Bytes())
 		if err != nil {
-			return fmt.Errorf("pipelines error when building %s: %w", path, err)
+			return fmt.Errorf("hook error when building %s: %w", path, err)
 		}
 
 		out = bytes.NewBuffer(b)

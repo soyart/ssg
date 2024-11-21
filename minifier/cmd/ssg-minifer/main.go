@@ -17,7 +17,10 @@ func main() {
 
 	src, dst, title, url := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
 	s := ssg.NewWithParallelWrites(src, dst, title, url)
-	s.With(ssg.Pipeline(minifier.SsgPipelineMinifyHtml))
+	s.With(
+		ssg.Pipeline(minifier.SsgPipelineMinifyCss),
+		ssg.Hook(minifier.SsgHookMinifyHtml),
+	)
 
 	err := s.Generate()
 	if err != nil {
