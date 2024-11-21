@@ -62,6 +62,8 @@ type Ssg struct {
 	preferred      set // Used to prefer html and ignore md files with identical names, as with the original ssg
 	dist           []OutputFile
 	parallelWrites int
+
+	pipelines func([]byte) ([]byte, error)
 }
 
 type OutputFile struct {
@@ -246,6 +248,10 @@ func Generate(sites ...Ssg) error {
 	}
 
 	return nil
+}
+
+func (s *Ssg) WithPipeline(f func([]byte) ([]byte, error)) {
+	s.pipelines = f
 }
 
 func (s *Ssg) Generate() error {
@@ -527,6 +533,15 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	out := bytes.NewBuffer(headerText)
 	out.Write(ToHtml(data))
 	out.Write(footer.Bytes())
+
+	if s.pipelines != nil {
+		b, err := s.pipelines(out.Bytes())
+		if err != nil {
+			return fmt.Errorf("pipelines error when building %s: %w", path, err)
+		}
+
+		out = bytes.NewBuffer(b)
+	}
 
 	s.dist = append(s.dist, OutputFile{
 		target: target,
