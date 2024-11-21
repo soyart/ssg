@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"syscall"
 
 	"github.com/soyart/ssg"
@@ -19,15 +18,7 @@ func main() {
 	src, dst, title, url := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
 	s := ssg.NewWithParallelWrites(src, dst, title, url)
 	s.With(
-		ssg.Pipeline(func(path string, b []byte) ([]byte, error) {
-			switch filepath.Ext(path) {
-			case ".css":
-				return minifier.MinifyCss(b)
-			}
-
-			return b, nil
-		}),
-
+		ssg.Pipeline(minifier.Minify),
 		ssg.Hook(minifier.MinifyHtml),
 	)
 

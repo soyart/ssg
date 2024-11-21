@@ -7,16 +7,19 @@ import (
 	"github.com/tdewolff/minify/v2"
 	"github.com/tdewolff/minify/v2/css"
 	"github.com/tdewolff/minify/v2/html"
+	"github.com/tdewolff/minify/v2/json"
 )
 
 const mediaTypeHtml = "text/html"
 const mediaTypeCss = "style/css"
+const mediaTypeJson = "application/json"
 
 var m = minify.New()
 
 func init() {
 	m.AddFunc(mediaTypeHtml, html.Minify)
 	m.AddFunc(mediaTypeCss, css.Minify)
+	m.AddFunc(mediaTypeJson, json.Minify)
 }
 
 func MinifyHtml(htmlDoc []byte) ([]byte, error) {
@@ -39,11 +42,25 @@ func MinifyCss(cssDoc []byte) ([]byte, error) {
 	return minified.Bytes(), nil
 }
 
-func SsgPipeline(path string, cssDoc []byte) ([]byte, error) {
-	switch filepath.Ext(path) {
-	case ".css":
-		return MinifyCss(cssDoc)
+func MinifyJson(jsonDoc []byte) ([]byte, error) {
+	minified := bytes.NewBuffer(nil)
+	err := m.Minify(mediaTypeJson, minified, bytes.NewBuffer(jsonDoc))
+	if err != nil {
+		return nil, err
 	}
 
-	return cssDoc, nil
+	return minified.Bytes(), nil
+}
+
+func Minify(path string, data []byte) ([]byte, error) {
+	switch filepath.Ext(path) {
+	case ".html":
+		return MinifyHtml(data)
+	case ".css":
+		return MinifyCss(data)
+	case ".json":
+		return MinifyJson(data)
+	}
+
+	return data, nil
 }
