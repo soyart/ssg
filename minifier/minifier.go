@@ -19,11 +19,17 @@ func init() {
 	m.AddFunc(mediaTypeCss, css.Minify)
 }
 
-func SsgPipelineMinifyCss(path string, cssDoc []byte) ([]byte, error) {
-	if filepath.Ext(path) != ".css" {
-		return cssDoc, nil
+func MinifyHtml(htmlDoc []byte) ([]byte, error) {
+	minified := bytes.NewBuffer(nil)
+	err := m.Minify(mediaTypeHtml, minified, bytes.NewBuffer(htmlDoc))
+	if err != nil {
+		return nil, err
 	}
 
+	return minified.Bytes(), nil
+}
+
+func MinifyCss(cssDoc []byte) ([]byte, error) {
 	minified := bytes.NewBuffer(nil)
 	err := m.Minify(mediaTypeCss, minified, bytes.NewBuffer(cssDoc))
 	if err != nil {
@@ -33,13 +39,11 @@ func SsgPipelineMinifyCss(path string, cssDoc []byte) ([]byte, error) {
 	return minified.Bytes(), nil
 }
 
-// Minify the whole HTML output
-func SsgHookMinifyHtml(htmlDoc []byte) ([]byte, error) {
-	minified := bytes.NewBuffer(nil)
-	err := m.Minify(mediaTypeHtml, minified, bytes.NewBuffer(htmlDoc))
-	if err != nil {
-		return nil, err
+func SsgPipeline(path string, cssDoc []byte) ([]byte, error) {
+	switch filepath.Ext(path) {
+	case ".css":
+		return MinifyCss(cssDoc)
 	}
 
-	return minified.Bytes(), nil
+	return cssDoc, nil
 }
