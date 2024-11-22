@@ -8,6 +8,7 @@ import (
 	"github.com/soyart/ssg/soyweb"
 )
 
+// TODO: cli option for walking dir
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stdout, "expecting 1 argument")
@@ -15,13 +16,7 @@ func main() {
 	}
 
 	filename := os.Args[1]
-	doc, err := os.ReadFile(filename)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "failed to read input file '%s': %v\n", filename, err)
-		syscall.Exit(2)
-	}
-
-	minified, err := soyweb.MinifyAll(filename, doc)
+	minified, err := soyweb.MinifyFile(filename)
 	if err != nil {
 		panic(err)
 	}
