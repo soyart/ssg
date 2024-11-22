@@ -18,7 +18,7 @@ func main() {
 	src, dst, title, url := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
 	s := ssg.NewWithOptions(src, dst, title, url,
 		ssg.ParallelWritesEnv(),
-		ssg.Pipeline(soyweb.Minify),
+		ssg.Pipeline(soyweb.MinifyAll),
 		ssg.Hook(soyweb.MinifyHtml),
 	)
 

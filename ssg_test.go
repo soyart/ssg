@@ -10,7 +10,7 @@ import (
 )
 
 func TestScan(t *testing.T) {
-	root := "./testdata/johndoe.com"
+	root := "./soyweb/testdata/johndoe.com"
 	src := filepath.Join(root, "/src")
 	dst := filepath.Join(root, "/dst")
 	title := "JohnDoe.com"

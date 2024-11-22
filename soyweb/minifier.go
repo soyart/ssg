@@ -52,7 +52,7 @@ func MinifyJson(jsonDoc []byte) ([]byte, error) {
 	return minified.Bytes(), nil
 }
 
-func Minify(path string, data []byte) ([]byte, error) {
+func MinifyAll(path string, data []byte) ([]byte, error) {
 	switch filepath.Ext(path) {
 	case ".html":
 		return MinifyHtml(data)
