@@ -82,13 +82,27 @@ func choose[T any](path string, valueDefault T, m map[string]T) T {
 		return chosen
 	}
 
+	parts := strings.Split(path, "/")
 	chosen, max := valueDefault, 0
-	for prefix, v := range m {
-		l := len(prefix)
-		if max > l {
-			continue
+
+outer:
+	for stored, v := range m {
+		prefixes := strings.Split(stored, "/")
+		for i := range parts {
+			if i >= len(prefixes) {
+				break
+			}
+
+			part := parts[i]
+			prefix := prefixes[i]
+
+			if part != prefix {
+				continue outer
+			}
 		}
-		if !strings.HasPrefix(path, prefix) {
+
+		l := len(stored)
+		if max > l {
 			continue
 		}
 
@@ -96,7 +110,6 @@ func choose[T any](path string, valueDefault T, m map[string]T) T {
 	}
 
 	return chosen
-
 }
 
 func (s set) insert(v string) bool {
