@@ -1,5 +1,7 @@
 # ssg static site generator
 
+> See also: [soyweb](./soyweb/)
+
 This Nix Flake provides 2 implementations of ssg.
 
 - POSIX shell ssg
@@ -164,83 +166,3 @@ ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
   SSG_PARALLEL_WRITES=1 ssg mySrc myDst myTitle myUrl
   ```
 
-## Manifests
-
-My original use case for ssg was with a [shell wrapper](https://github.com/soyart/webtools)
-that facilitates building multiple sites with ssg.
-
-The wrapper tool used to have a declarative JSON manifest that specifies
-source, destination, files to link or copy, and flag for cleaning up garbage.
-
-Those capabilities are now implemented by [`Manifest`](./manifest.go),
-and accessible on the command-line via [`ssg-manifest`](./cmd/ssg-manifest/).
-
-See `manifest.json` as example, or clone this repo and run [`./cmd/ssg-manifest/`]
-to see its effects.
-
-### ssg-manifest
-
-ssg-manifest reads manifest(s) and apply changes specified in them.
-Because it is a multi-stage application, ssg-manifest supports 3 subcommands
-for better user experience:
-
-- Default mode
-
-  It builds `./manifest.json` with all stages.
-
-  Due to the limitation of the CLI library, this default
-  mode takes no arguments.
-
-  ```shell
-  # Build from ./manifest.json (default path)
-  ssg-manifest
-  ```
-- `ssg-manifest build`
-
-  This subcommands build sites from one or multiple manifests.
-
-  We can specify skip flags to `build`, which will make ssg-manifest
-  skip some particular stages during application of manifests.
-
-  Synopsis:
-
-  ```shell
-  ssg-manifest build [--no-cleanup] [--no-copy] [--no-build] [...manifests]
-  ```
-
-  Examples:
-
-  ```shell
-  # Build from ./manifest.json (same with default behavior)
-  ssg-manifest build
-
-  # Build from ./m1.json and ./m2.sjon
-  ssg-manifest build ./m1.json ./m2.json
-
-  # Build from ./manifest.json without copying
-  ssg-manifest build --no-copy
-
-  # Build from ./m1 and ./m2.json
-  # without actually building HTMLs from Markdowns
-  ssg-manifest build --no-build ./m1.json ./m2.json
-  ```
-
-- `ssg-manifest clean`
-
-  Removes target files specified in the manifests' `copies` directive
-
-  Synopsis:
-
-  ```shell
-  ssg-manifest clean [...manifests]
-  ```
-
-- `ssg-manifest copy`
-
-  Copy files specified in the manifests' `copies` directive
-
-  Synopsis:
-
-  ```shell
-  ssg-manifest copy [...manifests]
-  ```

@@ -1,16 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"syscall"
 
-	"github.com/tdewolff/minify/v2"
-	"github.com/tdewolff/minify/v2/html"
+	"github.com/soyart/ssg/soyweb"
 )
-
-const mediaType = "text/html"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -25,14 +21,10 @@ func main() {
 		syscall.Exit(2)
 	}
 
-	m := minify.New()
-	m.AddFunc(mediaType, html.Minify)
-
-	minified := bytes.NewBuffer(nil)
-	err = m.Minify(mediaType, minified, bytes.NewBuffer(doc))
+	minified, err := soyweb.MinifyAll(filename, doc)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Fprintf(os.Stdout, "%s\n", minified.Bytes())
+	fmt.Fprintf(os.Stdout, "%s\n", minified)
 }
