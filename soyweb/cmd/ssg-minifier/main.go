@@ -6,7 +6,7 @@ import (
 	"syscall"
 
 	"github.com/soyart/ssg"
-	"github.com/soyart/ssg/minifier"
+	"github.com/soyart/ssg/soyweb"
 )
 
 func main() {
@@ -18,8 +18,8 @@ func main() {
 	src, dst, title, url := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
 	s := ssg.NewWithOptions(src, dst, title, url,
 		ssg.ParallelWritesEnv(),
-		ssg.Pipeline(minifier.Minify),
-		ssg.Hook(minifier.MinifyHtml),
+		ssg.Pipeline(soyweb.Minify),
+		ssg.Hook(soyweb.MinifyHtml),
 	)
 
 	err := s.Generate()

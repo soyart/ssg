@@ -1,4 +1,4 @@
-package minifier
+package soyweb
 
 import (
 	"bytes"

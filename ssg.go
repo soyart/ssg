@@ -249,10 +249,12 @@ func Generate(sites ...Ssg) error {
 	return nil
 }
 
-func (s *Ssg) With(opts ...Option) {
+func (s *Ssg) With(opts ...Option) *Ssg {
 	for i := range opts {
 		opts[i](s)
 	}
+
+	return s
 }
 
 func ParallelWritesEnv() Option {

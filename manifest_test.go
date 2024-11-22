@@ -170,7 +170,7 @@ func TestManifest(t *testing.T) {
 			t.Fatalf("[case %d] cannot remove dst '%s': %v", i, m.ssg.Dst, err)
 		}
 
-		err = Apply(manifests, StagesAll)
+		err = ApplyManifest(manifests, StagesAll)
 		if err != nil {
 			t.Fatalf("[case %d] error building manifest: %v", i, err)
 		}

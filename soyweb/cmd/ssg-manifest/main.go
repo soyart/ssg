@@ -73,7 +73,7 @@ func (s *cli) run() {
 }
 
 func build(path string, do ssg.Stage) {
-	err := ssg.ApplyManifest(path, do)
+	err := ssg.ApplyFromManifest(path, do, ssg.ParallelWritesEnv())
 	if err != nil {
 		panic(err)
 	}

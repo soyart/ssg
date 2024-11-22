@@ -26,8 +26,8 @@ const (
 type Manifest map[string]Site
 
 type Site struct {
-	Copies  map[string]WriteTarget `json:"-"`
 	ssg     Ssg                    `json:"-"`
+	Copies  map[string]WriteTarget `json:"-"`
 	CleanUp bool                   `json:"-"`
 }
 
@@ -45,7 +45,10 @@ type manifestError struct {
 
 var loglevel = new(slog.LevelVar)
 
-func Apply(m Manifest, do Stage) error {
+// ApplyManifest loops through all sites and apply manifest stages
+// described in do. It applies opts to each site's [Ssg] before
+// the call to [Ssg.Generate].
+func ApplyManifest(m Manifest, do Stage, opts ...Option) error {
 	slog.Info("stages",
 		StageCleanUp.String(), shouldDo(do, StageCleanUp),
 		StageCopy.String(), shouldDo(do, StageCopy),
@@ -96,9 +99,19 @@ func Apply(m Manifest, do Stage) error {
 			break
 		}
 
+		site.ssg.With(opts...)
 		old.
 			WithGroup("build").
-			With("key", key, "url", site.ssg.Url).
+			With(
+				"key", key,
+				"url", site.ssg.Url,
+			).
+			WithGroup("options").
+			With(
+				"parallel_writes", site.ssg.parallelWrites,
+				"pipeline_enabled", site.ssg.pipeline != nil,
+				"hook_enabled", site.ssg.hook != nil,
+			).
 			Info("building site")
 
 		err := site.ssg.Generate()
@@ -115,7 +128,7 @@ func Apply(m Manifest, do Stage) error {
 	return nil
 }
 
-func ApplyManifest(path string, do Stage) error {
+func ApplyFromManifest(path string, do Stage, opts ...Option) error {
 	logger := newLogger().With("manifest", path)
 	slog.SetDefault(logger)
 	slog.Info("parsing manifest")
@@ -126,7 +139,7 @@ func ApplyManifest(path string, do Stage) error {
 		return err
 	}
 
-	return Apply(m, do)
+	return ApplyManifest(m, do, opts...)
 }
 
 func NewManifest(filename string) (Manifest, error) {
@@ -187,7 +200,6 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 			site.Dst,
 			site.Title,
 			site.Url,
-			ParallelWritesEnv(),
 		),
 	}
 
