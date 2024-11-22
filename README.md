@@ -44,125 +44,132 @@ ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
 ## Differences between ssg and ssg-go
 
 - Like the original, ssg-go accepts a CLI parameter `title` (3rd arg)
-  that will be used as default `<title>` tag inside `<head>` (*head title*).
+that will be used as default `<title>` tag inside `<head>` (*head title*).
 
-  ssg-go also parses `_header.go` for title replacement placeholder. Currently,
-  ssg-go recognizes 2 placeholders:
+### Custom title tag for `_header.html`
 
-  - `{{from-h1}}`
+ssg-go also parses `_header.go` for title replacement placeholder. Currently,
+ssg-go recognizes 2 placeholders:
 
-    This will prompt ssg-go to use the first Markdown line starting with `#` value as head title.
-    For example, if this is your Markdown:
+- `{{from-h1}}`
 
-    ```markdown
-    ## This is H2
-
-    # This is H1
-
-    : This is also an H1
-
-    This is paragraph
-    ```
-
-    then `This is H1` will be used as the page's title.
-
-  - `{{from-tag}}`
-
-    Like with `{{from-h1}}`, but finds the first line starting with `:title` instead,
-    i.e. `This is also an H1` from the example above will be used as the page's title.
-
-  For example, consider the following header/footer templates and a Markdown page:
-
-  ```html
-  <!-- _header.html -->
-
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
-  <meta charset="UTF-8">
-  <title>{{from-tag}}</title>
-  </head>
-  <body>
-  ```
-
-  ```html
-  <!-- _footer.html -->
-
-  </body>
-  </html>
-   ```
+  This will prompt ssg-go to use the first Markdown line starting with `#` value as head title.
+  For example, if this is your Markdown:
 
   ```markdown
-  <!-- some/path/foo.md -->
-  
-  Mar 24 2024
+  ## This is H2
 
-  :title Real Header
+  # This is H1
 
-  # Some Header 2
+  : This is also an H1
 
-  Some para
+  This is paragraph
   ```
 
-  This is the generated HTML equivalent, in `${dst}/some/path/foo.html`:
+  then `This is H1` will be used as the page's title.
 
-  ```html
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
-  <meta charset="UTF-8">
-  <title>Real Header</title>
-  </head>
-  <body>
-  <p>Mar 24 2024</p>
-  <h1>Some Header 2</p>
-  <p>Some para</p>
-  </body>
-  </html>
-  ```
+- `{{from-tag}}`
 
-  Note how `{{from-tag}}` in `_header.html` will cause ssg-go to use `Real Header`
-  as the document head title.
+  Like with `{{from-h1}}`, but finds the first line starting with `:title` instead,
+  i.e. `This is also an H1` from the example above will be used as the page's title.
 
-  On the other hand, the `{{from-h1}}` will cause ssg-go to use `Some Header 2`
-  as the document head title.
+For example, consider the following header/footer templates and a Markdown page:
 
-- ssg-go cascades `_header.html` and `_footer.html` down the directory tree
+```html
+<!-- _header.html -->
 
-  If your tree looks like this:
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{{from-tag}}</title>
+</head>
+<body>
+```
 
-  ```
-  ├── _header.html
-  ├── blog
-  │   ├── 2023
-  │   │   ├── _header.html
-  │   │   ├── bar.md
-  │   │   ├── baz
-  │   │   │   └── index.md
-  │   │   └── foo.md
-  │   ├── _header.html
-  │   └── index.md
-  └── index.md  
-  ```
+```html
+<!-- _footer.html -->
 
-  Then:
+</body>
+</html>
+ ```
 
-  - `/index.md` will use `/_header.html`
+```markdown
+<!-- some/path/foo.md -->
 
-  - `/blog/index.md` will use `/blog/_header.html`
+Mar 24 2024
 
-  - `/blog/2023/baz/index.md` will use `/blog/2023/_header.html`
+:title Real Header
 
-- ssg-go allows users to configure concurrent write goroutines (green threads).
+# Some Header 2
 
-  ssg-go by default writes 20 files concurrently. This concurrent threads can
-  be configured by setting env `SSG_PARALLEL_WRITES` to a non-zero positive integer.
+Some para
+```
 
-  If the env value is illegal, ssg-go falls back to 20 concurrent write threads.
+This is the generated HTML equivalent, in `${dst}/some/path/foo.html`:
 
-  To write outputs sequentially, run:
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Real Header</title>
+</head>
+<body>
+<p>Mar 24 2024</p>
+<h1>Some Header 2</p>
+<p>Some para</p>
+</body>
+</html>
+```
 
-  ```shell
-  SSG_PARALLEL_WRITES=1 ssg mySrc myDst myTitle myUrl
-  ```
+Note how `{{from-tag}}` in `_header.html` will cause ssg-go to use `Real Header`
+as the document head title.
+
+On the other hand, the `{{from-h1}}` will cause ssg-go to use `Some Header 2`
+as the document head title.
+
+
+### Cascading header and footer templates
+
+ssg-go cascades `_header.html` and `_footer.html` down the directory tree
+
+If your tree looks like this:
+
+```
+├── _header.html
+├── blog
+│   ├── 2023
+│   │   ├── _header.html
+│   │   ├── bar.md
+│   │   ├── baz
+│   │   │   └── index.md
+│   │   └── foo.md
+│   ├── _header.html
+│   └── index.md
+└── index.md  
+```
+
+Then:
+
+- `/index.md` will use `/_header.html`
+
+- `/blog/index.md` will use `/blog/_header.html`
+
+- `/blog/2023/baz/index.md` will use `/blog/2023/_header.html`
+
+### Concurrent writes and environment variable
+
+ssg-go allows users to configure concurrent write goroutines (green threads).
+
+ssg-go by default writes 20 files concurrently. This concurrent threads can
+be configured by setting env `SSG_PARALLEL_WRITES` to a non-zero positive integer.
+
+If the env value is illegal, ssg-go falls back to 20 concurrent write threads.
+
+To write outputs sequentially, run:
+
+```shell
+SSG_PARALLEL_WRITES=1 ssg mySrc myDst myTitle myUrl
+```
 
