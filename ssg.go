@@ -106,18 +106,14 @@ func New(src, dst, title, url string) Ssg {
 	}
 }
 
-func NewWithParallelWrites(src, dst, title, url string) Ssg {
+func NewWithOptions(src, dst, title, url string, opts ...Option) Ssg {
 	s := New(src, dst, title, url)
-
-	writesEnv := os.Getenv(parallelWritesEnvKey)
-	writes, err := strconv.ParseUint(writesEnv, 10, 32)
-	if err == nil && writes != 0 {
-		s.parallelWrites = int(writes)
-	}
+	s.With(opts...)
 
 	return s
 }
 
+// ToHtml converts md (Markdown) into HTML document
 func ToHtml(md []byte) []byte {
 	root := markdown.Parse(md, parser.NewWithExtensions(SsgExtensions))
 	renderer := html.NewRenderer(html.RendererOptions{
@@ -259,6 +255,18 @@ func (s *Ssg) With(opts ...Option) {
 	}
 }
 
+func ParallelWritesEnv() Option {
+	return func(s *Ssg) {
+		writesEnv := os.Getenv(parallelWritesEnvKey)
+		writes, err := strconv.ParseUint(writesEnv, 10, 32)
+		if err == nil && writes != 0 {
+			s.parallelWrites = int(writes)
+		}
+	}
+}
+
+// Pipeline will make [Ssg] call f(path, fileContent)
+// on every unignored files.
 func Pipeline(f func(string, []byte) ([]byte, error)) Option {
 	return func(s *Ssg) {
 		s.pipeline = f
