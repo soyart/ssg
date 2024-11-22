@@ -9,6 +9,8 @@ import (
 )
 
 type (
+	Set map[string]struct{}
+
 	from int
 
 	// perDir tracks files under directory in a trie-like fashion.
@@ -21,8 +23,6 @@ type (
 		*bytes.Buffer
 		titleFrom from
 	}
-
-	set map[string]struct{}
 
 	headers struct {
 		perDir[header]
@@ -38,6 +38,28 @@ const (
 	fromH1        = 1 << iota
 	fromTag
 )
+
+func FileIs(f os.FileInfo, mode fs.FileMode) bool {
+	return f.Mode()&mode != 0
+}
+
+func (s Set) Insert(v string) bool {
+	_, ok := s[v]
+	s[v] = struct{}{}
+
+	return ok
+}
+
+func (s Set) ContainsAll(items ...string) bool {
+	for _, v := range items {
+		_, ok := s[v]
+		if !ok {
+			return false
+		}
+	}
+
+	return true
+}
 
 func newHeaders(defaultHeader string) headers {
 	return headers{
@@ -93,10 +115,7 @@ outer:
 				break
 			}
 
-			part := parts[i]
-			prefix := prefixes[i]
-
-			if part != prefix {
+			if parts[i] != prefixes[i] {
 				continue outer
 			}
 		}
@@ -110,26 +129,4 @@ outer:
 	}
 
 	return chosen
-}
-
-func (s set) insert(v string) bool {
-	_, ok := s[v]
-	s[v] = struct{}{}
-
-	return ok
-}
-
-func (s set) contains(items ...string) bool {
-	for _, v := range items {
-		_, ok := s[v]
-		if !ok {
-			return false
-		}
-	}
-
-	return true
-}
-
-func fileIs(f os.FileInfo, mode fs.FileMode) bool {
-	return f.Mode()&mode != 0
 }

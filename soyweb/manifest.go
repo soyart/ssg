@@ -1,4 +1,4 @@
-package ssg
+package soyweb
 
 import (
 	"encoding/json"
@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+
+	"github.com/soyart/ssg"
 )
 
 type Stage int
@@ -26,7 +28,7 @@ const (
 type Manifest map[string]Site
 
 type Site struct {
-	ssg     Ssg                    `json:"-"`
+	ssg     ssg.Ssg                `json:"-"`
 	Copies  map[string]WriteTarget `json:"-"`
 	CleanUp bool                   `json:"-"`
 }
@@ -48,18 +50,16 @@ var loglevel = new(slog.LevelVar)
 // ApplyManifest loops through all sites and apply manifest stages
 // described in do. It applies opts to each site's [Ssg] before
 // the call to [Ssg.Generate].
-func ApplyManifest(m Manifest, do Stage, opts ...Option) error {
+func ApplyManifest(m Manifest, do Stage, opts ...ssg.Option) error {
 	slog.Info("stages",
 		StageCleanUp.String(), shouldDo(do, StageCleanUp),
 		StageCopy.String(), shouldDo(do, StageCopy),
 		StageBuild.String(), shouldDo(do, StageBuild),
 	)
-
 	targets, err := collect(m)
 	if err != nil {
 		return err
 	}
-
 	if shouldDo(do, StageCleanUp) {
 		err = cleanup(m, targets)
 		if err != nil {
@@ -108,9 +108,9 @@ func ApplyManifest(m Manifest, do Stage, opts ...Option) error {
 			).
 			WithGroup("options").
 			With(
-				"parallel_writes", site.ssg.parallelWrites,
-				"pipeline_enabled", site.ssg.pipeline != nil,
-				"hook_enabled", site.ssg.hook != nil,
+			// "parallel_writes", site.ssg.parallelWrites,
+			// "pipeline_enabled", site.ssg.pipeline != nil,
+			// "hook_enabled", site.ssg.hook != nil,
 			).
 			Info("building site")
 
@@ -128,7 +128,7 @@ func ApplyManifest(m Manifest, do Stage, opts ...Option) error {
 	return nil
 }
 
-func ApplyFromManifest(path string, do Stage, opts ...Option) error {
+func ApplyFromManifest(path string, do Stage, opts ...ssg.Option) error {
 	logger := newLogger().With("manifest", path)
 	slog.SetDefault(logger)
 	slog.Info("parsing manifest")
@@ -195,7 +195,7 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 	*s = Site{
 		CleanUp: site.CleanUp,
 		Copies:  copies,
-		ssg: NewWithOptions(
+		ssg: ssg.NewWithOptions(
 			site.Src,
 			site.Dst,
 			site.Title,
@@ -241,19 +241,19 @@ func newLogger() *slog.Logger {
 	return logger
 }
 
-func collect(m Manifest) (map[string]set, error) {
+func collect(m Manifest) (map[string]ssg.Set, error) {
 	// Collect and detect duplicate write dups
-	dups := make(set)
-	targets := make(map[string]set)
+	dups := make(ssg.Set)
+	targets := make(map[string]ssg.Set)
 	for key, site := range m {
 		if targets[key] == nil {
-			targets[key] = make(set)
+			targets[key] = make(ssg.Set)
 		}
 
 		logger := slog.Default().WithGroup("collect").With("key", key, "url", site.ssg.Url)
 		for src, dst := range site.Copies {
-			if !dups.insert(dst.Target) {
-				if targets[key].insert(dst.Target) {
+			if !dups.Insert(dst.Target) {
+				if targets[key].Insert(dst.Target) {
 					panic("unexpected duplicate")
 				}
 
@@ -273,7 +273,7 @@ func collect(m Manifest) (map[string]set, error) {
 	return targets, nil
 }
 
-func cleanup(m Manifest, targets map[string]set) error {
+func cleanup(m Manifest, targets map[string]ssg.Set) error {
 	// Cleanup
 	for key, site := range m {
 		if !site.CleanUp {
@@ -353,7 +353,7 @@ func decodeTargetForce(entry interface{}) (WriteTarget, error) {
 func (s *Site) Copy() error {
 	logger := slog.Default()
 
-	dirs := make(set)
+	dirs := make(ssg.Set)
 	for cpSrc, cpDst := range s.Copies {
 		logger := logger.With("phase", "scan", "cpSrc", cpSrc, "cpDst", cpDst)
 
@@ -369,8 +369,7 @@ func (s *Site) Copy() error {
 			logger.Error("failed to stat copy src")
 			return fmt.Errorf("failed to stat copy src: '%s'", cpSrc)
 		}
-
-		if fileIs(ssrc, os.ModeSymlink) {
+		if ssg.FileIs(ssrc, os.ModeSymlink) {
 			logger.Error("copy src is symlink")
 			return fmt.Errorf("copy src is symlink: '%s'", cpSrc)
 		}
@@ -389,10 +388,10 @@ func (s *Site) Copy() error {
 		}
 
 		if ssrc != nil && ssrc.IsDir() {
-			dirs.insert(cpSrc)
+			dirs.Insert(cpSrc)
 		}
 		if sdst != nil && sdst.IsDir() {
-			dirs.insert(cpDst.Target)
+			dirs.Insert(cpDst.Target)
 		}
 	}
 
@@ -469,10 +468,10 @@ func cpRecurse(src string, dst WriteTarget) error {
 	return nil
 }
 
-func copyFiles(dirs set, src string, dst WriteTarget) error {
+func copyFiles(dirs ssg.Set, src string, dst WriteTarget) error {
 	switch {
 	// Copy dir to dir, with target not yet existing
-	case dirs.contains(src) && !dirs.contains(dst.Target):
+	case dirs.ContainsAll(src) && !dirs.ContainsAll(dst.Target):
 		err := os.MkdirAll(dst.Target, os.ModePerm)
 		if err != nil {
 			return fmt.Errorf("failed to prepare dst directory: %w", err)
@@ -481,12 +480,12 @@ func copyFiles(dirs set, src string, dst WriteTarget) error {
 		fallthrough
 
 	// Copy dir to dir, with target dir existing
-	case dirs.contains(src, dst.Target):
+	case dirs.ContainsAll(src, dst.Target):
 		return cpRecurse(src, dst)
 
 	// Copy file to dir, i.e. cp foo.json ./some-dir/
 	// which will just writes out to ./some-dir/foo.json
-	case dirs.contains(dst.Target):
+	case dirs.ContainsAll(dst.Target):
 		base := filepath.Base(src)
 		dst.Target = filepath.Join(dst.Target, base)
 	}
@@ -494,6 +493,6 @@ func copyFiles(dirs set, src string, dst WriteTarget) error {
 	return cp(src, dst)
 }
 
-func shouldDo(b Stage, mask Stage) bool {
+func shouldDo[I ~int](b I, mask I) bool {
 	return b&mask != 0
 }

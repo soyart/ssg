@@ -47,7 +47,7 @@ func main() {
 }
 
 func run(c *cli) {
-	stages := ssg.StagesAll
+	stages := soyweb.StagesAll
 	opts := []ssg.Option{
 		ssg.ParallelWritesEnv(),
 	}
@@ -55,23 +55,23 @@ func run(c *cli) {
 	var manifests []string
 	switch {
 	case c.Build != nil:
+		manifests = c.Build.Manifests
 		opts = append(opts, ssgOptions(c)...)
 
-		manifests = c.Build.Manifests
 		if c.Build.NoCleanup {
-			stages &^= ssg.StageCleanUp
+			stages &^= soyweb.StageCleanUp
 		}
 		if c.Build.NoCopy {
-			stages &^= ssg.StageCopy
+			stages &^= soyweb.StageCopy
 		}
 		if c.Build.NoBuild {
-			stages &^= ssg.StageBuild
+			stages &^= soyweb.StageBuild
 			opts = nil
 		}
 
 	case c.Copy != nil:
 		manifests = c.Copy.Manifests
-		stages = ssg.StageCopy
+		stages = soyweb.StageCopy
 
 	case c.Clean != nil:
 		c.CleanUp = c.Clean
@@ -79,7 +79,7 @@ func run(c *cli) {
 
 	case c.CleanUp != nil:
 		manifests = c.CleanUp.Manifests
-		stages = ssg.StageCleanUp
+		stages = soyweb.StageCleanUp
 	}
 
 	if len(manifests) == 0 {
@@ -92,14 +92,12 @@ func run(c *cli) {
 }
 
 func ssgOptions(c *cli) []ssg.Option {
-	var opts []ssg.Option
-
 	minifiers := make(map[string]minifyFn)
+	opts := []ssg.Option{}
+
 	if c.Build.MinifyHtmlAll {
 		minifiers[".html"] = soyweb.MinifyHtml
 	}
-
-	fmt.Println("foo")
 	if c.Build.MinifyCss {
 		minifiers[".css"] = soyweb.MinifyCss
 	}
@@ -119,8 +117,8 @@ func ssgOptions(c *cli) []ssg.Option {
 	return opts
 }
 
-func build(path string, do ssg.Stage, opts ...ssg.Option) {
-	err := ssg.ApplyFromManifest(path, do, opts...)
+func build(path string, do soyweb.Stage, opts ...ssg.Option) {
+	err := soyweb.ApplyFromManifest(path, do, opts...)
 	if err != nil {
 		panic(err)
 	}

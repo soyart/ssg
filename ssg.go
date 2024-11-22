@@ -59,7 +59,7 @@ type Ssg struct {
 	ssgignores     ignorer
 	headers        headers
 	footers        footers
-	preferred      set // Used to prefer html and ignore md files with identical names, as with the original ssg
+	preferred      Set // Used to prefer html and ignore md files with identical names, as with the original ssg
 	dist           []OutputFile
 	parallelWrites int
 
@@ -99,7 +99,7 @@ func New(src, dst, title, url string) Ssg {
 		Title:          title,
 		Url:            url,
 		ssgignores:     ignores,
-		preferred:      make(set),
+		preferred:      make(Set),
 		headers:        newHeaders(headerDefault),
 		footers:        newFooters(footerDefault),
 		parallelWrites: parallelWritesDefault,
@@ -402,7 +402,7 @@ func shouldIgnore(ignores ignorer, path, base string, d fs.DirEntry) (bool, erro
 		return false, err
 	}
 
-	if fileIs(stat, os.ModeSymlink) {
+	if FileIs(stat, os.ModeSymlink) {
 		return true, nil
 	}
 
@@ -479,7 +479,7 @@ func (s *Ssg) scan(path string, d fs.DirEntry, e error) error {
 	if filepath.Ext(base) != ".html" {
 		return nil
 	}
-	if s.preferred.insert(path) {
+	if s.preferred.Insert(path) {
 		return fmt.Errorf("duplicate html file %s", path)
 	}
 
@@ -529,7 +529,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	case ".md":
 		html := strings.TrimSuffix(path, ".md")
 		html += ".html"
-		if s.preferred.contains(html) {
+		if s.preferred.ContainsAll(html) {
 			return nil
 		}
 

@@ -22,7 +22,7 @@ func TestScan(t *testing.T) {
 		t.Errorf("unexpected error from scan: %v", err)
 	}
 
-	if !ssg.preferred.contains(filepath.Join(src, "/blog/index.html")) {
+	if !ssg.preferred.ContainsAll(filepath.Join(src, "/blog/index.html")) {
 		t.Fatalf("missing preferred html file /blog/index.html")
 	}
 

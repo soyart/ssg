@@ -1,4 +1,4 @@
-package ssg
+package soyweb
 
 import (
 	"encoding/json"
@@ -28,24 +28,24 @@ func TestManifest(t *testing.T) {
 	"johndoe.com": {
 		"name": "JohnDoe.com",
 		"url": "https://johndoe.com",
-		"src": "soyweb/testdata/johndoe.com/src",
-		"dst": "soyweb/testdata/johndoe.com/dst",
+		"src": "testdata/johndoe.com/src",
+		"dst": "testdata/johndoe.com/dst",
 		"cleanup": true,
 		"copies": {
-			"soyweb/testdata/assets/style.css": {
-				"target": "soyweb/testdata/johndoe.com/src/style.css",
+			"testdata/assets/style.css": {
+				"target": "testdata/johndoe.com/src/style.css",
 				"force": true
 			},
-			"soyweb/testdata/assets/some.txt": "soyweb/testdata/johndoe.com/src/some-txt.txt",
-			"soyweb/testdata/assets/some": {
+			"testdata/assets/some.txt": "testdata/johndoe.com/src/some-txt.txt",
+			"testdata/assets/some": {
 				"force": true,
-				"target": "soyweb/testdata/johndoe.com/src/drop"
+				"target": "testdata/johndoe.com/src/drop"
 			}
 		}
 	}
 }`,
 			siteKey: "johndoe.com",
-			dir:     "soyweb/testdata",
+			dir:     "testdata",
 			copies: []string{
 				"assets/style.css",
 				"assets/some.txt",
@@ -68,24 +68,24 @@ func TestManifest(t *testing.T) {
 	"johndoe.com": {
 		"name": "JohnDoe.com",
 		"url": "https://johndoe.com",
-		"src": "soyweb/testdata/johndoe.com/src",
-		"dst": "soyweb/testdata/johndoe.com/dst",
+		"src": "testdata/johndoe.com/src",
+		"dst": "testdata/johndoe.com/dst",
 		"cleanup": true,
 		"copies": {
-			"soyweb/testdata/assets/style.css": {
-				"target": "soyweb/testdata/johndoe.com/src/style.css",
+			"testdata/assets/style.css": {
+				"target": "testdata/johndoe.com/src/style.css",
 				"force": true
 			},
-			"soyweb/testdata/assets/some.txt": "soyweb/testdata/johndoe.com/src/some-txt.txt",
-			"soyweb/testdata/assets/some/fonts": {
+			"testdata/assets/some.txt": "testdata/johndoe.com/src/some-txt.txt",
+			"testdata/assets/some/fonts": {
 				"force": true,
-				"target": "soyweb/testdata/johndoe.com/src/drop"
+				"target": "testdata/johndoe.com/src/drop"
 			}
 		}
 	}
 }`,
 			siteKey: "johndoe.com",
-			dir:     "soyweb/testdata",
+			dir:     "testdata",
 			copies: []string{
 				"assets/style.css",
 				"assets/some/fonts",
@@ -106,25 +106,25 @@ func TestManifest(t *testing.T) {
 	"johndoe.com": {
 		"name": "JohnDoe.com",
 		"url": "https://johndoe.com",
-		"src": "soyweb/testdata/johndoe.com/src",
-		"dst": "soyweb/testdata/johndoe.com/dst",
+		"src": "testdata/johndoe.com/src",
+		"dst": "testdata/johndoe.com/dst",
 		"cleanup": true,
 		"copies": {
-			"soyweb/testdata/assets/style.css": {
-				"target": "soyweb/testdata/johndoe.com/src/style.css",
+			"testdata/assets/style.css": {
+				"target": "testdata/johndoe.com/src/style.css",
 				"force": true
 			},
-			"soyweb/testdata/assets/some.txt": "soyweb/testdata/johndoe.com/src/debug/some-txt.txt",
-			"soyweb/testdata/assets/some/nested/path/some.env": "soyweb/testdata/johndoe.com/src/assets/env",
-			"soyweb/testdata/assets/some/fonts": {
+			"testdata/assets/some.txt": "testdata/johndoe.com/src/debug/some-txt.txt",
+			"testdata/assets/some/nested/path/some.env": "testdata/johndoe.com/src/assets/env",
+			"testdata/assets/some/fonts": {
 				"force": true,
-				"target": "soyweb/testdata/johndoe.com/src/assets"
+				"target": "testdata/johndoe.com/src/assets"
 			}
 		}
 	}
 }`,
 			siteKey: "johndoe.com",
-			dir:     "soyweb/testdata",
+			dir:     "testdata",
 			copies: []string{
 				"assets/style.css",
 				"assets/some/fonts",
