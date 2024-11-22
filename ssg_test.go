@@ -10,13 +10,13 @@ import (
 )
 
 func TestScan(t *testing.T) {
-	root := "./testdata/johndoe.com"
+	root := "./soyweb/testdata/johndoe.com"
 	src := filepath.Join(root, "/src")
 	dst := filepath.Join(root, "/dst")
 	title := "JohnDoe.com"
 	url := "https://johndoe.com"
 
-	ssg := NewWithParallelWrites(src, dst, title, url)
+	ssg := NewWithOptions(src, dst, title, url)
 	err := filepath.WalkDir(root, ssg.scan)
 	if err != nil {
 		t.Errorf("unexpected error from scan: %v", err)

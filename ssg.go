@@ -62,7 +62,12 @@ type Ssg struct {
 	preferred      set // Used to prefer html and ignore md files with identical names, as with the original ssg
 	dist           []OutputFile
 	parallelWrites int
+
+	pipeline func(path string, data []byte) ([]byte, error) // Applied to all unignored files
+	hook     func(data []byte) ([]byte, error)              // Applied to converted files
 }
+
+type Option func(*Ssg)
 
 type OutputFile struct {
 	target string
@@ -101,18 +106,14 @@ func New(src, dst, title, url string) Ssg {
 	}
 }
 
-func NewWithParallelWrites(src, dst, title, url string) Ssg {
+func NewWithOptions(src, dst, title, url string, opts ...Option) Ssg {
 	s := New(src, dst, title, url)
-
-	writesEnv := os.Getenv(parallelWritesEnvKey)
-	writes, err := strconv.ParseUint(writesEnv, 10, 32)
-	if err == nil && writes != 0 {
-		s.parallelWrites = int(writes)
-	}
+	s.With(opts...)
 
 	return s
 }
 
+// ToHtml converts md (Markdown) into HTML document
 func ToHtml(md []byte) []byte {
 	root := markdown.Parse(md, parser.NewWithExtensions(SsgExtensions))
 	renderer := html.NewRenderer(html.RendererOptions{
@@ -246,6 +247,40 @@ func Generate(sites ...Ssg) error {
 	}
 
 	return nil
+}
+
+func (s *Ssg) With(opts ...Option) *Ssg {
+	for i := range opts {
+		opts[i](s)
+	}
+
+	return s
+}
+
+func ParallelWritesEnv() Option {
+	return func(s *Ssg) {
+		writesEnv := os.Getenv(parallelWritesEnvKey)
+		writes, err := strconv.ParseUint(writesEnv, 10, 32)
+		if err == nil && writes != 0 {
+			s.parallelWrites = int(writes)
+		}
+	}
+}
+
+// Pipeline will make [Ssg] call f(path, fileContent)
+// on every unignored files.
+func Pipeline(f func(string, []byte) ([]byte, error)) Option {
+	return func(s *Ssg) {
+		s.pipeline = f
+	}
+}
+
+// Hook assigns f to be called on full output of files
+// that will be converted by ssg from Markdown to HTML.
+func Hook(f func([]byte) ([]byte, error)) Option {
+	return func(s *Ssg) {
+		s.hook = f
+	}
 }
 
 func (s *Ssg) Generate() error {
@@ -480,6 +515,13 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 		return err
 	}
 
+	if s.pipeline != nil {
+		data, err = s.pipeline(path, data)
+		if err != nil {
+			return fmt.Errorf("hook error when building %s: %w", path, err)
+		}
+	}
+
 	ext := filepath.Ext(base)
 
 	switch ext {
@@ -527,6 +569,15 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	out := bytes.NewBuffer(headerText)
 	out.Write(ToHtml(data))
 	out.Write(footer.Bytes())
+
+	if s.hook != nil {
+		b, err := s.hook(out.Bytes())
+		if err != nil {
+			return fmt.Errorf("hook error when building %s: %w", path, err)
+		}
+
+		out = bytes.NewBuffer(b)
+	}
 
 	s.dist = append(s.dist, OutputFile{
 		target: target,

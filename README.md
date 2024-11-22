@@ -1,5 +1,7 @@
 # ssg static site generator
 
+> See also: [soyweb](./soyweb/)
+
 This Nix Flake provides 2 implementations of ssg.
 
 - POSIX shell ssg
@@ -42,205 +44,132 @@ ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
 ## Differences between ssg and ssg-go
 
 - Like the original, ssg-go accepts a CLI parameter `title` (3rd arg)
-  that will be used as default `<title>` tag inside `<head>` (*head title*).
+that will be used as default `<title>` tag inside `<head>` (*head title*).
 
-  ssg-go also parses `_header.go` for title replacement placeholder. Currently,
-  ssg-go recognizes 2 placeholders:
+### Custom title tag for `_header.html`
 
-  - `{{from-h1}}`
+ssg-go also parses `_header.go` for title replacement placeholder. Currently,
+ssg-go recognizes 2 placeholders:
 
-    This will prompt ssg-go to use the first Markdown line starting with `#` value as head title.
-    For example, if this is your Markdown:
+- `{{from-h1}}`
 
-    ```markdown
-    ## This is H2
-
-    # This is H1
-
-    : This is also an H1
-
-    This is paragraph
-    ```
-
-    then `This is H1` will be used as the page's title.
-
-  - `{{from-tag}}`
-
-    Like with `{{from-h1}}`, but finds the first line starting with `:title` instead,
-    i.e. `This is also an H1` from the example above will be used as the page's title.
-
-  For example, consider the following header/footer templates and a Markdown page:
-
-  ```html
-  <!-- _header.html -->
-
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
-  <meta charset="UTF-8">
-  <title>{{from-tag}}</title>
-  </head>
-  <body>
-  ```
-
-  ```html
-  <!-- _footer.html -->
-
-  </body>
-  </html>
-   ```
+  This will prompt ssg-go to use the first Markdown line starting with `#` value as head title.
+  For example, if this is your Markdown:
 
   ```markdown
-  <!-- some/path/foo.md -->
-  
-  Mar 24 2024
+  ## This is H2
 
-  :title Real Header
+  # This is H1
 
-  # Some Header 2
+  : This is also an H1
 
-  Some para
+  This is paragraph
   ```
 
-  This is the generated HTML equivalent, in `${dst}/some/path/foo.html`:
+  then `This is H1` will be used as the page's title.
 
-  ```html
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
-  <meta charset="UTF-8">
-  <title>Real Header</title>
-  </head>
-  <body>
-  <p>Mar 24 2024</p>
-  <h1>Some Header 2</p>
-  <p>Some para</p>
-  </body>
-  </html>
-  ```
+- `{{from-tag}}`
 
-  Note how `{{from-tag}}` in `_header.html` will cause ssg-go to use `Real Header`
-  as the document head title.
+  Like with `{{from-h1}}`, but finds the first line starting with `:title` instead,
+  i.e. `This is also an H1` from the example above will be used as the page's title.
 
-  On the other hand, the `{{from-h1}}` will cause ssg-go to use `Some Header 2`
-  as the document head title.
+For example, consider the following header/footer templates and a Markdown page:
 
-- ssg-go cascades `_header.html` and `_footer.html` down the directory tree
+```html
+<!-- _header.html -->
 
-  If your tree looks like this:
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{{from-tag}}</title>
+</head>
+<body>
+```
 
-  ```
-  ├── _header.html
-  ├── blog
-  │   ├── 2023
-  │   │   ├── _header.html
-  │   │   ├── bar.md
-  │   │   ├── baz
-  │   │   │   └── index.md
-  │   │   └── foo.md
-  │   ├── _header.html
-  │   └── index.md
-  └── index.md  
-  ```
+```html
+<!-- _footer.html -->
 
-  Then:
+</body>
+</html>
+ ```
 
-  - `/index.md` will use `/_header.html`
+```markdown
+<!-- some/path/foo.md -->
 
-  - `/blog/index.md` will use `/blog/_header.html`
+Mar 24 2024
 
-  - `/blog/2023/baz/index.md` will use `/blog/2023/_header.html`
+:title Real Header
 
-- ssg-go allows users to configure concurrent write goroutines (green threads).
+# Some Header 2
 
-  ssg-go by default writes 20 files concurrently. This concurrent threads can
-  be configured by setting env `SSG_PARALLEL_WRITES` to a non-zero positive integer.
+Some para
+```
 
-  If the env value is illegal, ssg-go falls back to 20 concurrent write threads.
+This is the generated HTML equivalent, in `${dst}/some/path/foo.html`:
 
-  To write outputs sequentially, run:
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Real Header</title>
+</head>
+<body>
+<p>Mar 24 2024</p>
+<h1>Some Header 2</p>
+<p>Some para</p>
+</body>
+</html>
+```
 
-  ```shell
-  SSG_PARALLEL_WRITES=1 ssg mySrc myDst myTitle myUrl
-  ```
+Note how `{{from-tag}}` in `_header.html` will cause ssg-go to use `Real Header`
+as the document head title.
 
-## Manifests
+On the other hand, the `{{from-h1}}` will cause ssg-go to use `Some Header 2`
+as the document head title.
 
-My original use case for ssg was with a [shell wrapper](https://github.com/soyart/webtools)
-that facilitates building multiple sites with ssg.
 
-The wrapper tool used to have a declarative JSON manifest that specifies
-source, destination, files to link or copy, and flag for cleaning up garbage.
+### Cascading header and footer templates
 
-Those capabilities are now implemented by [`Manifest`](./manifest.go),
-and accessible on the command-line via [`ssg-manifest`](./cmd/ssg-manifest/).
+ssg-go cascades `_header.html` and `_footer.html` down the directory tree
 
-See `manifest.json` as example, or clone this repo and run [`./cmd/ssg-manifest/`]
-to see its effects.
+If your tree looks like this:
 
-### ssg-manifest
+```
+├── _header.html
+├── blog
+│   ├── 2023
+│   │   ├── _header.html
+│   │   ├── bar.md
+│   │   ├── baz
+│   │   │   └── index.md
+│   │   └── foo.md
+│   ├── _header.html
+│   └── index.md
+└── index.md  
+```
 
-ssg-manifest reads manifest(s) and apply changes specified in them.
-Because it is a multi-stage application, ssg-manifest supports 3 subcommands
-for better user experience:
+Then:
 
-- Default mode
+- `/index.md` will use `/_header.html`
 
-  It builds `./manifest.json` with all stages.
+- `/blog/index.md` will use `/blog/_header.html`
 
-  Due to the limitation of the CLI library, this default
-  mode takes no arguments.
+- `/blog/2023/baz/index.md` will use `/blog/2023/_header.html`
 
-  ```shell
-  # Build from ./manifest.json (default path)
-  ssg-manifest
-  ```
-- `ssg-manifest build`
+### Concurrent writes and environment variable
 
-  This subcommands build sites from one or multiple manifests.
+ssg-go allows users to configure concurrent write goroutines (green threads).
 
-  We can specify skip flags to `build`, which will make ssg-manifest
-  skip some particular stages during application of manifests.
+ssg-go by default writes 20 files concurrently. This concurrent threads can
+be configured by setting env `SSG_PARALLEL_WRITES` to a non-zero positive integer.
 
-  Synopsis:
+If the env value is illegal, ssg-go falls back to 20 concurrent write threads.
 
-  ```shell
-  ssg-manifest build [--no-cleanup] [--no-copy] [--no-build] [...manifests]
-  ```
+To write outputs sequentially, run:
 
-  Examples:
+```shell
+SSG_PARALLEL_WRITES=1 ssg mySrc myDst myTitle myUrl
+```
 
-  ```shell
-  # Build from ./manifest.json (same with default behavior)
-  ssg-manifest build
-
-  # Build from ./m1.json and ./m2.sjon
-  ssg-manifest build ./m1.json ./m2.json
-
-  # Build from ./manifest.json without copying
-  ssg-manifest build --no-copy
-
-  # Build from ./m1 and ./m2.json
-  # without actually building HTMLs from Markdowns
-  ssg-manifest build --no-build ./m1.json ./m2.json
-  ```
-
-- `ssg-manifest clean`
-
-  Removes target files specified in the manifests' `copies` directive
-
-  Synopsis:
-
-  ```shell
-  ssg-manifest clean [...manifests]
-  ```
-
-- `ssg-manifest copy`
-
-  Copy files specified in the manifests' `copies` directive
-
-  Synopsis:
-
-  ```shell
-  ssg-manifest copy [...manifests]
-  ```

@@ -6,6 +6,7 @@ import (
 	"syscall"
 
 	"github.com/soyart/ssg"
+	"github.com/soyart/ssg/soyweb"
 )
 
 func main() {
@@ -15,16 +16,14 @@ func main() {
 	}
 
 	src, dst, title, url := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
-	s := ssg.NewWithOptions(
-		src,
-		dst,
-		title,
-		url,
+	s := ssg.NewWithOptions(src, dst, title, url,
 		ssg.ParallelWritesEnv(),
+		ssg.Pipeline(soyweb.MinifyAll),
+		ssg.Hook(soyweb.MinifyHtml),
 	)
 
-	if err := s.Generate(); err != nil {
-		fmt.Fprintln(os.Stdout, "error with", "src", src, "dst", dst, "title", title, "url", url)
+	err := s.Generate()
+	if err != nil {
 		panic(err)
 	}
 }

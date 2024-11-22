@@ -26,8 +26,8 @@ const (
 type Manifest map[string]Site
 
 type Site struct {
-	Copies  map[string]WriteTarget `json:"-"`
 	ssg     Ssg                    `json:"-"`
+	Copies  map[string]WriteTarget `json:"-"`
 	CleanUp bool                   `json:"-"`
 }
 
@@ -45,11 +45,14 @@ type manifestError struct {
 
 var loglevel = new(slog.LevelVar)
 
-func Apply(m Manifest, do Stage) error {
+// ApplyManifest loops through all sites and apply manifest stages
+// described in do. It applies opts to each site's [Ssg] before
+// the call to [Ssg.Generate].
+func ApplyManifest(m Manifest, do Stage, opts ...Option) error {
 	slog.Info("stages",
-		StageCleanUp.String(), willDo(do, StageCleanUp),
-		StageCopy.String(), willDo(do, StageCopy),
-		StageBuild.String(), willDo(do, StageBuild),
+		StageCleanUp.String(), shouldDo(do, StageCleanUp),
+		StageCopy.String(), shouldDo(do, StageCopy),
+		StageBuild.String(), shouldDo(do, StageBuild),
 	)
 
 	targets, err := collect(m)
@@ -57,7 +60,7 @@ func Apply(m Manifest, do Stage) error {
 		return err
 	}
 
-	if willDo(do, StageCleanUp) {
+	if shouldDo(do, StageCleanUp) {
 		err = cleanup(m, targets)
 		if err != nil {
 			return err
@@ -67,7 +70,7 @@ func Apply(m Manifest, do Stage) error {
 	// Copy
 	old := slog.Default()
 	for key, site := range m {
-		if !willDo(do, StageCopy) {
+		if !shouldDo(do, StageCopy) {
 			old.Info("skipping stage copy")
 			break
 		}
@@ -91,14 +94,24 @@ func Apply(m Manifest, do Stage) error {
 
 	// Build
 	for key, site := range m {
-		if !willDo(do, StageBuild) {
+		if !shouldDo(do, StageBuild) {
 			old.Info("skipping stage build")
 			break
 		}
 
+		site.ssg.With(opts...)
 		old.
 			WithGroup("build").
-			With("key", key, "url", site.ssg.Url).
+			With(
+				"key", key,
+				"url", site.ssg.Url,
+			).
+			WithGroup("options").
+			With(
+				"parallel_writes", site.ssg.parallelWrites,
+				"pipeline_enabled", site.ssg.pipeline != nil,
+				"hook_enabled", site.ssg.hook != nil,
+			).
 			Info("building site")
 
 		err := site.ssg.Generate()
@@ -115,7 +128,7 @@ func Apply(m Manifest, do Stage) error {
 	return nil
 }
 
-func ApplyManifest(path string, do Stage) error {
+func ApplyFromManifest(path string, do Stage, opts ...Option) error {
 	logger := newLogger().With("manifest", path)
 	slog.SetDefault(logger)
 	slog.Info("parsing manifest")
@@ -126,7 +139,7 @@ func ApplyManifest(path string, do Stage) error {
 		return err
 	}
 
-	return Apply(m, do)
+	return ApplyManifest(m, do, opts...)
 }
 
 func NewManifest(filename string) (Manifest, error) {
@@ -158,30 +171,36 @@ func (s manifestError) Unwrap() error {
 }
 
 func (s *Site) UnmarshalJSON(b []byte) error {
-	var tmpl struct {
+	var site struct {
+		Src   string `json:"src"`
+		Dst   string `json:"dst"`
+		Title string `json:"title"`
+		Url   string `json:"url"`
+
 		Copies  map[string]interface{} `json:"copies"`
 		CleanUp bool                   `json:"cleanup"`
-		Src     string                 `json:"src"`
-		Dst     string                 `json:"dst"`
-		Title   string                 `json:"title"`
-		Url     string                 `json:"url"`
 	}
 
-	err := json.Unmarshal(b, &tmpl)
+	err := json.Unmarshal(b, &site)
 	if err != nil {
 		return err
 	}
 
 	copies := make(map[string]WriteTarget)
-	err = decodeTargetsForce(tmpl.Copies, copies)
+	err = decodeTargetsForce(site.Copies, copies)
 	if err != nil {
 		return err
 	}
 
 	*s = Site{
-		CleanUp: tmpl.CleanUp,
+		CleanUp: site.CleanUp,
 		Copies:  copies,
-		ssg:     NewWithParallelWrites(tmpl.Src, tmpl.Dst, tmpl.Title, tmpl.Url),
+		ssg: NewWithOptions(
+			site.Src,
+			site.Dst,
+			site.Title,
+			site.Url,
+		),
 	}
 
 	return nil
@@ -199,13 +218,10 @@ func (s Stage) String() string {
 	switch s {
 	case StageCollect:
 		return "collect"
-
 	case StageCleanUp:
 		return "cleanup"
-
 	case StageCopy:
 		return "copy"
-
 	case StageBuild:
 		return "build"
 	}
@@ -246,7 +262,7 @@ func collect(m Manifest) (map[string]set, error) {
 
 			logger.Error("duplicate write target", "src", src, "target", dst.Target)
 			return nil, manifestError{
-				err:   nil,
+				err:   fmt.Errorf("duplicate target '%s'", dst.Target),
 				key:   key,
 				msg:   "duplicate write target",
 				stage: StageCollect,
@@ -478,6 +494,6 @@ func copyFiles(dirs set, src string, dst WriteTarget) error {
 	return cp(src, dst)
 }
 
-func willDo(b Stage, mask Stage) bool {
+func shouldDo(b Stage, mask Stage) bool {
 	return b&mask != 0
 }
