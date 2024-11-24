@@ -142,8 +142,7 @@ func Sitemap(
 ) {
 	dateStr := date.Format(time.DateOnly)
 
-	sm := new(strings.Builder)
-	sm.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
+	sm := bytes.NewBufferString(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset
 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
@@ -183,7 +182,7 @@ xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 		fmt.Fprintf(sm, "><lastmod>%s</lastmod><priority>1.0</priority></url>\n", dateStr)
 	}
 
-	sm.WriteString("</urlset>")
+	sm.WriteString("</urlset>\n")
 	return sm.String(), nil
 }
 
