@@ -13,10 +13,10 @@ type (
 	}
 
 	NoMinifyFlags struct {
-		NoMinifyHtml    bool `arg:"--no-min-html,env:NO_MIN_HTML" help:"Minify HTML outputs"`
-		NoMinifyHtmlAll bool `arg:"--no-min-html-all,env:NO_MIN_HTML_ALL" help:"Minify all HTML outputs"`
-		NoMinifyCss     bool `arg:"--no-min-css,env:NO_MIN_CSS" help:"Minify CSS files"`
-		NoMinifyJson    bool `arg:"--no-min-json,env:NO_MIN_JSON" help:"Minify JSON files"`
+		NoMinifyHtml    bool `arg:"--no-min-html,env:NO_MIN_HTML" help:"Do not minify HTML outputs"`
+		NoMinifyHtmlAll bool `arg:"--no-min-html-all,env:NO_MIN_HTML_ALL" help:"Do not minify all HTML outputs"`
+		NoMinifyCss     bool `arg:"--no-min-css,env:NO_MIN_CSS" help:"Do not minify CSS files"`
+		NoMinifyJson    bool `arg:"--no-min-json,env:NO_MIN_JSON" help:"Do not minify JSON files"`
 	}
 
 	Flags struct {
@@ -52,18 +52,19 @@ func SsgOptions(f Flags) []ssg.Option {
 	return opts
 }
 
-func negate(y MinifyFlags, n NoMinifyFlags) MinifyFlags {
-	if n.NoMinifyHtml {
-		y.MinifyHtml = false
+func negate(yes MinifyFlags, no NoMinifyFlags) MinifyFlags {
+	if no.NoMinifyHtml {
+		yes.MinifyHtml = false
 	}
-	if n.NoMinifyHtmlAll {
-		y.MinifyHtmlAll = false
+	if no.NoMinifyHtmlAll {
+		yes.MinifyHtmlAll = false
 	}
-	if n.NoMinifyCss {
-		y.MinifyCss = false
+	if no.NoMinifyCss {
+		yes.MinifyCss = false
 	}
-	if n.NoMinifyJson {
-		y.MinifyJson = false
+	if no.NoMinifyJson {
+		yes.MinifyJson = false
 	}
-	return y
+
+	return yes
 }

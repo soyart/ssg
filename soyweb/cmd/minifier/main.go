@@ -30,12 +30,10 @@ func main() {
 		if c.NoMinifyHtml || c.NoMinifyHtmlAll {
 			return
 		}
-
 	case ".css":
 		if c.NoMinifyCss {
 			return
 		}
-
 	case ".json":
 		if c.NoMinifyJson {
 			return
