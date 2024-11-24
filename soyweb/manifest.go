@@ -13,10 +13,13 @@ import (
 	"github.com/soyart/ssg"
 )
 
+var loglevel = new(slog.LevelVar)
+
 type Stage int
 
 const (
 	StageCollect Stage = -1
+
 	// These stages can be skipped
 	StageCleanUp Stage = 1 << iota
 	StageCopy
@@ -45,22 +48,41 @@ type manifestError struct {
 	stage Stage
 }
 
-var loglevel = new(slog.LevelVar)
+func (s *Stage) Skip(targets ...Stage) {
+	copied := *s
+	for i := range targets {
+		copied &^= targets[i]
+	}
+
+	*s = copied
+}
+
+func (s *Stage) Ok(targets ...Stage) bool {
+	copied := *s
+	for i := range targets {
+		if copied&targets[i] == 0 {
+			return false
+		}
+	}
+
+	return true
+}
 
 // ApplyManifest loops through all sites and apply manifest stages
 // described in do. It applies opts to each site's [Ssg] before
 // the call to [Ssg.Generate].
-func ApplyManifest(m Manifest, do Stage, opts ...ssg.Option) error {
+func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 	slog.Info("stages",
-		StageCleanUp.String(), shouldDo(do, StageCleanUp),
-		StageCopy.String(), shouldDo(do, StageCopy),
-		StageBuild.String(), shouldDo(do, StageBuild),
+		StageCleanUp.String(), stages.Ok(StageCleanUp),
+		StageCopy.String(), stages.Ok(StageCopy),
+		StageBuild.String(), stages.Ok(StageBuild),
 	)
+
 	targets, err := collect(m)
 	if err != nil {
 		return err
 	}
-	if shouldDo(do, StageCleanUp) {
+	if stages.Ok(StageCleanUp) {
 		err = cleanup(m, targets)
 		if err != nil {
 			return err
@@ -70,7 +92,7 @@ func ApplyManifest(m Manifest, do Stage, opts ...ssg.Option) error {
 	// Copy
 	old := slog.Default()
 	for key, site := range m {
-		if !shouldDo(do, StageCopy) {
+		if !stages.Ok(StageCopy) {
 			old.Info("skipping stage copy")
 			break
 		}
@@ -94,7 +116,7 @@ func ApplyManifest(m Manifest, do Stage, opts ...ssg.Option) error {
 
 	// Build
 	for key, site := range m {
-		if !shouldDo(do, StageBuild) {
+		if !stages.Ok(StageBuild) {
 			old.Info("skipping stage build")
 			break
 		}
@@ -491,8 +513,4 @@ func copyFiles(dirs ssg.Set, src string, dst WriteTarget) error {
 	}
 
 	return cp(src, dst)
-}
-
-func shouldDo[I ~int](b I, mask I) bool {
-	return b&mask != 0
 }

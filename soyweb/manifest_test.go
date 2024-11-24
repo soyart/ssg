@@ -194,6 +194,60 @@ func TestManifest(t *testing.T) {
 	}
 }
 
+func TestStages(t *testing.T) {
+	type testCase struct {
+		original Stage
+		skips    []Stage
+		oks      []Stage
+	}
+
+	tests := []testCase{
+		{
+			original: Stage(0),
+			skips:    []Stage{StageBuild, StageBuild, StageCleanUp},
+			oks:      []Stage{},
+		},
+		{
+			original: StageBuild,
+			skips:    []Stage{StageBuild, StageBuild, StageCleanUp},
+			oks:      []Stage{},
+		},
+		{
+			original: StageBuild,
+			skips:    []Stage{StageCleanUp},
+			oks:      []Stage{StageBuild},
+		},
+		{
+			original: StagesAll,
+			skips:    []Stage{StagesAll},
+			oks:      []Stage{},
+		},
+		{
+			original: StagesAll,
+			skips:    []Stage{StageBuild},
+			oks:      []Stage{StageCleanUp, StageCopy},
+		},
+		{
+			original: StagesAll,
+			skips:    []Stage{StageBuild, StageCopy},
+			oks:      []Stage{StageCleanUp},
+		},
+		{
+			original: StagesAll,
+			skips:    []Stage{StageCopy},
+			oks:      []Stage{StageCleanUp, StageBuild},
+		},
+	}
+
+	for i := range tests {
+		tc := &tests[i]
+		tc.original.Skip(tc.skips...)
+		if !tc.original.Ok(tc.oks...) {
+			t.Fatalf("unexpected result for test case %d", i+1)
+		}
+	}
+}
+
 func assertExists[K comparable, V any](t *testing.T, m map[K]V, k K) {
 	_, ok := m[k]
 	if !ok {

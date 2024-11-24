@@ -59,13 +59,13 @@ func run(c *cli) {
 		opts = append(opts, ssgOptions(c)...)
 
 		if c.Build.NoCleanup {
-			stages &^= soyweb.StageCleanUp
+			stages.Skip(soyweb.StageCleanUp)
 		}
 		if c.Build.NoCopy {
-			stages &^= soyweb.StageCopy
+			stages.Skip(soyweb.StageCopy)
 		}
 		if c.Build.NoBuild {
-			stages &^= soyweb.StageBuild
+			stages.Skip(soyweb.StageBuild)
 			opts = nil
 		}
 
