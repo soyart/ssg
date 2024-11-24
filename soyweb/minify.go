@@ -20,13 +20,6 @@ const (
 )
 
 type (
-	MinifyFlags struct {
-		MinifyHtml    bool `arg:"--min-html" help:"Minify HTML outputs"`
-		MinifyHtmlAll bool `arg:"--min-html-all" help:"Minify all HTML outputs"`
-		MinifyCss     bool `arg:"--min-css" help:"Minify CSS files"`
-		MinifyJson    bool `arg:"--min-json" help:"Minify JSON files"`
-	}
-
 	MinifyFn func(data []byte) ([]byte, error)
 )
 
