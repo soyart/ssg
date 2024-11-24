@@ -8,7 +8,7 @@ import (
 	"github.com/soyart/ssg/soyweb"
 )
 
-// TODO: cli option for walking dir
+// @TODO: cli option for walking dir
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stdout, "expecting 1 argument")

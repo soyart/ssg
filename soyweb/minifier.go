@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/soyart/ssg"
 	"github.com/tdewolff/minify/v2"
 	"github.com/tdewolff/minify/v2/css"
 	"github.com/tdewolff/minify/v2/html"
@@ -16,6 +17,17 @@ const (
 	mediaTypeHtml = "text/html"
 	mediaTypeCss  = "style/css"
 	mediaTypeJson = "application/json"
+)
+
+type (
+	MinifyFlags struct {
+		MinifyHtml    bool `arg:"--min-html" help:"Minify HTML outputs"`
+		MinifyHtmlAll bool `arg:"--min-html-all" help:"Minify all HTML outputs"`
+		MinifyCss     bool `arg:"--min-css" help:"Minify CSS files"`
+		MinifyJson    bool `arg:"--min-json" help:"Minify JSON files"`
+	}
+
+	MinifyFn func(data []byte) ([]byte, error)
 )
 
 var m = minify.New()
@@ -57,7 +69,7 @@ func MinifyJson(jsonDoc []byte) ([]byte, error) {
 }
 
 func MinifyAll(path string, data []byte) ([]byte, error) {
-	fn, err := mapFn(filepath.Ext(path))
+	fn, err := ExtToFn(filepath.Ext(path))
 	if err != nil {
 		return data, nil
 	}
@@ -78,7 +90,7 @@ func MinifyFile(path string) ([]byte, error) {
 
 	defer fn.Close()
 
-	mediaType, err := mapType(filepath.Ext(path))
+	mediaType, err := ExtToMediaType(filepath.Ext(path))
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +104,7 @@ func MinifyFile(path string) ([]byte, error) {
 	return min.Bytes(), nil
 }
 
-func mapType(ext string) (string, error) {
+func ExtToMediaType(ext string) (string, error) {
 	switch ext {
 	case ".html":
 		return mediaTypeHtml, nil
@@ -105,7 +117,7 @@ func mapType(ext string) (string, error) {
 	return "", fmt.Errorf("unknown media extension '%s'", ext)
 }
 
-func mapFn(ext string) (func([]byte) ([]byte, error), error) {
+func ExtToFn(ext string) (func([]byte) ([]byte, error), error) {
 	switch ext {
 	case ".html":
 		return MinifyHtml, nil
@@ -116,4 +128,25 @@ func mapFn(ext string) (func([]byte) ([]byte, error), error) {
 	}
 
 	return nil, fmt.Errorf("unknown media extension '%s'", ext)
+}
+
+func pipelineMinify(m map[string]MinifyFn) ssg.PipelineFn {
+	if len(m) == 0 {
+		return nil
+	}
+
+	return func(path string, data []byte) ([]byte, error) {
+		ext := filepath.Ext(path)
+		f, ok := m[ext]
+		if !ok {
+			return data, nil
+		}
+
+		b, err := f(data)
+		if err != nil {
+			return nil, fmt.Errorf("error from minifier for '%s'", ext)
+		}
+
+		return b, nil
+	}
 }

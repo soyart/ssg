@@ -63,9 +63,17 @@ type Ssg struct {
 	dist           []OutputFile
 	parallelWrites int
 
-	pipeline func(path string, data []byte) ([]byte, error) // Applied to all unignored files
-	hook     func(data []byte) ([]byte, error)              // Applied to converted files
+	pipeline PipelineFn // Applied to all unignored files
+	hook     HookFn     // Applied to converted files
 }
+
+// PipelineFn takes in a path and reads file data,
+// returning modified output to be written at destination
+type PipelineFn func(path string, data []byte) (output []byte, err error)
+
+// HookFn takes in converted HTML bytes and returns modified HTML output
+// (e.g. minified) to be written at destination
+type HookFn func(htmlDoc []byte) (output []byte, err error)
 
 type Option func(*Ssg)
 
