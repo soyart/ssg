@@ -13,7 +13,7 @@ import (
 
 func main() {
 	if len(os.Args) < 5 {
-		fmt.Fprint(os.Stdout, "usage: ssg src dst title base_url\n")
+		fmt.Fprint(os.Stdout, "usage: ssg src dst title base_url [--no-min-html --no-min-html-copy --no-min-css --no-min-json]\n")
 		syscall.Exit(1)
 	}
 
@@ -27,10 +27,10 @@ func main() {
 
 	minifyOpts := soyweb.SsgOptions(soyweb.Flags{
 		MinifyFlags: soyweb.MinifyFlags{
-			MinifyHtml:    true,
-			MinifyHtmlAll: true,
-			MinifyCss:     true,
-			MinifyJson:    true,
+			MinifyHtml:     true,
+			MinifyHtmlCopy: true,
+			MinifyCss:      true,
+			MinifyJson:     true,
 		},
 		NoMinifyFlags: f,
 	})

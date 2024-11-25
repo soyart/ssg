@@ -1,5 +1,8 @@
-# ssg static site generator
+# ssg (static site generator)
 
+> This repository also hosts soyweb,
+> an ssg wrapper and replacement for [webtools](https://github.com/soyart/webtools)
+>
 > See also: [soyweb](./soyweb/)
 
 This Nix Flake provides 2 implementations of ssg.

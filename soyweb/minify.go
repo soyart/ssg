@@ -107,7 +107,7 @@ func ExtToMediaType(ext string) (string, error) {
 		return mediaTypeJson, nil
 	}
 
-	return "", fmt.Errorf("unknown media extension '%s'", ext)
+	return "", fmt.Errorf("'%s': %w", ext, ErrNotSupported)
 }
 
 func ExtToFn(ext string) (func([]byte) ([]byte, error), error) {
@@ -120,7 +120,7 @@ func ExtToFn(ext string) (func([]byte) ([]byte, error), error) {
 		return MinifyJson, nil
 	}
 
-	return nil, fmt.Errorf("unknown media extension '%s'", ext)
+	return nil, fmt.Errorf("'%s': %w", ext, ErrNotSupported)
 }
 
 func pipelineMinify(m map[string]MinifyFn) ssg.PipelineFn {

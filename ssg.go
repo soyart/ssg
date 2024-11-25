@@ -78,8 +78,8 @@ type HookFn func(htmlDoc []byte) (output []byte, err error)
 type Option func(*Ssg)
 
 type OutputFile struct {
-	target string
-	data   []byte
+	Target string
+	Data   []byte
 }
 
 type writeError struct {
@@ -152,7 +152,7 @@ xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 
 	for i := range outputs {
 		o := &outputs[i]
-		target, err := filepath.Rel(dst, o.target)
+		target, err := filepath.Rel(dst, o.Target)
 		if err != nil {
 			return sm.String(), err
 		}
@@ -266,12 +266,19 @@ func (s *Ssg) With(opts ...Option) *Ssg {
 
 func ParallelWritesEnv() Option {
 	return func(s *Ssg) {
-		writesEnv := os.Getenv(parallelWritesEnvKey)
-		writes, err := strconv.ParseUint(writesEnv, 10, 32)
-		if err == nil && writes != 0 {
-			s.parallelWrites = int(writes)
-		}
+		writes := GetEnvParallelWrites()
+		s.parallelWrites = int(writes)
 	}
+}
+
+func GetEnvParallelWrites() int {
+	writesEnv := os.Getenv(parallelWritesEnvKey)
+	writes, err := strconv.ParseUint(writesEnv, 10, 32)
+	if err == nil && writes != 0 {
+		return int(writes)
+	}
+
+	return parallelWritesDefault
 }
 
 // Pipeline will make [Ssg] call f(path, fileContent)
@@ -351,7 +358,7 @@ func (s *Ssg) WriteOut() error {
 		return err
 	}
 
-	err = writeOut(s.dist, s.parallelWrites)
+	err = WriteOut(s.dist, s.parallelWrites)
 	if err != nil {
 		return err
 	}
@@ -359,7 +366,7 @@ func (s *Ssg) WriteOut() error {
 	files := bytes.NewBuffer(nil)
 	for i := range s.dist {
 		f := &s.dist[i]
-		path, err := filepath.Rel(s.Dst, f.target)
+		path, err := filepath.Rel(s.Dst, f.Target)
 		if err != nil {
 			return err
 		}
@@ -547,8 +554,8 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 			return err
 		}
 		s.dist = append(s.dist, OutputFile{
-			target: target,
-			data:   data,
+			Target: target,
+			Data:   data,
 		})
 
 		return nil
@@ -587,8 +594,8 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	}
 
 	s.dist = append(s.dist, OutputFile{
-		target: target,
-		data:   out.Bytes(),
+		Target: target,
+		Data:   out.Bytes(),
 	})
 
 	return nil
@@ -702,8 +709,8 @@ func mirrorPath(
 	return filepath.Join(dst, path), nil
 }
 
-// writeOut blocks and writes concurrently to output locations.
-func writeOut(writes []OutputFile, parallelWrites int) error {
+// WriteOut blocks and writes concurrently to output locations.
+func WriteOut(writes []OutputFile, parallelWrites int) error {
 	wg := new(sync.WaitGroup)
 	errs := make(chan writeError)
 	guard := make(chan struct{}, parallelWrites)
@@ -718,24 +725,24 @@ func writeOut(writes []OutputFile, parallelWrites int) error {
 				wg.Done()
 			}()
 
-			err := os.MkdirAll(filepath.Dir(w.target), os.ModePerm)
+			err := os.MkdirAll(filepath.Dir(w.Target), os.ModePerm)
 			if err != nil {
 				errs <- writeError{
 					err:    err,
-					target: w.target,
+					target: w.Target,
 				}
 				return
 			}
-			err = os.WriteFile(w.target, w.data, os.ModePerm)
+			err = os.WriteFile(w.Target, w.Data, os.ModePerm)
 			if err != nil {
 				errs <- writeError{
 					err:    err,
-					target: w.target,
+					target: w.Target,
 				}
 				return
 			}
 
-			fmt.Fprintln(os.Stdout, w.target)
+			fmt.Fprintln(os.Stdout, w.Target)
 
 		}(&writes[i], wg)
 	}

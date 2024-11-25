@@ -2,48 +2,131 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
 	"github.com/alexflint/go-arg"
 
+	"github.com/soyart/ssg"
 	"github.com/soyart/ssg/soyweb"
 )
 
 type cli struct {
-	Target string `arg:"positional"`
+	Src string `arg:"positional" default:"src"`
+	Dst string `arg:"positional" default:"dist"`
+
 	soyweb.NoMinifyFlags
 }
 
-// @TODO: cli option for walking dir
+type minifier struct {
+	src  string
+	dst  string
+	dist []ssg.OutputFile
+
+	soyweb.NoMinifyFlags
+}
+
 func main() {
 	c := cli{}
 	arg.MustParse(&c)
 
-	ext := filepath.Ext(c.Target)
-	if ext == "" {
-		panic("unknown media type")
-	}
-
-	switch ext {
-	case ".html":
-		if c.NoMinifyHtml || c.NoMinifyHtmlAll {
-			return
-		}
-	case ".css":
-		if c.NoMinifyCss {
-			return
-		}
-	case ".json":
-		if c.NoMinifyJson {
-			return
-		}
-	}
-
-	minified, err := soyweb.MinifyFile(c.Target)
+	err := run(&c)
 	if err != nil {
 		panic(err)
 	}
+}
 
-	fmt.Fprintf(os.Stdout, "%s\n", minified)
+func run(c *cli) error {
+	m := minifier{
+		src:           c.Src,
+		dst:           c.Dst,
+		NoMinifyFlags: c.NoMinifyFlags,
+	}
+
+	writes, err := m.minify()
+	if err != nil {
+		return err
+	}
+
+	err = ssg.WriteOut(writes, ssg.GetEnvParallelWrites())
+	if err != nil {
+		return fmt.Errorf("error writing out: %w", err)
+	}
+
+	return nil
+}
+
+func (m *minifier) minify() ([]ssg.OutputFile, error) {
+	if m.src == m.dst {
+		return nil, fmt.Errorf("dst overwrites src: %s", m.src)
+	}
+
+	stat, err := os.Stat(m.src)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat src: %w", err)
+	}
+	if stat.IsDir() {
+		err = filepath.WalkDir(m.src, m.walk)
+		if err != nil {
+			return nil, err
+		}
+
+		return m.dist, nil
+	}
+
+	output, err := soyweb.MinifyFile(m.src)
+	if err != nil {
+		output, err = os.ReadFile(m.src)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	out := ssg.OutputFile{
+		Target: m.dst,
+		Data:   output,
+	}
+
+	return []ssg.OutputFile{out}, nil
+}
+
+func (m *minifier) walk(path string, d fs.DirEntry, e error) error {
+	if e != nil {
+		return e
+	}
+	if d.IsDir() {
+		return nil
+	}
+
+	rel, err := filepath.Rel(m.src, path)
+	if err != nil {
+		return err
+	}
+
+	dst := filepath.Join(m.dst, rel)
+	if m.NoMinifyFlags.Skip(filepath.Ext(path)) {
+		copied, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		m.dist = append(m.dist, ssg.OutputFile{
+			Target: dst,
+			Data:   copied,
+		})
+
+		return nil
+	}
+
+	minified, err := soyweb.MinifyFile(path)
+	if err != nil {
+		return err
+	}
+
+	m.dist = append(m.dist, ssg.OutputFile{
+		Target: dst,
+		Data:   minified,
+	})
+
+	return nil
 }
