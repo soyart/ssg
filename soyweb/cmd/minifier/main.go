@@ -86,6 +86,7 @@ func (m *minifier) minify() ([]ssg.OutputFile, error) {
 	out := ssg.OutputFile{
 		Target: m.dst,
 		Data:   output,
+		Mode:   stat.Mode(),
 	}
 
 	return []ssg.OutputFile{out}, nil
@@ -103,6 +104,10 @@ func (m *minifier) walk(path string, d fs.DirEntry, e error) error {
 	if err != nil {
 		return err
 	}
+	info, err := d.Info()
+	if err != nil {
+		return err
+	}
 
 	dst := filepath.Join(m.dst, rel)
 	if m.NoMinifyFlags.Skip(filepath.Ext(path)) {
@@ -113,6 +118,7 @@ func (m *minifier) walk(path string, d fs.DirEntry, e error) error {
 		m.dist = append(m.dist, ssg.OutputFile{
 			Target: dst,
 			Data:   copied,
+			Mode:   info.Mode(),
 		})
 
 		return nil
@@ -126,6 +132,7 @@ func (m *minifier) walk(path string, d fs.DirEntry, e error) error {
 	m.dist = append(m.dist, ssg.OutputFile{
 		Target: dst,
 		Data:   minified,
+		Mode:   info.Mode(),
 	})
 
 	return nil

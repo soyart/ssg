@@ -16,7 +16,7 @@ import (
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
 	"github.com/gomarkdown/markdown/parser"
-	"github.com/sabhiram/go-gitignore"
+	ignore "github.com/sabhiram/go-gitignore"
 )
 
 const (
@@ -80,6 +80,7 @@ type Option func(*Ssg)
 type OutputFile struct {
 	Target string
 	Data   []byte
+	Mode   fs.FileMode
 }
 
 type writeError struct {
@@ -521,6 +522,11 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 		return nil
 	}
 
+	info, err := d.Info()
+	if err != nil {
+		return err
+	}
+
 	switch base {
 	case
 		"_header.html",
@@ -561,6 +567,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 		s.dist = append(s.dist, OutputFile{
 			Target: target,
 			Data:   data,
+			Mode:   info.Mode(),
 		})
 
 		return nil
@@ -601,6 +608,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	s.dist = append(s.dist, OutputFile{
 		Target: target,
 		Data:   out.Bytes(),
+		Mode:   info.Mode(),
 	})
 
 	return nil
@@ -612,6 +620,14 @@ func (s *Ssg) pront(l int) {
 
 func (w writeError) Error() string {
 	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
+}
+
+func (o OutputFile) modeOutput() fs.FileMode {
+	if o.Mode == fs.FileMode(0) {
+		return fs.ModePerm
+	}
+
+	return o.Mode
 }
 
 // titleFromH1 finds the first h1 in markdown and uses the h1 title
@@ -738,7 +754,7 @@ func WriteOut(writes []OutputFile, parallelWrites int) error {
 				}
 				return
 			}
-			err = os.WriteFile(w.Target, w.Data, os.ModePerm)
+			err = os.WriteFile(w.Target, w.Data, w.modeOutput())
 			if err != nil {
 				errs <- writeError{
 					err:    err,
