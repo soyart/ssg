@@ -1,30 +1,32 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	"syscall"
-
 	"github.com/alexflint/go-arg"
 
 	"github.com/soyart/ssg"
 	"github.com/soyart/ssg/soyweb"
 )
 
+type cli struct {
+	Src   string `arg:"required,positional"`
+	Dst   string `arg:"required,positional"`
+	Title string `arg:"required,positional"`
+	Url   string `arg:"required,positional"`
+
+	soyweb.NoMinifyFlags
+}
+
 func main() {
-	if len(os.Args) < 5 {
-		fmt.Fprint(os.Stdout, "usage: ssg src dst title base_url [--no-min-html --no-min-html-copy --no-min-css --no-min-json]\n")
-		syscall.Exit(1)
+	c := cli{}
+	arg.MustParse(&c)
+
+	err := run(&c)
+	if err != nil {
+		panic(err)
 	}
+}
 
-	src, dst, title, url := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
-
-	// Reset, to avoid "too many positional arguments"
-	// from parsing NoMinifyFlags
-	os.Args = os.Args[4:]
-	f := soyweb.NoMinifyFlags{}
-	arg.MustParse(&f)
-
+func run(c *cli) error {
 	minifyOpts := soyweb.SsgOptions(soyweb.Flags{
 		MinifyFlags: soyweb.MinifyFlags{
 			MinifyHtml:     true,
@@ -32,7 +34,7 @@ func main() {
 			MinifyCss:      true,
 			MinifyJson:     true,
 		},
-		NoMinifyFlags: f,
+		NoMinifyFlags: c.NoMinifyFlags,
 	})
 
 	opts := append(
@@ -40,9 +42,5 @@ func main() {
 		minifyOpts...,
 	)
 
-	s := ssg.NewWithOptions(src, dst, title, url, opts...)
-	err := s.Generate()
-	if err != nil {
-		panic(err)
-	}
+	return ssg.GenerateWithOptions(c.Src, c.Dst, c.Title, c.Url, opts...)
 }

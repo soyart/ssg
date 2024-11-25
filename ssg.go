@@ -121,6 +121,11 @@ func NewWithOptions(src, dst, title, url string, opts ...Option) Ssg {
 	return s
 }
 
+func GenerateWithOptions(src, dst, title, url string, opts ...Option) error {
+	s := NewWithOptions(src, dst, title, url, opts...)
+	return s.Generate()
+}
+
 // ToHtml converts md (Markdown) into HTML document
 func ToHtml(md []byte) []byte {
 	root := markdown.Parse(md, parser.NewWithExtensions(SsgExtensions))
