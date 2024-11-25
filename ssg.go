@@ -251,7 +251,7 @@ func Generate(sites ...Ssg) error {
 		if err != nil {
 			return err
 		}
-		err = os.WriteFile(s.Dst+"/sitemap.xml", []byte(sitemap), os.ModePerm)
+		err = os.WriteFile(s.Dst+"/sitemap.xml", []byte(sitemap), 0644)
 		if err != nil {
 			return err
 		}
@@ -325,7 +325,7 @@ func (s *Ssg) Generate() error {
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(s.Dst+"/sitemap.xml", []byte(sitemap), os.ModePerm)
+	err = os.WriteFile(s.Dst+"/sitemap.xml", []byte(sitemap), 0644)
 	if err != nil {
 		return err
 	}
@@ -386,7 +386,7 @@ func (s *Ssg) WriteOut() error {
 	}
 
 	target := filepath.Join(s.Dst, ".files")
-	err = os.WriteFile(target, files.Bytes(), os.ModePerm)
+	err = os.WriteFile(target, files.Bytes(), 0644)
 	if err != nil {
 		return fmt.Errorf("error writing %s: %w", target, err)
 	}

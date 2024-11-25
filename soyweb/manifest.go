@@ -438,6 +438,10 @@ func cp(src string, dst WriteTarget) error {
 		}
 	}
 
+	stat, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("error getting src stat: %w", err)
+	}
 	b, err := os.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("error reading src: %w", err)
@@ -449,7 +453,7 @@ func cp(src string, dst WriteTarget) error {
 		return fmt.Errorf("error preparing dst directory at '%s': %w", dir, err)
 	}
 
-	err = os.WriteFile(dst.Target, b, os.ModePerm)
+	err = os.WriteFile(dst.Target, b, stat.Mode())
 	if err != nil {
 		return fmt.Errorf("error writing to dst: %w", err)
 	}
