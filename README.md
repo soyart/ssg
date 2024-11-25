@@ -23,15 +23,27 @@ This Nix Flake provides 2 implementations of ssg.
   This implementation is good for deploying ssg remotely,
   because it's just 1 Go executable.
 
-## Usage for both
+## Build from Nix flake
+
+```
+nix build # Build default package - pure POSIX shell ssg
+nix build .#impure # Build directly from ssg.sh
+nix build .#ssg-go # Build Go implementation of ssg
+nix build .#soyweb # Build soyweb programs
+```
+
+## Usage for both implementations
 
 ```sh
 ssg <src> <dst> <title> <url>
 ```
 
-ssg reads Markdown files from `src`, prepends it with `_header.html`,
-and appends it with content of `_footer.html`. The output files are mirrored
-into `dst`. Files or directories whose names start with `.` are skipped.
+Each implementation of ssg reads Markdown files under `src`,
+converts each to HTML and prepends and appends the resulting HTML
+with `_header.html` and `_footer.html` respectively.
+
+The output file tree is mirrored into `dst`.
+Files or directories whose names start with `.` are skipped.
 
 Files listed in `${src}/.ssgignore` are also ignored in a fashion similar
 to `.gitignore`. To see how `.ssgignore` works in Go implementation, see
