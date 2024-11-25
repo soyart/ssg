@@ -59,7 +59,7 @@ rec {
 
           pname = "ssg";
           src = ./.;
-          vendorHash = "sha256-Q4fDv3n+TBdjQDQkBEjrL4rFV51XHdxt/J4QZ+sdKOI=";
+          vendorHash = "sha256-89MtPLdBD0lF7YOrhMgSB0q0AdKylBAiLmPQayL+M9I=";
           # Go unit tests are already executed by buildGoModule.
           # preBuild would instead be more useful if we want to set Go flags.
           # preBuild = ''
@@ -69,6 +69,25 @@ rec {
           meta = {
             homepage = "https://github.com/soyart/ssg";
             description = "${description} (go implementation)";
+          };
+        };
+
+        soyweb = pkgs.buildGoModule {
+          inherit version;
+
+          pname = "soyweb";
+          src = ./.;
+          modRoot = "./soyweb";
+          vendorHash = "sha256-cZqF9O5HVNR+SwUu8or4fANlZNgpBmy7NZm4gRseVGs=";
+          # Go unit tests are already executed by buildGoModule.
+          # preBuild would instead be more useful if we want to set Go flags.
+          # preBuild = ''
+          #   go test ./...;
+          # '';
+
+          meta = {
+            homepage = "https://github.com/soyart/ssg";
+            description = "soyweb - ssg wrapper";
           };
         };
       });
