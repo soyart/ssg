@@ -6,16 +6,19 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/soyart/ssg"
 	"github.com/tdewolff/minify/v2"
 	"github.com/tdewolff/minify/v2/css"
 	"github.com/tdewolff/minify/v2/html"
+	"github.com/tdewolff/minify/v2/js"
 	"github.com/tdewolff/minify/v2/json"
+
+	"github.com/soyart/ssg"
 )
 
 const (
 	mediaTypeHtml = "text/html"
 	mediaTypeCss  = "style/css"
+	mediaTypeJs   = "text/javascript"
 	mediaTypeJson = "application/json"
 )
 
@@ -28,37 +31,24 @@ var m = minify.New()
 func init() {
 	m.AddFunc(mediaTypeHtml, html.Minify)
 	m.AddFunc(mediaTypeCss, css.Minify)
+	m.AddFunc(mediaTypeJs, js.Minify)
 	m.AddFunc(mediaTypeJson, json.Minify)
 }
 
-func MinifyHtml(htmlDoc []byte) ([]byte, error) {
-	min := bytes.NewBuffer(nil)
-	err := m.Minify(mediaTypeHtml, min, bytes.NewBuffer(htmlDoc))
-	if err != nil {
-		return nil, err
-	}
-
-	return min.Bytes(), nil
+func MinifyHtml(original []byte) ([]byte, error) {
+	return minifyFormat(original, mediaTypeHtml)
 }
 
-func MinifyCss(cssDoc []byte) ([]byte, error) {
-	min := bytes.NewBuffer(nil)
-	err := m.Minify(mediaTypeCss, min, bytes.NewBuffer(cssDoc))
-	if err != nil {
-		return nil, err
-	}
-
-	return min.Bytes(), nil
+func MinifyCss(original []byte) ([]byte, error) {
+	return minifyFormat(original, mediaTypeCss)
 }
 
-func MinifyJson(jsonDoc []byte) ([]byte, error) {
-	min := bytes.NewBuffer(nil)
-	err := m.Minify(mediaTypeJson, min, bytes.NewBuffer(jsonDoc))
-	if err != nil {
-		return nil, err
-	}
+func MinifyJs(original []byte) ([]byte, error) {
+	return minifyFormat(original, mediaTypeJs)
+}
 
-	return min.Bytes(), nil
+func MinifyJson(original []byte) ([]byte, error) {
+	return minifyFormat(original, mediaTypeJson)
 }
 
 func MinifyAll(path string, data []byte) ([]byte, error) {
@@ -66,7 +56,6 @@ func MinifyAll(path string, data []byte) ([]byte, error) {
 	if err != nil {
 		return data, nil
 	}
-
 	out, err := fn(data)
 	if err != nil {
 		return nil, err
@@ -76,12 +65,12 @@ func MinifyAll(path string, data []byte) ([]byte, error) {
 }
 
 func MinifyFile(path string) ([]byte, error) {
-	fn, err := os.Open(path)
+	original, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 
-	defer fn.Close()
+	defer original.Close()
 
 	mediaType, err := ExtToMediaType(filepath.Ext(path))
 	if err != nil {
@@ -89,7 +78,7 @@ func MinifyFile(path string) ([]byte, error) {
 	}
 
 	min := bytes.NewBuffer(nil)
-	err = m.Minify(mediaType, min, fn)
+	err = m.Minify(mediaType, min, original)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +92,8 @@ func ExtToMediaType(ext string) (string, error) {
 		return mediaTypeHtml, nil
 	case ".css":
 		return mediaTypeCss, nil
+	case ".js":
+		return mediaTypeJs, nil
 	case ".json":
 		return mediaTypeJson, nil
 	}
@@ -116,11 +107,23 @@ func ExtToFn(ext string) (func([]byte) ([]byte, error), error) {
 		return MinifyHtml, nil
 	case ".css":
 		return MinifyCss, nil
+	case ".js":
+		return MinifyJs, nil
 	case ".json":
 		return MinifyJson, nil
 	}
 
 	return nil, fmt.Errorf("'%s': %w", ext, ErrNotSupported)
+}
+
+func minifyFormat(original []byte, format string) ([]byte, error) {
+	min := bytes.NewBuffer(nil)
+	err := m.Minify(format, min, bytes.NewBuffer(original))
+	if err != nil {
+		return nil, err
+	}
+
+	return min.Bytes(), nil
 }
 
 func pipelineMinify(m map[string]MinifyFn) ssg.PipelineFn {

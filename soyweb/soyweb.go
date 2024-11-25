@@ -15,6 +15,7 @@ type (
 		MinifyHtml     bool `arg:"--min-html" help:"Minify converted HTML outputs"`
 		MinifyHtmlCopy bool `arg:"--min-html-all" help:"Minify all copied HTML"`
 		MinifyCss      bool `arg:"--min-css" help:"Minify CSS files"`
+		MinifyJs       bool `arg:"--min-js" help:"Minify Javascript files"`
 		MinifyJson     bool `arg:"--min-json" help:"Minify JSON files"`
 	}
 
@@ -22,6 +23,7 @@ type (
 		NoMinifyHtml     bool `arg:"--no-min-html,env:NO_MIN_HTML" help:"Do not minify converted HTML outputs"`
 		NoMinifyHtmlCopy bool `arg:"--no-min-html-copy,env:NO_MIN_HTML_COPY" help:"Do not minify all copied HTML"`
 		NoMinifyCss      bool `arg:"--no-min-css,env:NO_MIN_CSS" help:"Do not minify CSS files"`
+		NoMinifyJs       bool `arg:"--no-min-js,env:NO_MIN_JSON" help:"Do not minify Javascript files"`
 		NoMinifyJson     bool `arg:"--no-min-json,env:NO_MIN_JSON" help:"Do not minify JSON files"`
 	}
 
@@ -42,6 +44,9 @@ func SsgOptions(f Flags) []ssg.Option {
 	}
 	if f.MinifyCss {
 		minifiers[".css"] = MinifyCss
+	}
+	if f.MinifyJs {
+		minifiers[".js"] = MinifyJs
 	}
 	if f.MinifyJson {
 		minifiers[".json"] = MinifyJson
@@ -67,12 +72,14 @@ func (m MinifyFlags) Skip(ext string) bool {
 		if m.MinifyHtmlCopy {
 			return false
 		}
-
 	case ".css":
 		if m.MinifyCss {
 			return false
 		}
-
+	case ".js":
+		if m.MinifyJs {
+			return false
+		}
 	case ".json":
 		if m.MinifyJson {
 			return false
@@ -94,12 +101,14 @@ func (n NoMinifyFlags) Skip(ext string) bool {
 		if n.NoMinifyHtmlCopy {
 			return true
 		}
-
 	case ".css":
 		if n.NoMinifyCss {
 			return true
 		}
-
+	case ".js":
+		if n.NoMinifyJs {
+			return true
+		}
 	case ".json":
 		if n.NoMinifyJson {
 			return true
@@ -121,6 +130,9 @@ func negate(yes MinifyFlags, no NoMinifyFlags) MinifyFlags {
 	}
 	if no.NoMinifyCss {
 		yes.MinifyCss = false
+	}
+	if no.NoMinifyJs {
+		yes.MinifyJs = false
 	}
 	if no.NoMinifyJson {
 		yes.MinifyJson = false
