@@ -29,11 +29,11 @@ func TestScan(t *testing.T) {
 	for i := range ssg.dist {
 		o := &ssg.dist[i]
 
-		if strings.HasSuffix(o.Target, "_header.html") {
-			t.Fatalf("unexpected _header.html output in '%s'", o.Target)
+		if strings.HasSuffix(o.target, "_header.html") {
+			t.Fatalf("unexpected _header.html output in '%s'", o.target)
 		}
-		if strings.HasSuffix(o.Target, "_footer.html") {
-			t.Fatalf("unexpected _footer.html output in '%s'", o.Target)
+		if strings.HasSuffix(o.target, "_footer.html") {
+			t.Fatalf("unexpected _footer.html output in '%s'", o.target)
 		}
 	}
 

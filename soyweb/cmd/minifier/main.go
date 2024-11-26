@@ -83,12 +83,7 @@ func (m *minifier) minify() ([]ssg.OutputFile, error) {
 		}
 	}
 
-	out := ssg.OutputFile{
-		Target: m.dst,
-		Data:   output,
-		Mode:   stat.Mode(),
-	}
-
+	out := ssg.Output(m.dst, output, stat.Mode().Perm())
 	return []ssg.OutputFile{out}, nil
 }
 
@@ -99,28 +94,23 @@ func (m *minifier) walk(path string, d fs.DirEntry, e error) error {
 	if d.IsDir() {
 		return nil
 	}
-
-	rel, err := filepath.Rel(m.src, path)
-	if err != nil {
-		return err
-	}
 	info, err := d.Info()
 	if err != nil {
 		return err
 	}
 
+	rel, err := filepath.Rel(m.src, path)
+	if err != nil {
+		return err
+	}
 	dst := filepath.Join(m.dst, rel)
 	if m.NoMinifyFlags.Skip(filepath.Ext(path)) {
 		copied, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		m.dist = append(m.dist, ssg.OutputFile{
-			Target: dst,
-			Data:   copied,
-			Mode:   info.Mode(),
-		})
 
+		m.dist = append(m.dist, ssg.Output(dst, copied, info.Mode().Perm()))
 		return nil
 	}
 
@@ -129,11 +119,6 @@ func (m *minifier) walk(path string, d fs.DirEntry, e error) error {
 		return err
 	}
 
-	m.dist = append(m.dist, ssg.OutputFile{
-		Target: dst,
-		Data:   minified,
-		Mode:   info.Mode(),
-	})
-
+	m.dist = append(m.dist, ssg.Output(dst, minified, info.Mode().Perm()))
 	return nil
 }

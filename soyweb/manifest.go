@@ -376,6 +376,7 @@ func (s *Site) Copy() error {
 	logger := slog.Default()
 
 	dirs := make(ssg.Set)
+	perms := make(map[string]fs.FileMode)
 	for cpSrc, cpDst := range s.Copies {
 		logger := logger.With("phase", "scan", "cpSrc", cpSrc, "cpDst", cpDst)
 
@@ -411,16 +412,18 @@ func (s *Site) Copy() error {
 
 		if ssrc != nil && ssrc.IsDir() {
 			dirs.Insert(cpSrc)
+			perms[cpSrc] = ssrc.Mode().Perm()
 		}
 		if sdst != nil && sdst.IsDir() {
 			dirs.Insert(cpDst.Target)
+			perms[cpDst.Target] = sdst.Mode().Perm()
 		}
 	}
 
 	for cpSrc, cpDst := range s.Copies {
 		logger := logger.With("phase", "copy", "cpSrc", cpSrc, "cpDst", cpDst)
 
-		err := copyFiles(dirs, cpSrc, cpDst)
+		err := copyFiles(dirs, cpSrc, cpDst, perms)
 		if err != nil {
 			logger.Error("failed to copy file")
 			return fmt.Errorf("failed to copy directory '%s'->'%s': %w", cpSrc, cpDst.Target, err)
@@ -430,7 +433,7 @@ func (s *Site) Copy() error {
 	return nil
 }
 
-func cp(src string, dst WriteTarget) error {
+func cp(src string, dst WriteTarget, perm fs.FileMode) error {
 	if dst.Force {
 		err := os.RemoveAll(dst.Target)
 		if err != nil && !os.IsNotExist(err) {
@@ -438,10 +441,6 @@ func cp(src string, dst WriteTarget) error {
 		}
 	}
 
-	stat, err := os.Stat(src)
-	if err != nil {
-		return fmt.Errorf("error getting src stat: %w", err)
-	}
 	b, err := os.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("error reading src: %w", err)
@@ -453,7 +452,14 @@ func cp(src string, dst WriteTarget) error {
 		return fmt.Errorf("error preparing dst directory at '%s': %w", dir, err)
 	}
 
-	err = os.WriteFile(dst.Target, b, stat.Mode())
+	if perm.Perm() == 0 {
+		stat, err := os.Stat(src)
+		if err != nil {
+			return fmt.Errorf("error stating cp src file: %w", err)
+		}
+		perm = stat.Mode().Perm()
+	}
+	err = os.WriteFile(dst.Target, b, perm)
 	if err != nil {
 		return fmt.Errorf("error writing to dst: %w", err)
 	}
@@ -473,6 +479,10 @@ func cpRecurse(src string, dst WriteTarget) error {
 		if d.IsDir() {
 			return nil
 		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
 
 		rel, err := filepath.Rel(src, path)
 		if err != nil {
@@ -480,12 +490,13 @@ func cpRecurse(src string, dst WriteTarget) error {
 		}
 
 		target := filepath.Join(dstRoot, rel)
-
 		slog.Debug("cpRecurse", "src", src, "base", filepath.Base(path), "dst", dst, "target", target)
-		return cp(path, WriteTarget{
+		out := WriteTarget{
 			Target: target,
 			Force:  dst.Force,
-		})
+		}
+
+		return cp(path, out, info.Mode().Perm())
 	})
 	if err != nil {
 		return fmt.Errorf("walkDir failed for src '%s', dst '%s': %w", src, dst.Target, err)
@@ -494,7 +505,7 @@ func cpRecurse(src string, dst WriteTarget) error {
 	return nil
 }
 
-func copyFiles(dirs ssg.Set, src string, dst WriteTarget) error {
+func copyFiles(dirs ssg.Set, src string, dst WriteTarget, permsCache map[string]fs.FileMode) error {
 	switch {
 	// Copy dir to dir, with target not yet existing
 	case dirs.ContainsAll(src) && !dirs.ContainsAll(dst.Target):
@@ -516,5 +527,5 @@ func copyFiles(dirs ssg.Set, src string, dst WriteTarget) error {
 		dst.Target = filepath.Join(dst.Target, base)
 	}
 
-	return cp(src, dst)
+	return cp(src, dst, permsCache[src])
 }

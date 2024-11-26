@@ -78,9 +78,9 @@ type HookFn func(htmlDoc []byte) (output []byte, err error)
 type Option func(*Ssg)
 
 type OutputFile struct {
-	Target string
-	Data   []byte
-	Mode   fs.FileMode
+	target string
+	data   []byte
+	perm   fs.FileMode
 }
 
 type writeError struct {
@@ -158,7 +158,7 @@ xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
 
 	for i := range outputs {
 		o := &outputs[i]
-		target, err := filepath.Rel(dst, o.Target)
+		target, err := filepath.Rel(dst, o.target)
 		if err != nil {
 			return sm.String(), err
 		}
@@ -372,7 +372,7 @@ func (s *Ssg) WriteOut() error {
 	files := bytes.NewBuffer(nil)
 	for i := range s.dist {
 		f := &s.dist[i]
-		path, err := filepath.Rel(s.Dst, f.Target)
+		path, err := filepath.Rel(s.Dst, f.target)
 		if err != nil {
 			return err
 		}
@@ -427,6 +427,14 @@ func shouldIgnore(ignores ignorer, path, base string, d fs.DirEntry) (bool, erro
 	}
 
 	return false, nil
+}
+
+func Output(target string, data []byte, perm fs.FileMode) OutputFile {
+	return OutputFile{
+		target: target,
+		data:   data,
+		perm:   perm,
+	}
 }
 
 func (i *ignorerGitignore) ignore(path string) bool {
@@ -564,11 +572,11 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 		if err != nil {
 			return err
 		}
-		s.dist = append(s.dist, OutputFile{
-			Target: target,
-			Data:   data,
-			Mode:   info.Mode(),
-		})
+		s.dist = append(s.dist, Output(
+			target,
+			data,
+			info.Mode().Perm(),
+		))
 
 		return nil
 	}
@@ -605,12 +613,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 		out = bytes.NewBuffer(b)
 	}
 
-	s.dist = append(s.dist, OutputFile{
-		Target: target,
-		Data:   out.Bytes(),
-		Mode:   info.Mode(),
-	})
-
+	s.dist = append(s.dist, Output(target, out.Bytes(), info.Mode().Perm()))
 	return nil
 }
 
@@ -622,12 +625,12 @@ func (w writeError) Error() string {
 	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
 }
 
-func (o OutputFile) modeOutput() fs.FileMode {
-	if o.Mode == fs.FileMode(0) {
+func (o *OutputFile) modeOutput() fs.FileMode {
+	if o.perm == fs.FileMode(0) {
 		return fs.ModePerm
 	}
 
-	return o.Mode
+	return o.perm
 }
 
 // titleFromH1 finds the first h1 in markdown and uses the h1 title
@@ -746,24 +749,24 @@ func WriteOut(writes []OutputFile, parallelWrites int) error {
 				wg.Done()
 			}()
 
-			err := os.MkdirAll(filepath.Dir(w.Target), os.ModePerm)
+			err := os.MkdirAll(filepath.Dir(w.target), os.ModePerm)
 			if err != nil {
 				errs <- writeError{
 					err:    err,
-					target: w.Target,
+					target: w.target,
 				}
 				return
 			}
-			err = os.WriteFile(w.Target, w.Data, w.modeOutput())
+			err = os.WriteFile(w.target, w.data, w.modeOutput())
 			if err != nil {
 				errs <- writeError{
 					err:    err,
-					target: w.Target,
+					target: w.target,
 				}
 				return
 			}
 
-			fmt.Fprintln(os.Stdout, w.Target)
+			fmt.Fprintln(os.Stdout, w.target)
 
 		}(&writes[i], wg)
 	}
