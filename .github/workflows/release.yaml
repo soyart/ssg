@@ -5,6 +5,7 @@ on:
   push:
     tags:
       - 'v*'
+      - 'dev-*'
       - 'test-*'
 
 name: Release ssg-go
