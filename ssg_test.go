@@ -9,6 +9,131 @@ import (
 	"github.com/sabhiram/go-gitignore"
 )
 
+func TestToHTML(t *testing.T) {
+	type testCase struct {
+		md   string
+		html string
+	}
+
+	tests := []testCase{
+		{
+			md:   "",
+			html: "",
+		},
+		{
+			md:   "This is a paragraph",
+			html: "<p>This is a paragraph</p>\n",
+		},
+		{
+			md: `# Some h1
+Some paragraph`,
+			html: `<h1 id="some-h1">Some h1</h1>
+
+<p>Some paragraph</p>
+`,
+		},
+		{
+			md: `# Some h1
+Some paragraph
+
+## Some h2`,
+			html: `<h1 id="some-h1">Some h1</h1>
+
+<p>Some paragraph</p>
+
+<h2 id="some-h2">Some h2</h2>
+`,
+		},
+		{
+			md: `# Some h1
+Some paragraph
+
+<p>Embedded HTML paragraph</p>
+
+## Some h2`,
+			html: `<h1 id="some-h1">Some h1</h1>
+
+<p>Some paragraph</p>
+
+<p>Embedded HTML paragraph</p>
+
+<h2 id="some-h2">Some h2</h2>
+`,
+		},
+		{
+			md: `# Some h1
+Some paragraph
+
+<p>Embedded HTML paragraph</p>
+
+## Some h2
+
+Some paragraph2`,
+			html: `<h1 id="some-h1">Some h1</h1>
+
+<p>Some paragraph</p>
+
+<p>Embedded HTML paragraph</p>
+
+<h2 id="some-h2">Some h2</h2>
+
+<p>Some paragraph2</p>
+`,
+		},
+		{
+			md: `# Some h1
+Some paragraph
+
+<p>Embedded HTML paragraph</p>
+
+<h2 id="some-h2">Embedded HTML h2</h2>
+
+Some paragraph2`,
+			html: `<h1 id="some-h1">Some h1</h1>
+
+<p>Some paragraph</p>
+
+<p>Embedded HTML paragraph</p>
+
+<h2 id="some-h2">Embedded HTML h2</h2>
+
+<p>Some paragraph2</p>
+`,
+		},
+		{
+			md: `# Some h1
+Some paragraph
+
+<p>Embedded HTML paragraph</p>
+
+<h2>Embedded HTML h2</h2>
+
+Some paragraph2`,
+			html: `<h1 id="some-h1">Some h1</h1>
+
+<p>Some paragraph</p>
+
+<p>Embedded HTML paragraph</p>
+
+<h2>Embedded HTML h2</h2>
+
+<p>Some paragraph2</p>
+`,
+		},
+	}
+
+	for i := range tests {
+		tc := &tests[i]
+		html := ToHtml([]byte(tc.md))
+		if actual := string(html); actual != tc.html {
+			t.Logf("len(expected)=%d, len(actual)=%d", len(html), len(actual))
+			t.Logf("expected:\n%s", tc.html)
+			t.Logf("actual:\n%s", actual)
+			t.Fatalf("unexpected HTML output from case %d", i+1)
+		}
+	}
+}
+
 func TestScan(t *testing.T) {
 	root := "./soyweb/testdata/johndoe.com"
 	src := filepath.Join(root, "/src")
