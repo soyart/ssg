@@ -1,0 +1,44 @@
+name: test
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+
+jobs:
+  test:
+    name: Test code
+    strategy:
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
+
+        go-version:
+          - stable
+          - "" # empty string = read version from go.mod
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@master
+        with:
+          fetch-depth: "0"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          go-version-file: "go.mod"
+          cache: false
+          check-latest: true
+
+      - name: Test with Go
+        run: go test -json ./... > ssg-go-test_result-go${{ matrix.go-version }}_${{ matrix.os }}.json
+
+      - name: Upload Go test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssg-go-test_result-go${{ matrix.go-version }}_${{ matrix.os }}
+          path: ssg-go-test_result-go${{ matrix.go-version }}_${{ matrix.os }}.json
+

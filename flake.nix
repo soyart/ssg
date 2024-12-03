@@ -31,9 +31,7 @@ rec {
             lowdown
           ];
 
-          text = ''
-            ${builtins.readFile ./ssg.sh}
-          '';
+          text = builtins.readFile ./ssg.sh;
 
           meta = {
             inherit description homepage;
@@ -52,8 +50,68 @@ rec {
 
           meta = {
             inherit homepage;
-            description = "${description} + (impure version)";
+            description = "${description} (impure version)";
           };
+        };
+
+        ssg-go = pkgs.buildGoModule {
+          inherit version;
+
+          pname = "ssg";
+          src = ./.;
+          vendorHash = "sha256-89MtPLdBD0lF7YOrhMgSB0q0AdKylBAiLmPQayL+M9I=";
+
+          buildPhase = ''
+            echo "Note: only building ./cmd/ssg for ssg-go"
+            mkdir -p bin $out/bin
+            go build -o ./bin/ssg ./cmd/ssg
+            mv ./bin/ssg $out/bin/
+          '';
+
+          # Go unit tests are already executed by buildGoModule.
+          # preBuild would instead be more useful if we want to set Go flags.
+          # preBuild = ''
+          #   go test ./...;
+          # '';
+
+          meta = {
+            homepage = "https://github.com/soyart/ssg";
+            description = "${description} (go implementation)";
+          };
+        };
+
+        soyweb = pkgs.buildGoModule {
+          inherit version;
+
+          pname = "soyweb";
+          src = ./.;
+          modRoot = "./soyweb";
+          vendorHash = "sha256-cZqF9O5HVNR+SwUu8or4fANlZNgpBmy7NZm4gRseVGs=";
+          meta = {
+            homepage = "https://github.com/soyart/ssg";
+            description = "soyweb - ssg wrapper";
+          };
+        };
+      });
+
+      devShells = forAllSystems ({ pkgs }: {
+        default = pkgs.mkShell {
+          packages = with pkgs; [
+            nixd
+            nixpkgs-fmt
+
+            bash-language-server
+            shellcheck
+            shfmt
+
+            coreutils
+            lowdown
+
+            go
+            gopls
+            gotools
+            go-tools
+          ];
         };
       });
     };
