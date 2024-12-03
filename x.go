@@ -108,8 +108,8 @@ func choose[T any](path string, valueDefault T, m map[string]T) T {
 	chosen, max := valueDefault, 0
 
 outer:
-	for stored, v := range m {
-		prefixes := strings.Split(stored, "/")
+	for prefix, stored := range m {
+		prefixes := strings.Split(prefix, "/")
 		for i := range parts {
 			if i >= len(prefixes) {
 				break
@@ -120,12 +120,12 @@ outer:
 			}
 		}
 
-		l := len(stored)
+		l := len(prefix)
 		if max > l {
 			continue
 		}
 
-		chosen, max = v, l
+		chosen, max = stored, l
 	}
 
 	return chosen

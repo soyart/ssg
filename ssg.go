@@ -556,18 +556,7 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 	}
 
 	ext := filepath.Ext(base)
-
-	switch ext {
-	// Check if there's a competing HTML file
-	case ".md":
-		html := strings.TrimSuffix(path, ".md")
-		html += ".html"
-		if s.preferred.ContainsAll(html) {
-			return nil
-		}
-
-	// Copy files as they are
-	default:
+	if ext != ".md" {
 		target, err := mirrorPath(s.Src, s.Dst, path, ext)
 		if err != nil {
 			return err
@@ -578,6 +567,12 @@ func (s *Ssg) build(path string, d fs.DirEntry, e error) error {
 			info.Mode().Perm(),
 		))
 
+		return nil
+	}
+
+	html := strings.TrimSuffix(path, ".md")
+	html += ".html"
+	if s.preferred.ContainsAll(html) {
 		return nil
 	}
 

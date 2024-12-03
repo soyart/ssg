@@ -23,6 +23,11 @@ This Nix Flake provides 2 implementations of ssg.
   This implementation is good for deploying ssg remotely,
   because it's just 1 Go executable.
 
+  A Go wrapper for ssg-go is also available in [`soyweb`](./soyweb/).
+
+  > Note: both ssg-go and soyweb will probably not work on Windows due to
+  > Windows path delimiter being different than POSIX's
+
 ## Build from Nix flake
 
 ```
