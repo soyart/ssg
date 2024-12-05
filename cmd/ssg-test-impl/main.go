@@ -50,8 +50,7 @@ func main() {
 			content := bytes.NewBufferString(fmt.Sprintf("Blog %s\n\n", heading))
 			for i := range articles {
 				article := articles[i]
-				line := fmt.Sprintf("[%s](./%s/%s)\n", article, parent, article)
-				content.WriteString(line)
+				fmt.Fprintf(content, "- [%s](./%s/%s)\n\n", article, parent, article)
 			}
 
 			path = filepath.Join(parent, "index.md")
