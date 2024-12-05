@@ -443,7 +443,7 @@ func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
 
 	ext := filepath.Ext(path)
 	if ext != ".md" {
-		target, err := mirrorPath(s.Src, s.Dst, path, ext)
+		target, err := MirrorPath(s.Src, s.Dst, path, ext)
 		if err != nil {
 			return err
 		}
@@ -462,7 +462,7 @@ func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
 		return nil
 	}
 
-	target, err := mirrorPath(s.Src, s.Dst, path, ".html")
+	target, err := MirrorPath(s.Src, s.Dst, path, ".html")
 	if err != nil {
 		return err
 	}
@@ -475,10 +475,10 @@ func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
 	headerText := []byte(header.String()) //nolint:gosimple
 	switch header.titleFrom {
 	case fromH1:
-		headerText = titleFromH1([]byte(s.Title), headerText, data)
+		headerText = TitleFromH1([]byte(s.Title), headerText, data)
 
 	case fromTag:
-		headerText, data = titleFromTag([]byte(s.Title), headerText, data)
+		headerText, data = TitleFromTag([]byte(s.Title), headerText, data)
 	}
 
 	out := bytes.NewBuffer(headerText)
@@ -573,9 +573,9 @@ func shouldIgnore(ignores ignorer, path, base string, d fs.DirEntry) (bool, erro
 	return false, nil
 }
 
-// titleFromH1 finds the first h1 in markdown and uses the h1 title
+// TitleFromH1 finds the first h1 in markdown and uses the h1 title
 // to write to <title> tag in header.
-func titleFromH1(d []byte, header []byte, markdown []byte) []byte {
+func TitleFromH1(d []byte, header []byte, markdown []byte) []byte {
 	k := []byte(keyTitleFromH1)
 	t := []byte(targetFromH1)
 	s := bufio.NewScanner(bytes.NewBuffer(markdown))
@@ -599,9 +599,9 @@ func titleFromH1(d []byte, header []byte, markdown []byte) []byte {
 	return header
 }
 
-// titleFromTag finds title in markdown and then write it to <title> tag in header.
+// TitleFromTag finds title in markdown and then write it to <title> tag in header.
 // It also deletes the tag line from markdown.
-func titleFromTag(
+func TitleFromTag(
 	d []byte,
 	header []byte,
 	markdown []byte,
@@ -673,12 +673,12 @@ func (i *ignorerGitignore) ignore(path string) bool {
 	return i.MatchesPath(path)
 }
 
-// mirrorPath mirrors the target HTML file path under src to under dist
+// MirrorPath mirrors the target HTML file path under src to under dist
 //
 // i.e. if src="foo/src" and dst="foo/dist",
 // and path="foo/src/bar/baz.md"  newExt=".html",
 // then the return value will be foo/dist/bar/baz.html
-func mirrorPath(
+func MirrorPath(
 	src string,
 	dst string,
 	path string,

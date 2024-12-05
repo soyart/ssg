@@ -241,7 +241,7 @@ Some para`,
 
 	for i := range tests {
 		tc := &tests[i]
-		actual := titleFromH1([]byte{}, []byte(tc.head), []byte(tc.markdown))
+		actual := TitleFromH1([]byte{}, []byte(tc.head), []byte(tc.markdown))
 		if !bytes.Equal(actual, []byte(tc.expected)) {
 			t.Logf("Expected:\nSTART===\n%s\nEND===", tc.expected)
 			t.Logf("Actual:\nSTART===\n%s\nEND===", actual)
@@ -326,7 +326,7 @@ Some para  `,
 
 	for i := range tests {
 		tc := &tests[i]
-		head, markdown := titleFromTag([]byte{}, []byte(tc.head), []byte(tc.markdown))
+		head, markdown := TitleFromTag([]byte{}, []byte(tc.head), []byte(tc.markdown))
 		if !bytes.Equal(head, []byte(tc.expectedHead)) {
 			t.Logf("Expected:\nSTART===\n%s\nEND===", tc.expectedHead)
 			t.Logf("Actual:\nSTART===\n%s\nEND===", head)
