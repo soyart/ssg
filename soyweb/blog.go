@@ -1,4 +1,4 @@
-package main
+package soyweb
 
 import (
 	"bytes"
@@ -11,14 +11,12 @@ import (
 	"github.com/soyart/ssg"
 )
 
-func main() {
-	s := ssg.New("soyweb/testdata/johndoe.com/src", "soyweb/testdata/johndoe.com/dst", "TestWithImpl", "https://johndoe.com")
-	implDefault := s.ImplDefault()
+const markerBlog = "_blog.ssg"
 
-	impl := ssg.WithImpl(func(path string, data []byte, d fs.DirEntry) error {
+func ArticleGenerator(impl ssg.Impl) ssg.Impl {
+	return func(path string, data []byte, d fs.DirEntry) error {
 		base := filepath.Base(path)
-
-		if !d.IsDir() && strings.Contains(path, "/blog/") && base == "_blog.ssg" {
+		if !d.IsDir() && strings.Contains(path, "/blog/") && base == markerBlog {
 			parent := filepath.Dir(path)
 			fmt.Fprintf(os.Stdout, "found blog marker=%s, parent=%s\n", path, parent)
 			entries, err := os.ReadDir(filepath.Dir(path))
@@ -38,7 +36,7 @@ func main() {
 				if fname == "_footer.html" {
 					continue
 				}
-				if fname == "_blog.ssh" {
+				if fname == markerBlog {
 					continue
 				}
 
@@ -47,7 +45,7 @@ func main() {
 			}
 
 			heading := filepath.Base(parent)
-			content := bytes.NewBufferString(fmt.Sprintf("Blog %s\n\n", heading))
+			content := bytes.NewBufferString(fmt.Sprintf(":title Blog %s\n\n<h1>Blog %s</h1>", heading, heading))
 			for i := range articles {
 				article := articles[i]
 				fmt.Fprintf(content, "- [%s](./%s/%s)\n\n", article, parent, article)
@@ -57,12 +55,6 @@ func main() {
 			data = content.Bytes()
 		}
 
-		return implDefault(path, data, d)
-	})
-
-	s.With(impl)
-	err := s.Generate()
-	if err != nil {
-		panic(err)
+		return impl(path, data, d)
 	}
 }
