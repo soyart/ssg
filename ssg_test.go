@@ -142,7 +142,7 @@ func TestScan(t *testing.T) {
 	url := "https://johndoe.com"
 
 	ssg := NewWithOptions(src, dst, title, url)
-	err := filepath.WalkDir(root, ssg.scan)
+	err := filepath.WalkDir(root, ssg.walkScan)
 	if err != nil {
 		t.Errorf("unexpected error from scan: %v", err)
 	}
