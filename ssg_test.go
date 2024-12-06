@@ -322,6 +322,42 @@ Mar 24 1998
 
 Some para  `,
 		},
+		{
+			head: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{{from-tag}}</title>
+</head>`,
+			markdown: `
+Mar 24 1998
+
+	:title Not actually title
+
+:title This is the title
+
+:title This should persist
+
+# Some h1
+
+Some para  `,
+			expectedHead: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>This is the title</title>
+</head>`,
+			expectedMarkdown: `
+Mar 24 1998
+
+	:title Not actually title
+
+:title This should persist
+
+# Some h1
+
+Some para  `,
+		},
 	}
 
 	for i := range tests {

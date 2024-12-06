@@ -93,6 +93,9 @@ ssg-go recognizes 2 placeholders:
   Like with `{{from-h1}}`, but finds the first line starting with `:title` instead,
   i.e. `This is also an H1` from the example above will be used as the page's title.
 
+  > Note: `{{from-tag}}` directive will make ssg look for pattern `:title YourTitle\n\n`,
+  > so users must always append an empty line after the title tag line.
+
 For example, consider the following header/footer templates and a Markdown page:
 
 ```html
