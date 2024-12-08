@@ -15,23 +15,32 @@ const markerBlog = "_blog.ssg"
 
 func ArticleGeneratorMarkdown(impl ssg.Impl) ssg.Impl {
 	return func(path string, data []byte, d fs.DirEntry) error {
-		marker := filepath.Base(path)
-		if !d.IsDir() && strings.Contains(path, "/blog/") && marker == markerBlog {
-			parent := filepath.Dir(path)
-			fmt.Fprintf(os.Stdout, "found blog marker: marker=\"%s\", parent=\"%s\"\n", path, parent)
-
-			entries, err := os.ReadDir(filepath.Dir(path))
-			if err != nil {
-				return fmt.Errorf("failed to read dir for blog %s: %w", path, err)
-			}
-
-			content, err := articleLink(parent, entries)
-			if err != nil {
-				return fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
-			}
-			path = filepath.Join(parent, "index.md")
-			data = []byte(content)
+		base := filepath.Base(path)
+		if base != markerBlog {
+			return impl(path, data, d)
 		}
+		if d.IsDir() {
+			return impl(path, data, d)
+		}
+		if !strings.Contains(path, "/blog/") {
+			return impl(path, data, d)
+		}
+
+		parent := filepath.Dir(path)
+		fmt.Fprintf(os.Stdout, "found blog marker: marker=\"%s\", parent=\"%s\"\n", path, parent)
+
+		entries, err := os.ReadDir(filepath.Dir(path))
+		if err != nil {
+			return fmt.Errorf("failed to read dir for blog %s: %w", path, err)
+		}
+
+		content, err := articleLink(parent, entries)
+		if err != nil {
+			return fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
+		}
+
+		path = filepath.Join(parent, "index.md")
+		data = []byte(content)
 
 		return impl(path, data, d)
 	}
