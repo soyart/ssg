@@ -6,9 +6,16 @@ import (
 )
 
 func main() {
-	s := ssg.New("testdata/johndoe.com/src", "testdata/johndoe.com/dst", "TestWithImpl", "https://johndoe.com")
-	generator := ssg.WithImpl(soyweb.ArticleGenerator(s.ImplDefault()))
-	s.With(generator)
+	s := ssg.New(
+		"testdata/johndoe.com/src",
+		"testdata/johndoe.com/dst",
+		"TestWithImpl",
+		"https://johndoe.com",
+	)
+
+	generator := soyweb.ArticleGeneratorMarkdown(s.ImplDefault())
+	optGenerator := ssg.WithImpl(generator)
+	s.With(optGenerator)
 
 	err := s.Generate()
 	if err != nil {
