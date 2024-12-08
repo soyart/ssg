@@ -475,10 +475,10 @@ func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
 	headerText := []byte(header.String()) //nolint:gosimple
 	switch header.titleFrom {
 	case fromH1:
-		headerText = TitleFromH1([]byte(s.Title), headerText, data)
+		headerText = AddTitleFromH1([]byte(s.Title), headerText, data)
 
 	case fromTag:
-		headerText, data = TitleFromTag([]byte(s.Title), headerText, data)
+		headerText, data = AddTitleFromTag([]byte(s.Title), headerText, data)
 	}
 
 	out := bytes.NewBuffer(headerText)
@@ -573,9 +573,53 @@ func shouldIgnore(ignores ignorer, path, base string, d fs.DirEntry) (bool, erro
 	return false, nil
 }
 
-// TitleFromH1 finds the first h1 in markdown and uses the h1 title
+func TitleFromH1(markdown []byte) []byte {
+	k := []byte(keyTitleFromH1)
+	s := bufio.NewScanner(bytes.NewBuffer(markdown))
+
+	var title []byte
+	for s.Scan() {
+		line := s.Bytes()
+		if !bytes.HasPrefix(line, k) {
+			continue
+		}
+		parts := bytes.Split(line, k)
+		if len(parts) != 2 {
+			continue
+		}
+
+		title = parts[1]
+		break
+	}
+
+	return title
+}
+
+func TitleFromTag(markdown []byte) []byte {
+	k := []byte(keyTitleFromTag)
+	s := bufio.NewScanner(bytes.NewBuffer(markdown))
+
+	var title []byte
+	for s.Scan() {
+		line := s.Bytes()
+		if !bytes.HasPrefix(line, k) {
+			continue
+		}
+		parts := bytes.Split(line, k)
+		if len(parts) != 2 {
+			continue
+		}
+
+		title = parts[1]
+		break
+	}
+
+	return title
+}
+
+// AddTitleFromH1 finds the first h1 in markdown and uses the h1 title
 // to write to <title> tag in header.
-func TitleFromH1(d []byte, header []byte, markdown []byte) []byte {
+func AddTitleFromH1(d []byte, header []byte, markdown []byte) []byte {
 	k := []byte(keyTitleFromH1)
 	t := []byte(targetFromH1)
 	s := bufio.NewScanner(bytes.NewBuffer(markdown))
@@ -599,9 +643,9 @@ func TitleFromH1(d []byte, header []byte, markdown []byte) []byte {
 	return header
 }
 
-// TitleFromTag finds title in markdown and then write it to <title> tag in header.
+// AddTitleFromTag finds title in markdown and then write it to <title> tag in header.
 // It also deletes the tag line from markdown.
-func TitleFromTag(
+func AddTitleFromTag(
 	d []byte,
 	header []byte,
 	markdown []byte,

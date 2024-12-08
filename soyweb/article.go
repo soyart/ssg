@@ -59,11 +59,10 @@ func articleLink(
 
 	for i := range entries {
 		article := entries[i]
-		articlePath := article.Name()
-		// TODO: extract title
-		articleTitle := articlePath
+		articleFname := article.Name()
+		articleTitle := articleFname
 
-		switch articlePath {
+		switch articleFname {
 		case
 			"_header.html",
 			"_footer.html",
@@ -78,37 +77,56 @@ func articleLink(
 			// e.g. /parent/article/index.html
 			// or   /parent/article/index.md
 
-			subEntries, err := os.ReadDir(filepath.Join(parent, articlePath))
+			articleDir := filepath.Join(parent, articleFname)
+			subEntries, err := os.ReadDir(articleDir)
 			if err != nil {
-				return "", fmt.Errorf("failed to read article dir %s: %w", articlePath, err)
+				return "", fmt.Errorf("failed to read article dir %s: %w", articleFname, err)
 			}
 
-			foundIndex := false
+			index := ""
 			for j := range subEntries {
-				index := subEntries[j].Name()
-				if index != "index.md" && index != "index.html" {
+				name := subEntries[j].Name()
+				if name != "index.md" && name != "index.html" {
 					continue
 				}
 
-				foundIndex = true
+				index = name
 				break
 			}
 
-			if !foundIndex {
+			if index == "" {
 				continue
 			}
 
-			articlePath = filepath.Join(parent, articlePath, "index.html")
+			titleFromTag, err := extractTitleFromTag(filepath.Join(articleDir, index))
+			if err != nil {
+				return "", err
+			}
+			if titleFromTag != nil {
+				articleTitle = string(titleFromTag)
+			}
 
-		case filepath.Ext(articlePath) != ".md":
+			articleFname = filepath.Join(articleDir, "index.html")
+
+		case filepath.Ext(articleFname) == ".md":
+			articlePath := filepath.Join(parent, articleFname)
+			titleFromTag, err := extractTitleFromTag(articlePath)
+			if err != nil {
+				return "", err
+			}
+
+			if len(titleFromTag) > 0 {
+				articleTitle = string(titleFromTag)
+			}
+
+			articleFname = strings.TrimSuffix(articleFname, ".md")
+			articleFname += ".html"
+
+		case filepath.Ext(articleFname) != ".md":
 			continue
-
-		case filepath.Ext(articlePath) == ".md":
-			articlePath = strings.TrimSuffix(articlePath, ".md")
-			articlePath += ".html"
 		}
 
-		fmt.Fprintf(content, "- [%s](./%s/%s)", articleTitle, parent, articlePath)
+		fmt.Fprintf(content, "- [%s](./%s/%s)", articleTitle, parent, articleFname)
 		if i != l-1 {
 			content.WriteString("\n\n")
 		}
@@ -122,4 +140,13 @@ func articleLink(
 	fmt.Println("======== END ========")
 
 	return content.String(), nil
+}
+
+func extractTitleFromTag(path string) ([]byte, error) {
+	articleData, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read article file %s: %w", path, err)
+	}
+
+	return ssg.TitleFromTag(articleData), nil
 }
