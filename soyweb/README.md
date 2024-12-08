@@ -111,3 +111,26 @@ soyweb provides 3 more programs and a library for working with ssg:
     ```shell
     ssg-manifest copy -h
     ```
+
+# ssg options provided by soyweb
+
+## Minifiers
+
+soyweb provides webformat minifiers opitions for ssg, implemented as hooks that
+map 1 input data to 1 output data.
+
+The minifiers is available to all programs under soyweb.
+
+## [Blog article index generator (PoC)](./blog.go)
+
+soyweb provides an [ssg.Impl](/options.go) that will automatically generate indices
+for blog directories. It scans for `_blog.ssg`, and, if found, lists all links to the
+children (i.e. "articles").
+
+To be considered an article, a path has to be either:
+
+- A directory with `index.html` or `index.md`
+
+- A file with `.md` extension
+
+The generator is currently available to `ssg-manifest` via the site manifest specification

@@ -12,19 +12,19 @@ var (
 
 type (
 	MinifyFlags struct {
-		MinifyHtml     bool `arg:"--min-html" help:"Minify converted HTML outputs"`
-		MinifyHtmlCopy bool `arg:"--min-html-all" help:"Minify all copied HTML"`
-		MinifyCss      bool `arg:"--min-css" help:"Minify CSS files"`
-		MinifyJs       bool `arg:"--min-js" help:"Minify Javascript files"`
-		MinifyJson     bool `arg:"--min-json" help:"Minify JSON files"`
+		MinifyHtmlGenerate bool `arg:"--min-html" help:"Minify converted HTML outputs"`
+		MinifyHtmlCopy     bool `arg:"--min-html-copy" help:"Minify all copied HTML"`
+		MinifyCss          bool `arg:"--min-css" help:"Minify CSS files"`
+		MinifyJs           bool `arg:"--min-js" help:"Minify Javascript files"`
+		MinifyJson         bool `arg:"--min-json" help:"Minify JSON files"`
 	}
 
 	NoMinifyFlags struct {
-		NoMinifyHtml     bool `arg:"--no-min-html,env:NO_MIN_HTML" help:"Do not minify converted HTML outputs"`
-		NoMinifyHtmlCopy bool `arg:"--no-min-html-copy,env:NO_MIN_HTML_COPY" help:"Do not minify all copied HTML"`
-		NoMinifyCss      bool `arg:"--no-min-css,env:NO_MIN_CSS" help:"Do not minify CSS files"`
-		NoMinifyJs       bool `arg:"--no-min-js,env:NO_MIN_JS" help:"Do not minify Javascript files"`
-		NoMinifyJson     bool `arg:"--no-min-json,env:NO_MIN_JSON" help:"Do not minify JSON files"`
+		NoMinifyHtmlGenerate bool `arg:"--no-min-html,env:NO_MIN_HTML" help:"Do not minify converted HTML outputs"`
+		NoMinifyHtmlCopy     bool `arg:"--no-min-html-copy,env:NO_MIN_HTML_COPY" help:"Do not minify all copied HTML"`
+		NoMinifyCss          bool `arg:"--no-min-css,env:NO_MIN_CSS" help:"Do not minify CSS files"`
+		NoMinifyJs           bool `arg:"--no-min-js,env:NO_MIN_JS" help:"Do not minify Javascript files"`
+		NoMinifyJson         bool `arg:"--no-min-json,env:NO_MIN_JSON" help:"Do not minify JSON files"`
 	}
 
 	Flags struct {
@@ -52,12 +52,12 @@ func SsgOptions(f Flags) []ssg.Option {
 		minifiers[".json"] = MinifyJson
 	}
 
-	pipeline := pipelineMinify(minifiers)
-	if pipeline != nil {
-		opts = append(opts, ssg.Pipeline(pipeline))
+	hook := pipelineMinify(minifiers)
+	if hook != nil {
+		opts = append(opts, ssg.WithHookAll(hook))
 	}
-	if f.MinifyHtml {
-		opts = append(opts, ssg.Hook(MinifyHtml))
+	if f.MinifyHtmlGenerate {
+		opts = append(opts, ssg.WithHookGenerate(MinifyHtml))
 	}
 
 	return opts
@@ -66,7 +66,7 @@ func SsgOptions(f Flags) []ssg.Option {
 func (m MinifyFlags) Skip(ext string) bool {
 	switch ext {
 	case ".html":
-		if m.MinifyHtml {
+		if m.MinifyHtmlGenerate {
 			return false
 		}
 		if m.MinifyHtmlCopy {
@@ -95,7 +95,7 @@ func (m MinifyFlags) Skip(ext string) bool {
 func (n NoMinifyFlags) Skip(ext string) bool {
 	switch ext {
 	case ".html":
-		if n.NoMinifyHtml {
+		if n.NoMinifyHtmlGenerate {
 			return true
 		}
 		if n.NoMinifyHtmlCopy {
@@ -122,8 +122,8 @@ func (n NoMinifyFlags) Skip(ext string) bool {
 }
 
 func negate(yes MinifyFlags, no NoMinifyFlags) MinifyFlags {
-	if no.NoMinifyHtml {
-		yes.MinifyHtml = false
+	if no.NoMinifyHtmlGenerate {
+		yes.MinifyHtmlGenerate = false
 	}
 	if no.NoMinifyHtmlCopy {
 		yes.MinifyHtmlCopy = false
