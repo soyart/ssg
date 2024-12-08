@@ -620,26 +620,14 @@ func TitleFromTag(markdown []byte) []byte {
 // AddTitleFromH1 finds the first h1 in markdown and uses the h1 title
 // to write to <title> tag in header.
 func AddTitleFromH1(d []byte, header []byte, markdown []byte) []byte {
-	k := []byte(keyTitleFromH1)
-	t := []byte(targetFromH1)
-	s := bufio.NewScanner(bytes.NewBuffer(markdown))
-
-	for s.Scan() {
-		line := s.Bytes()
-		if !bytes.HasPrefix(line, k) {
-			continue
-		}
-		parts := bytes.Split(line, k)
-		if len(parts) != 2 {
-			continue
-		}
-
-		title := parts[1]
-		header = bytes.Replace(header, t, title, 1)
+	target := []byte(targetFromH1)
+	title := TitleFromH1(markdown)
+	if len(title) == 0 {
+		header = bytes.Replace(header, target, d, 1)
 		return header
 	}
 
-	header = bytes.Replace(header, t, d, 1)
+	header = bytes.Replace(header, target, title, 1)
 	return header
 }
 
@@ -653,16 +641,16 @@ func AddTitleFromTag(
 	[]byte,
 	[]byte,
 ) {
-	k := []byte(keyTitleFromTag)
-	t := []byte(targetFromTag)
+	key := []byte(keyTitleFromTag)
+	target := []byte(targetFromTag)
 	s := bufio.NewScanner(bytes.NewBuffer(markdown))
 
 	for s.Scan() {
 		line := s.Bytes()
-		if !bytes.HasPrefix(line, k) {
+		if !bytes.HasPrefix(line, key) {
 			continue
 		}
-		parts := bytes.Split(line, k)
+		parts := bytes.Split(line, key)
 		if len(parts) != 2 {
 			continue
 		}
@@ -670,13 +658,13 @@ func AddTitleFromTag(
 		line = trimRightWhitespace(line)
 		title := parts[1]
 
-		header = bytes.Replace(header, t, title, 1)
+		header = bytes.Replace(header, target, title, 1)
 		markdown = bytes.Replace(markdown, append(line, []byte{'\n', '\n'}...), nil, 1)
 		return header, markdown
 	}
 
 	// Remove target and use default header string
-	header = bytes.Replace(header, t, []byte(d), 1)
+	header = bytes.Replace(header, target, []byte(d), 1)
 	return header, markdown
 }
 
