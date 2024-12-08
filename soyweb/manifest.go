@@ -31,9 +31,10 @@ const (
 type Manifest map[string]Site
 
 type Site struct {
-	ssg     ssg.Ssg                `json:"-"`
-	Copies  map[string]WriteTarget `json:"-"`
-	CleanUp bool                   `json:"-"`
+	ssg          ssg.Ssg                `json:"-"`
+	Copies       map[string]WriteTarget `json:"-"`
+	CleanUp      bool                   `json:"-"`
+	GenerateBlog bool                   `json:"-"`
 }
 
 type WriteTarget struct {
@@ -121,7 +122,13 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 			break
 		}
 
+		if site.GenerateBlog {
+			generator := ArticleListGenerator(site.ssg.Src, site.ssg.Dst, site.ssg.ImplDefault())
+			opts = append(opts, ssg.WithImpl(generator))
+		}
+
 		site.ssg.With(opts...)
+
 		old.
 			WithGroup("build").
 			With(
@@ -129,11 +136,6 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 				"url", site.ssg.Url,
 			).
 			WithGroup("options").
-			With(
-			// "parallel_writes", site.ssg.parallelWrites,
-			// "pipeline_enabled", site.ssg.pipeline != nil,
-			// "hook_enabled", site.ssg.hook != nil,
-			).
 			Info("building site")
 
 		err := site.ssg.Generate()
@@ -194,13 +196,14 @@ func (s manifestError) Unwrap() error {
 
 func (s *Site) UnmarshalJSON(b []byte) error {
 	var site struct {
-		Src   string `json:"src"`
-		Dst   string `json:"dst"`
-		Title string `json:"title"`
-		Url   string `json:"url"`
+		Copies map[string]interface{} `json:"copies"`
 
-		Copies  map[string]interface{} `json:"copies"`
-		CleanUp bool                   `json:"cleanup"`
+		Src          string `json:"src"`
+		Dst          string `json:"dst"`
+		Title        string `json:"title"`
+		Url          string `json:"url"`
+		CleanUp      bool   `json:"cleanup"`
+		GenerateBlog bool   `json:"generate_blog"`
 	}
 
 	err := json.Unmarshal(b, &site)
@@ -215,8 +218,9 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 	}
 
 	*s = Site{
-		CleanUp: site.CleanUp,
-		Copies:  copies,
+		Copies:       copies,
+		CleanUp:      site.CleanUp,
+		GenerateBlog: site.GenerateBlog,
 		ssg: ssg.NewWithOptions(
 			site.Src,
 			site.Dst,

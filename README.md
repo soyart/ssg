@@ -196,3 +196,9 @@ To write outputs sequentially, run:
 SSG_PARALLEL_WRITES=1 ssg mySrc myDst myTitle myUrl
 ```
 
+# Extending ssg-go
+
+ssg-go defines APIs for extending its usefulness called `Option`.
+
+[soyweb](/soyweb/) extends ssg via `Option`, and provide extra functionality
+such as index generator and minifiers.
