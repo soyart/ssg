@@ -13,7 +13,11 @@ import (
 
 const markerBlog = "_blog.ssg"
 
-func ArticleGeneratorMarkdown(impl ssg.Impl) ssg.Impl {
+func ArticleGeneratorMarkdown(
+	src string,
+	_dst string, //nolint:unused
+	impl ssg.Impl,
+) ssg.Impl {
 	return func(path string, data []byte, d fs.DirEntry) error {
 		switch {
 		case
@@ -32,7 +36,7 @@ func ArticleGeneratorMarkdown(impl ssg.Impl) ssg.Impl {
 			return fmt.Errorf("failed to read dir for blog %s: %w", path, err)
 		}
 
-		content, err := articleLink(parent, entries)
+		content, err := articleLink(src, parent, entries)
 		if err != nil {
 			return fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
 		}
@@ -45,6 +49,7 @@ func ArticleGeneratorMarkdown(impl ssg.Impl) ssg.Impl {
 }
 
 func articleLink(
+	src string,
 	parent string,
 	entries []fs.DirEntry,
 ) (
@@ -71,12 +76,15 @@ func articleLink(
 			continue
 		}
 
+		if !article.IsDir() && filepath.Ext(articleFname) != ".md" {
+			continue
+		}
+
 		switch {
 		case article.IsDir():
 			// Find 1st-level subdir with index.html or index.md
 			// e.g. /parent/article/index.html
 			// or   /parent/article/index.md
-
 			articleDir := filepath.Join(parent, articleFname)
 			subEntries, err := os.ReadDir(articleDir)
 			if err != nil {
@@ -106,7 +114,7 @@ func articleLink(
 				articleTitle = string(titleFromTag)
 			}
 
-			articleFname = filepath.Join(articleDir, "index.html")
+			articleFname = filepath.Join(articleFname, "index.html")
 
 		case filepath.Ext(articleFname) == ".md":
 			articlePath := filepath.Join(parent, articleFname)
@@ -122,13 +130,19 @@ func articleLink(
 			articleFname = strings.TrimSuffix(articleFname, ".md")
 			articleFname += ".html"
 
-		case filepath.Ext(articleFname) != ".md":
-			continue
+		default:
+			panic("unhandled case for blog: " + filepath.Join(parent, articleFname))
 		}
 
-		fmt.Fprintf(content, "- [%s](./%s/%s)", articleTitle, parent, articleFname)
-		if i != l-1 {
+		rel, err := filepath.Rel(src, parent)
+		if err != nil {
+			return "", err
+		}
+
+		fmt.Fprintf(content, "- [%s](./%s/%s)", articleTitle, rel, articleFname)
+		if i < l-1 {
 			content.WriteString("\n\n")
+			continue
 		}
 
 		content.WriteString("\n")

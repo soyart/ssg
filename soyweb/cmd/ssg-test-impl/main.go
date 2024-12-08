@@ -13,7 +13,7 @@ func main() {
 		"https://johndoe.com",
 	)
 
-	generator := soyweb.ArticleGeneratorMarkdown(s.ImplDefault())
+	generator := soyweb.ArticleGeneratorMarkdown(s.Src, s.Dst, s.ImplDefault())
 	optGenerator := ssg.WithImpl(generator)
 	s.With(optGenerator)
 
