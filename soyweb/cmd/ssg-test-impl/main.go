@@ -7,13 +7,13 @@ import (
 
 func main() {
 	s := ssg.New(
-		"testdata/johndoe.com/src",
-		"testdata/johndoe.com/dst",
-		"TestWithImpl",
-		"https://johndoe.com",
+		"testdata/myblog/src",
+		"testdata/myblog/dst",
+		"TestArticleListGenerator",
+		"https://mybloggyblogblog.com",
 	)
 
-	generator := soyweb.ArticleGeneratorMarkdown(s.Src, s.Dst, s.ImplDefault())
+	generator := soyweb.ArticleListGenerator(s.Src, s.Dst, s.ImplDefault())
 	optGenerator := ssg.WithImpl(generator)
 	s.With(optGenerator)
 

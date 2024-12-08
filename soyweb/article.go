@@ -13,7 +13,13 @@ import (
 
 const markerBlog = "_blog.ssg"
 
-func ArticleGeneratorMarkdown(
+// ArticleListGenerator returns an [ssg.Impl] that would look for
+// marker file "_blog.ssg" within a directory.
+//
+// Once it finds a marked directory, it inspects the children
+// and generate a Markdown list with name index.md,
+// which is later sent to supplied impl.
+func ArticleListGenerator(
 	src string,
 	_dst string, //nolint:unused
 	impl ssg.Impl,
@@ -22,7 +28,6 @@ func ArticleGeneratorMarkdown(
 		switch {
 		case
 			d.IsDir(),
-			!strings.Contains(path, "/blog/"),
 			filepath.Base(path) != markerBlog:
 
 			return impl(path, data, d)
@@ -43,7 +48,6 @@ func ArticleGeneratorMarkdown(
 
 		path = filepath.Join(parent, "index.md")
 		data = []byte(content)
-
 		return impl(path, data, d)
 	}
 }
