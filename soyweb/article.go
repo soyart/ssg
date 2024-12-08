@@ -15,14 +15,12 @@ const markerBlog = "_blog.ssg"
 
 func ArticleGeneratorMarkdown(impl ssg.Impl) ssg.Impl {
 	return func(path string, data []byte, d fs.DirEntry) error {
-		base := filepath.Base(path)
-		if base != markerBlog {
-			return impl(path, data, d)
-		}
-		if d.IsDir() {
-			return impl(path, data, d)
-		}
-		if !strings.Contains(path, "/blog/") {
+		switch {
+		case
+			d.IsDir(),
+			!strings.Contains(path, "/blog/"),
+			filepath.Base(path) != markerBlog:
+
 			return impl(path, data, d)
 		}
 
@@ -99,6 +97,8 @@ func articleLink(
 			if !foundIndex {
 				continue
 			}
+
+			articlePath = filepath.Join(parent, articlePath, "index.html")
 
 		case filepath.Ext(articlePath) != ".md":
 			continue
