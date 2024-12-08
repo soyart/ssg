@@ -96,8 +96,15 @@ func articleLink(
 			}
 
 			index := ""
+			recurse := false
 			for j := range subEntries {
 				name := subEntries[j].Name()
+				if name == "_blog.ssg" {
+					index = "index.html"
+					recurse = true
+					break
+				}
+
 				if name != "index.md" && name != "index.html" {
 					continue
 				}
@@ -106,8 +113,13 @@ func articleLink(
 				break
 			}
 
-			if index == "" {
+			if !recurse && index == "" {
 				continue
+			}
+
+			articleFname = filepath.Join(articleFname, "index.html")
+			if recurse {
+				break // switch
 			}
 
 			titleFromTag, err := extractTitleFromTag(filepath.Join(articleDir, index))
@@ -117,8 +129,6 @@ func articleLink(
 			if titleFromTag != nil {
 				articleTitle = string(titleFromTag)
 			}
-
-			articleFname = filepath.Join(articleFname, "index.html")
 
 		case filepath.Ext(articleFname) == ".md":
 			articlePath := filepath.Join(parent, articleFname)
