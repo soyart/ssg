@@ -142,7 +142,7 @@ func TestScan(t *testing.T) {
 	url := "https://johndoe.com"
 
 	ssg := NewWithOptions(src, dst, title, url)
-	err := filepath.WalkDir(root, ssg.scan)
+	err := filepath.WalkDir(root, ssg.walkScan)
 	if err != nil {
 		t.Errorf("unexpected error from scan: %v", err)
 	}
@@ -185,9 +185,10 @@ func TestScan(t *testing.T) {
 
 func TestTitleFromH1(t *testing.T) {
 	type testCase struct {
-		head     string
-		markdown string
-		expected string
+		head          string
+		markdown      string
+		expectedTitle string
+		expectedHead  string
 	}
 
 	tests := []testCase{
@@ -205,7 +206,8 @@ Mar 24 1998
 # Some h1
 
 Some para`,
-			expected: `
+			expectedTitle: "Some h1",
+			expectedHead: `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -224,12 +226,15 @@ Some para`,
 			markdown: `
 Mar 24 1998
 
+:title Not a title
+
 ## Some h2
 
 # Some h1
 
 Some para`,
-			expected: `
+			expectedTitle: "Some h1",
+			expectedHead: `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -241,9 +246,16 @@ Some para`,
 
 	for i := range tests {
 		tc := &tests[i]
-		actual := titleFromH1([]byte{}, []byte(tc.head), []byte(tc.markdown))
-		if !bytes.Equal(actual, []byte(tc.expected)) {
-			t.Logf("Expected:\nSTART===\n%s\nEND===", tc.expected)
+		title := TitleFromH1([]byte(tc.markdown))
+		if string(title) != tc.expectedTitle {
+			t.Logf("Expected='%s'", tc.expectedTitle)
+			t.Logf("Actual='%s'", string(title))
+			t.Fatalf("unexpected title for case %d", i+1)
+		}
+
+		actual := AddTitleFromH1([]byte{}, []byte(tc.head), []byte(tc.markdown))
+		if !bytes.Equal(actual, []byte(tc.expectedHead)) {
+			t.Logf("Expected:\nSTART===\n%s\nEND===", tc.expectedHead)
 			t.Logf("Actual:\nSTART===\n%s\nEND===", actual)
 
 			t.Fatalf("unexpected value for case %d", i+1)
@@ -255,6 +267,7 @@ func TestTitleFromTag(t *testing.T) {
 	type testCase struct {
 		head             string
 		markdown         string
+		expectedTitle    string
 		expectedHead     string
 		expectedMarkdown string
 	}
@@ -276,6 +289,7 @@ Mar 24 1998
 # Some h1
 
 Some para`,
+			expectedTitle: "My title",
 			expectedHead: `
 <!DOCTYPE html>
 <html lang="en">
@@ -307,6 +321,7 @@ Mar 24 1998
 # Some h1
 
 Some para  `,
+			expectedTitle: "This is the title",
 			expectedHead: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -322,11 +337,55 @@ Mar 24 1998
 
 Some para  `,
 		},
+		{
+			head: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{{from-tag}}</title>
+</head>`,
+			markdown: `
+Mar 24 1998
+
+	:title Not actually title
+
+:title This is the title
+
+:title This should persist
+
+# Some h1
+
+Some para  `,
+			expectedTitle: "This is the title",
+			expectedHead: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>This is the title</title>
+</head>`,
+			expectedMarkdown: `
+Mar 24 1998
+
+	:title Not actually title
+
+:title This should persist
+
+# Some h1
+
+Some para  `,
+		},
 	}
 
 	for i := range tests {
 		tc := &tests[i]
-		head, markdown := titleFromTag([]byte{}, []byte(tc.head), []byte(tc.markdown))
+		title := TitleFromTag([]byte(tc.markdown))
+		if string(title) != tc.expectedTitle {
+			t.Logf("Expected='%s'", tc.expectedTitle)
+			t.Logf("Actual='%s'", string(title))
+			t.Fatalf("unexpected title for case %d", i+1)
+		}
+
+		head, markdown := AddTitleFromTag([]byte{}, []byte(tc.head), []byte(tc.markdown))
 		if !bytes.Equal(head, []byte(tc.expectedHead)) {
 			t.Logf("Expected:\nSTART===\n%s\nEND===", tc.expectedHead)
 			t.Logf("Actual:\nSTART===\n%s\nEND===", head)
