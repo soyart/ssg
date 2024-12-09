@@ -125,12 +125,17 @@ The minifiers is available to all programs under soyweb.
 
 soyweb provides an [ssg.Impl](/options.go) that will automatically generate indices
 for blog directories. It scans for `_index.ssg`, and, if found, lists all links to the
-children (i.e. "articles").
+children (i.e. "articles"). The marker `_index.ssg` can be blank or contain template,
+in plaintext, Markdown, or HTML.
 
 To be considered an article, a path has to be either:
 
 - A directory with `index.html` or `index.md`
 
 - A file with `.md` extension
+
+If the marker `_index.ssg` is empty, a default content header will be written.
+If the marker has some template, then the index list will be appended to the template
+in the output.
 
 The generator is currently available to `ssg-manifest` via the site manifest specification

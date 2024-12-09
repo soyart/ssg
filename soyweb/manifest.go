@@ -123,7 +123,7 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 		}
 
 		if site.GenerateBlog {
-			gen := IndexGenerator(site.ssg.Src, site.ssg.Dst, site.ssg.ImplDefault())
+			gen := IndexGenerator(site.ssg.ImplDefault())
 			opts = append(opts, ssg.WithImpl(gen))
 		}
 

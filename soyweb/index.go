@@ -19,11 +19,7 @@ const markerIndex = "_index.ssg"
 // Once it finds a marked directory, it inspects the children
 // and generate a Markdown list with name index.md,
 // which is later sent to supplied impl.
-func IndexGenerator(
-	src string,
-	_dst string, //nolint:unused
-	impl ssg.Impl,
-) ssg.Impl {
+func IndexGenerator(impl ssg.Impl) ssg.Impl {
 	return func(path string, data []byte, d fs.DirEntry) error {
 		switch {
 		case
@@ -46,11 +42,7 @@ func IndexGenerator(
 			return fmt.Errorf("failed to read marker '%s': %w", path, err)
 		}
 
-		if len(template) != 0 {
-			fmt.Fprintf(os.Stdout, "found template for marker '%s'\n", path)
-		}
-
-		content, err := genIndex(src, parent, entries, template)
+		content, err := genIndex(parent, entries, template)
 		if err != nil {
 			return fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
 		}
@@ -62,9 +54,8 @@ func IndexGenerator(
 }
 
 func genIndex(
-	src string,
 	parent string,
-	entries []fs.DirEntry,
+	children []fs.DirEntry,
 	template []byte,
 ) (
 	string,
@@ -81,13 +72,12 @@ func genIndex(
 		content = bytes.NewBuffer(template)
 	}
 
-	l := len(entries)
-	for i := range entries {
-		article := entries[i]
-		articleFname := article.Name()
-		articleTitle := articleFname
+	for i := range children {
+		child := children[i]
+		childPath := child.Name()
+		childTitle := childPath
 
-		switch articleFname {
+		switch childPath {
 		case
 			ssg.MarkerHeader,
 			ssg.MarkerFooter,
@@ -95,19 +85,20 @@ func genIndex(
 			continue
 		}
 
-		if !article.IsDir() && filepath.Ext(articleFname) != ".md" {
+		if !child.IsDir() && filepath.Ext(childPath) != ".md" {
 			continue
 		}
 
 		switch {
-		case article.IsDir():
+		case child.IsDir():
 			// Find 1st-level subdir with index.html or index.md
 			// e.g. /parent/article/index.html
 			// or   /parent/article/index.md
-			articleDir := filepath.Join(parent, articleFname)
+			childPath += "/"
+			articleDir := filepath.Join(parent, childPath)
 			subEntries, err := os.ReadDir(articleDir)
 			if err != nil {
-				return "", fmt.Errorf("failed to read article dir %s: %w", articleFname, err)
+				return "", fmt.Errorf("failed to read child dir %s: %w", childPath, err)
 			}
 
 			index := ""
@@ -128,11 +119,11 @@ func genIndex(
 				break
 			}
 
+			// No index
 			if !recurse && index == "" {
 				continue
 			}
 
-			articleFname = filepath.Join(articleFname, "index.html")
 			if recurse {
 				break // switch
 			}
@@ -142,45 +133,34 @@ func genIndex(
 				return "", err
 			}
 			if titleFromTag != nil {
-				articleTitle = string(titleFromTag)
+				childTitle = string(titleFromTag)
 			}
 
-		case filepath.Ext(articleFname) == ".md":
-			articlePath := filepath.Join(parent, articleFname)
+		case filepath.Ext(childPath) == ".md":
+			articlePath := filepath.Join(parent, childPath)
 			titleFromTag, err := extractTitleFromTag(articlePath)
 			if err != nil {
 				return "", err
 			}
 
 			if len(titleFromTag) > 0 {
-				articleTitle = string(titleFromTag)
+				childTitle = string(titleFromTag)
 			}
 
-			articleFname = strings.TrimSuffix(articleFname, ".md")
-			articleFname += ".html"
+			childPath = strings.TrimSuffix(childPath, ".md")
+			childPath += ".html"
 
 		default:
-			panic("unhandled case for blog: " + filepath.Join(parent, articleFname))
+			panic("unhandled case for child: " + filepath.Join(parent, childPath))
 		}
 
-		rel, err := filepath.Rel(src, parent)
-		if err != nil {
-			return "", err
-		}
-
-		fmt.Fprintf(content, "- [%s](./%s/%s)", articleTitle, rel, articleFname)
-		if i < l-1 {
-			content.WriteString("\n\n")
-			continue
-		}
-
-		content.WriteString("\n")
+		fmt.Fprintf(content, "- [%s](%s)\n\n", childTitle, childPath)
 	}
 
-	fmt.Println("Generated article list for blog", parent)
-	fmt.Println("======= START =======")
-	fmt.Println(content.String())
-	fmt.Println("======== END ========")
+	fmt.Fprintln(os.Stdout, "Generated index for directory", parent)
+	fmt.Fprint(os.Stdout, "======= START =======\n")
+	fmt.Fprintln(os.Stdout, content.String())
+	fmt.Fprint(os.Stdout, "======== END ========\n")
 
 	return content.String(), nil
 }
@@ -188,7 +168,7 @@ func genIndex(
 func extractTitleFromTag(path string) ([]byte, error) {
 	articleData, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read article file %s: %w", path, err)
+		return nil, fmt.Errorf("failed to read article file %s for title extraction: %w", path, err)
 	}
 
 	return ssg.TitleFromTag(articleData), nil
