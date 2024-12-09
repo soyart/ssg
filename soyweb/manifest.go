@@ -122,13 +122,6 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 			break
 		}
 
-		if site.GenerateBlog {
-			gen := IndexGenerator(site.ssg.ImplDefault())
-			opts = append(opts, ssg.WithImpl(gen))
-		}
-
-		site.ssg.With(opts...)
-
 		old.
 			WithGroup("build").
 			With(
@@ -137,8 +130,14 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 			).
 			Info("building site")
 
-		err := site.ssg.Generate()
-		if err != nil {
+		s := &site.ssg
+		if site.GenerateBlog {
+			gen := IndexGenerator(s.Src, s.ImplDefault())
+			opts = append(opts, ssg.WithImpl(gen))
+		}
+
+		s.With(opts...)
+		if err := s.Generate(); err != nil {
 			return manifestError{
 				err:   err,
 				key:   key,

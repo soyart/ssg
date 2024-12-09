@@ -19,7 +19,7 @@ const markerIndex = "_index.ssg"
 // Once it finds a marked directory, it inspects the children
 // and generate a Markdown list with name index.md,
 // which is later sent to supplied impl.
-func IndexGenerator(impl ssg.Impl) ssg.Impl {
+func IndexGenerator(src string, impl ssg.Impl) ssg.Impl {
 	return func(path string, data []byte, d fs.DirEntry) error {
 		switch {
 		case
@@ -42,7 +42,7 @@ func IndexGenerator(impl ssg.Impl) ssg.Impl {
 			return fmt.Errorf("failed to read marker '%s': %w", path, err)
 		}
 
-		content, err := genIndex(parent, entries, template)
+		content, err := genIndex(src, parent, entries, template)
 		if err != nil {
 			return fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
 		}
@@ -54,6 +54,7 @@ func IndexGenerator(impl ssg.Impl) ssg.Impl {
 }
 
 func genIndex(
+	src string,
 	parent string,
 	children []fs.DirEntry,
 	template []byte,
@@ -61,15 +62,11 @@ func genIndex(
 	string,
 	error,
 ) {
-	var content *bytes.Buffer
-	switch len(template) {
-	case 0:
+	content := bytes.NewBuffer(template)
+	if len(template) == 0 {
 		heading := filepath.Base(parent)
 		heading = fmt.Sprintf(":title Blog %s\n\n<h1>Blog %s</h1>\n\n", heading, heading)
 		content = bytes.NewBufferString(heading)
-
-	default:
-		content = bytes.NewBuffer(template)
 	}
 
 	for i := range children {
@@ -89,46 +86,44 @@ func genIndex(
 			continue
 		}
 
+		isDir := child.IsDir()
 		switch {
-		case child.IsDir():
+		case isDir:
 			// Find 1st-level subdir with index.html or index.md
 			// e.g. /parent/article/index.html
 			// or   /parent/article/index.md
-			childPath += "/"
-			articleDir := filepath.Join(parent, childPath)
-			subEntries, err := os.ReadDir(articleDir)
+			childDir := filepath.Join(parent, childPath)
+			grandChildren, err := os.ReadDir(childDir)
 			if err != nil {
 				return "", fmt.Errorf("failed to read child dir %s: %w", childPath, err)
 			}
 
 			index := ""
 			recurse := false
-			for j := range subEntries {
-				name := subEntries[j].Name()
+			for j := range grandChildren {
+				name := grandChildren[j].Name()
 				if name == "_index.ssg" {
 					index = "index.html"
 					recurse = true
 					break
 				}
-
-				if name != "index.md" && name != "index.html" {
-					continue
+				if name == "index.md" || name == "index.html" {
+					index = name
+					break
 				}
-
-				index = name
-				break
 			}
 
 			// No index
-			if !recurse && index == "" {
+			if index == "" {
 				continue
 			}
 
+			// Use dir as childTitle
 			if recurse {
 				break // switch
 			}
 
-			titleFromTag, err := extractTitleFromTag(filepath.Join(articleDir, index))
+			titleFromTag, err := extractTitleFromTag(filepath.Join(childDir, index))
 			if err != nil {
 				return "", err
 			}
@@ -154,7 +149,16 @@ func genIndex(
 			panic("unhandled case for child: " + filepath.Join(parent, childPath))
 		}
 
-		fmt.Fprintf(content, "- [%s](%s)\n\n", childTitle, childPath)
+		parentRel, err := filepath.Rel(src, parent)
+		if err != nil {
+			return "", err
+		}
+		linkPath := filepath.Join(parentRel, childPath)
+		if isDir {
+			linkPath += "/"
+		}
+
+		fmt.Fprintf(content, "- [%s](/%s)\n\n", childTitle, linkPath)
 	}
 
 	fmt.Fprintln(os.Stdout, "Generated index for directory", parent)

@@ -13,7 +13,7 @@ func main() {
 		"https://mybloggyblogblog.com",
 	)
 
-	g := soyweb.IndexGenerator(s.ImplDefault())
+	g := soyweb.IndexGenerator(s.Src, s.ImplDefault())
 	optGen := ssg.WithImpl(g)
 	s.With(optGen)
 
