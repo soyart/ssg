@@ -19,11 +19,12 @@ import (
 )
 
 const (
+	MarkerHeader  = "_header.html"
+	MarkerFooter  = "_footer.html"
+	HtmlFlags     = html.CommonFlags
 	SsgExtensions = parser.CommonExtensions |
 		parser.Mmark |
 		parser.AutoHeadingIDs
-
-	HtmlFlags = html.CommonFlags
 
 	headerDefault = `<!DOCTYPE html>
 <html lang="en">
@@ -345,7 +346,7 @@ func (s *Ssg) walkScan(path string, d fs.DirEntry, e error) error {
 
 	// Collect cascading headers and footers
 	switch base {
-	case "_header.html":
+	case MarkerHeader:
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
@@ -369,7 +370,7 @@ func (s *Ssg) walkScan(path string, d fs.DirEntry, e error) error {
 
 		return nil
 
-	case "_footer.html":
+	case MarkerFooter:
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
@@ -410,9 +411,8 @@ func (s *Ssg) walkBuild(path string, d fs.DirEntry, e error) error {
 
 	switch base {
 	case
-		"_header.html",
-		"_footer.html":
-
+		MarkerHeader,
+		MarkerFooter:
 		return nil
 	}
 

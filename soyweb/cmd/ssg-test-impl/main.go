@@ -9,13 +9,13 @@ func main() {
 	s := ssg.New(
 		"testdata/myblog/src",
 		"testdata/myblog/dst",
-		"TestArticleListGenerator",
+		"TestIndexGenerator",
 		"https://mybloggyblogblog.com",
 	)
 
-	generator := soyweb.ArticleListGenerator(s.Src, s.Dst, s.ImplDefault())
-	optGenerator := ssg.WithImpl(generator)
-	s.With(optGenerator)
+	g := soyweb.IndexGenerator(s.Src, s.Dst, s.ImplDefault())
+	optGen := ssg.WithImpl(g)
+	s.With(optGen)
 
 	err := s.Generate()
 	if err != nil {

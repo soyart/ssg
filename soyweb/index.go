@@ -11,15 +11,15 @@ import (
 	"github.com/soyart/ssg"
 )
 
-const markerBlog = "_blog.ssg"
+const markerIndex = "_index.ssg"
 
-// ArticleListGenerator returns an [ssg.Impl] that would look for
-// marker file "_blog.ssg" within a directory.
+// IndexGenerator returns an [ssg.Impl] that would look for
+// marker file "_index.ssg" within a directory.
 //
 // Once it finds a marked directory, it inspects the children
 // and generate a Markdown list with name index.md,
 // which is later sent to supplied impl.
-func ArticleListGenerator(
+func IndexGenerator(
 	src string,
 	_dst string, //nolint:unused
 	impl ssg.Impl,
@@ -28,7 +28,7 @@ func ArticleListGenerator(
 		switch {
 		case
 			d.IsDir(),
-			filepath.Base(path) != markerBlog:
+			filepath.Base(path) != markerIndex:
 
 			return impl(path, data, d)
 		}
@@ -73,10 +73,9 @@ func articleLink(
 
 		switch articleFname {
 		case
-			"_header.html",
-			"_footer.html",
-			"_blog.ssg":
-
+			ssg.MarkerHeader,
+			ssg.MarkerFooter,
+			markerIndex:
 			continue
 		}
 
@@ -99,7 +98,7 @@ func articleLink(
 			recurse := false
 			for j := range subEntries {
 				name := subEntries[j].Name()
-				if name == "_blog.ssg" {
+				if name == "_index.ssg" {
 					index = "index.html"
 					recurse = true
 					break

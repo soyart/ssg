@@ -124,7 +124,7 @@ The minifiers is available to all programs under soyweb.
 ## [Blog article index generator (PoC)](./blog.go)
 
 soyweb provides an [ssg.Impl](/options.go) that will automatically generate indices
-for blog directories. It scans for `_blog.ssg`, and, if found, lists all links to the
+for blog directories. It scans for `_index.ssg`, and, if found, lists all links to the
 children (i.e. "articles").
 
 To be considered an article, a path has to be either:

@@ -123,8 +123,8 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 		}
 
 		if site.GenerateBlog {
-			generator := ArticleListGenerator(site.ssg.Src, site.ssg.Dst, site.ssg.ImplDefault())
-			opts = append(opts, ssg.WithImpl(generator))
+			gen := IndexGenerator(site.ssg.Src, site.ssg.Dst, site.ssg.ImplDefault())
+			opts = append(opts, ssg.WithImpl(gen))
 		}
 
 		site.ssg.With(opts...)
@@ -135,7 +135,6 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 				"key", key,
 				"url", site.ssg.Url,
 			).
-			WithGroup("options").
 			Info("building site")
 
 		err := site.ssg.Generate()
