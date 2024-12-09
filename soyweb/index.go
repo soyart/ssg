@@ -38,10 +38,19 @@ func IndexGenerator(
 
 		entries, err := os.ReadDir(filepath.Dir(path))
 		if err != nil {
-			return fmt.Errorf("failed to read dir for blog %s: %w", path, err)
+			return fmt.Errorf("failed to read marker dir '%s': %w", path, err)
 		}
 
-		content, err := articleLink(src, parent, entries)
+		template, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("failed to read marker '%s': %w", path, err)
+		}
+
+		if len(template) != 0 {
+			fmt.Fprintf(os.Stdout, "found template for marker '%s'\n", path)
+		}
+
+		content, err := genIndex(src, parent, entries, template)
 		if err != nil {
 			return fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
 		}
@@ -52,20 +61,27 @@ func IndexGenerator(
 	}
 }
 
-func articleLink(
+func genIndex(
 	src string,
 	parent string,
 	entries []fs.DirEntry,
+	template []byte,
 ) (
 	string,
 	error,
 ) {
-	heading := filepath.Base(parent)
-	heading = fmt.Sprintf(":title Blog %s\n\n<h1>Blog %s</h1>\n\n", heading, heading)
+	var content *bytes.Buffer
+	switch len(template) {
+	case 0:
+		heading := filepath.Base(parent)
+		heading = fmt.Sprintf(":title Blog %s\n\n<h1>Blog %s</h1>\n\n", heading, heading)
+		content = bytes.NewBufferString(heading)
+
+	default:
+		content = bytes.NewBuffer(template)
+	}
 
 	l := len(entries)
-	content := bytes.NewBufferString(heading)
-
 	for i := range entries {
 		article := entries[i]
 		articleFname := article.Name()
