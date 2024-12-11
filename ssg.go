@@ -71,19 +71,19 @@ type OutputFile struct {
 	perm   fs.FileMode
 }
 
-type writeError struct {
-	err    error
-	target string
-}
-
-type ignorerGitignore struct {
-	*ignore.GitIgnore
-}
-
 type ignorer interface {
 	ignore(path string) bool
 }
 
+// Generate creates a one-off [Ssg] that's used to generate a site right away.
+func Generate(src, dst, title, url string, opts ...Option) error {
+	s := New(src, dst, title, url)
+	return s.
+		With(opts...).
+		Generate()
+}
+
+// New returns a default, vanilla [Ssg].
 func New(src, dst, title, url string) Ssg {
 	ignores, err := prepare(src, dst)
 	if err != nil {
@@ -100,18 +100,6 @@ func New(src, dst, title, url string) Ssg {
 		headers:    newHeaders(headerDefault),
 		footers:    newFooters(footerDefault),
 	}
-}
-
-func NewWithOptions(src, dst, title, url string, opts ...Option) Ssg {
-	s := New(src, dst, title, url)
-	s.With(opts...)
-
-	return s
-}
-
-func GenerateWithOptions(src, dst, title, url string, opts ...Option) error {
-	s := NewWithOptions(src, dst, title, url, opts...)
-	return s.Generate()
 }
 
 // ToHtml converts md (Markdown) into HTML document
@@ -134,7 +122,6 @@ func Sitemap(
 	error,
 ) {
 	dateStr := date.Format(time.DateOnly)
-
 	sm := bytes.NewBufferString(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset
 xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance"
@@ -179,52 +166,6 @@ xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
 	return sm.String(), nil
 }
 
-func Generate(sites ...Ssg) error {
-	stats := make(map[string]fs.FileInfo)
-	for i := range sites {
-		s := &sites[i]
-		stat, err := os.Stat(s.Src)
-		if err != nil {
-			return err
-		}
-
-		stats[s.Src] = stat
-
-		_, err = s.build()
-		if err != nil {
-			return fmt.Errorf("error walking in %s: %w", s.Src, err)
-		}
-	}
-
-	for i := range sites {
-		s := &sites[i]
-		stat, ok := stats[s.Src]
-		if !ok {
-			return fmt.Errorf("ssg-go bug: unexpected missing stat for directory %s (url='%s')", s.Src, s.Url)
-		}
-		err := s.WriteOut()
-		if err != nil {
-			return fmt.Errorf("error writing out to %s: %w", s.Dst, err)
-		}
-		if s.Url == "" {
-			s.pront(len(s.dist))
-			return nil
-		}
-		sitemap, err := Sitemap(s.Dst, s.Url, stat.ModTime(), s.dist)
-		if err != nil {
-			return err
-		}
-		err = os.WriteFile(s.Dst+"/sitemap.xml", []byte(sitemap), 0644)
-		if err != nil {
-			return err
-		}
-
-		s.pront(len(s.dist) + 1)
-	}
-
-	return nil
-}
-
 func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	s.dist = append(s.dist, outputs...)
 }
@@ -233,11 +174,13 @@ func (s *Ssg) With(opts ...Option) *Ssg {
 	for i := range opts {
 		opts[i](s)
 	}
-
 	return s
 }
 
 func (s *Ssg) Generate() error {
+	// Reset
+	s.dist = nil
+
 	stat, err := os.Stat(s.Src)
 	if err != nil {
 		return err
@@ -511,8 +454,8 @@ func (s *Ssg) pront(l int) {
 	fmt.Fprintf(os.Stdout, "[ssg-go] wrote %d file(s) to %s\n", l, s.Dst)
 }
 
-func (w writeError) Error() string {
-	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
+type ignorerGitignore struct {
+	*ignore.GitIgnore
 }
 
 func prepare(src, dst string) (*ignorerGitignore, error) {
@@ -730,6 +673,15 @@ func MirrorPath(
 	}
 
 	return filepath.Join(dst, path), nil
+}
+
+type writeError struct {
+	err    error
+	target string
+}
+
+func (w writeError) Error() string {
+	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
 }
 
 // WriteOut blocks and writes concurrently to output locations.

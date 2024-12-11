@@ -132,8 +132,7 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 
 		s := &site.ssg
 		if site.GenerateBlog {
-			gen := IndexGenerator(s.Src, s.ImplDefault())
-			opts = append(opts, ssg.WithImpl(gen))
+			opts = append(opts, IndexGenerator())
 		}
 
 		s.With(opts...)
@@ -219,7 +218,7 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 		Copies:       copies,
 		CleanUp:      site.CleanUp,
 		GenerateBlog: site.GenerateBlog,
-		ssg: ssg.NewWithOptions(
+		ssg: ssg.New(
 			site.Src,
 			site.Dst,
 			site.Title,

@@ -17,6 +17,9 @@ type (
 	// and returns modified HTML output (e.g. minified) to be written at destination
 	HookGenerate func(generatedHtml []byte) (output []byte, err error)
 
+	// Impl is called during directory tree walks.
+	// ssg-go provides path and data from the file,
+	// and Impl is free to do whatever it wants
 	Impl func(path string, data []byte, d fs.DirEntry) error
 
 	option struct {
@@ -50,7 +53,7 @@ func GetEnvParallelWrites() int {
 
 // WithHookAll will make [Ssg] call f(path, fileContent)
 // on every unignored files.
-func WithHookAll(f func(string, []byte) ([]byte, error)) Option {
+func WithHookAll(f HookAll) Option {
 	return func(s *Ssg) {
 		s.hookAll = f
 	}
@@ -58,7 +61,7 @@ func WithHookAll(f func(string, []byte) ([]byte, error)) Option {
 
 // WithHookGenerate assigns f to be called on full output of files
 // that will be converted by ssg from Markdown to HTML.
-func WithHookGenerate(f func([]byte) ([]byte, error)) Option {
+func WithHookGenerate(f HookGenerate) Option {
 	return func(s *Ssg) {
 		s.hookGenerate = f
 	}

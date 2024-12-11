@@ -6,18 +6,13 @@ import (
 )
 
 func main() {
-	s := ssg.New(
+	err := ssg.GenerateWithOptions(
 		"testdata/myblog/src",
 		"testdata/myblog/dst",
 		"TestIndexGenerator",
-		"https://mybloggyblogblog.com",
+		"https://myblog.com",
+		soyweb.IndexGenerator(),
 	)
-
-	g := soyweb.IndexGenerator(s.Src, s.ImplDefault())
-	optGen := ssg.WithImpl(g)
-	s.With(optGen)
-
-	err := s.Generate()
 	if err != nil {
 		panic(err)
 	}

@@ -141,18 +141,17 @@ func TestScan(t *testing.T) {
 	title := "JohnDoe.com"
 	url := "https://johndoe.com"
 
-	ssg := NewWithOptions(src, dst, title, url)
-	err := filepath.WalkDir(root, ssg.walkScan)
+	s := New(src, dst, title, url)
+	err := filepath.WalkDir(root, s.walkScan)
 	if err != nil {
 		t.Errorf("unexpected error from scan: %v", err)
 	}
-
-	if !ssg.preferred.ContainsAll(filepath.Join(src, "/blog/index.html")) {
+	if !s.preferred.ContainsAll(filepath.Join(src, "/blog/index.html")) {
 		t.Fatalf("missing preferred html file /blog/index.html")
 	}
 
-	for i := range ssg.dist {
-		o := &ssg.dist[i]
+	for i := range s.dist {
+		o := &s.dist[i]
 
 		if strings.HasSuffix(o.target, "_header.html") {
 			t.Fatalf("unexpected _header.html output in '%s'", o.target)
@@ -172,7 +171,7 @@ func TestScan(t *testing.T) {
 		filename := filepath.Join(src, h)
 		dirname := filepath.Dir(filename)
 
-		header, ok := ssg.headers.perDir.values[dirname]
+		header, ok := s.headers.perDir.values[dirname]
 		if !ok {
 			t.Fatalf("missing header '%s' for dir '%s'", filename, dirname)
 		}

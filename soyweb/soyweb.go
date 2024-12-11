@@ -30,15 +30,29 @@ type (
 	Flags struct {
 		MinifyFlags
 		NoMinifyFlags
+		GenerateIndex bool `arg:"--gen-index" default:"true" help:"Generate index on _index.ssg"`
 	}
 )
 
+// IndexGenerator returns an option that will make ssg generates
+// index.md/index.html for all unignored _index.ssg marker files.
+func IndexGenerator() ssg.Option {
+	return func(s *ssg.Ssg) {
+		f := indexGenerator(s.Src, s.ImplDefault())
+		opt := ssg.WithImpl(f)
+		opt(s)
+	}
+}
+
 func SsgOptions(f Flags) []ssg.Option {
 	f.MinifyFlags = negate(f.MinifyFlags, f.NoMinifyFlags)
-
-	minifiers := make(map[string]MinifyFn)
 	opts := []ssg.Option{}
 
+	if f.GenerateIndex {
+		opts = append(opts, IndexGenerator())
+	}
+
+	minifiers := make(map[string]MinifyFn)
 	if f.MinifyHtmlCopy {
 		minifiers[".html"] = MinifyHtml
 	}

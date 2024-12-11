@@ -13,13 +13,13 @@ import (
 
 const markerIndex = "_index.ssg"
 
-// IndexGenerator returns an [ssg.Impl] that would look for
+// indexGenerator returns an [ssg.Pipeline] that would look for
 // marker file "_index.ssg" within a directory.
 //
 // Once it finds a marked directory, it inspects the children
 // and generate a Markdown list with name index.md,
 // which is later sent to supplied impl.
-func IndexGenerator(src string, impl ssg.Impl) ssg.Impl {
+func indexGenerator(src string, impl ssg.Impl) ssg.Impl {
 	return func(path string, data []byte, d fs.DirEntry) error {
 		switch {
 		case
@@ -127,7 +127,7 @@ func genIndex(
 			if err != nil {
 				return "", err
 			}
-			if titleFromTag != nil {
+			if len(titleFromTag) != 0 {
 				childTitle = string(titleFromTag)
 			}
 
@@ -138,7 +138,7 @@ func genIndex(
 				return "", err
 			}
 
-			if len(titleFromTag) > 0 {
+			if len(titleFromTag) != 0 {
 				childTitle = string(titleFromTag)
 			}
 
