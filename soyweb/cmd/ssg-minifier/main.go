@@ -42,5 +42,5 @@ func run(c *cli) error {
 		minifyOpts...,
 	)
 
-	return ssg.GenerateWithOptions(c.Src, c.Dst, c.Title, c.Url, opts...)
+	return ssg.Generate(c.Src, c.Dst, c.Title, c.Url, opts...)
 }

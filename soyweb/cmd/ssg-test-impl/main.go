@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	err := ssg.GenerateWithOptions(
+	err := ssg.Generate(
 		"testdata/myblog/src",
 		"testdata/myblog/dst",
 		"TestIndexGenerator",

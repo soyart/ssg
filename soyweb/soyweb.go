@@ -6,6 +6,10 @@ import (
 	"github.com/soyart/ssg"
 )
 
+const (
+	MarkerIndex = "_index.ssg"
+)
+
 var (
 	ErrNotSupported = errors.New("unsupported web format")
 )

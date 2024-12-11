@@ -1,7 +1,6 @@
 package ssg
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -38,13 +37,6 @@ const (
 	footerDefault = `</body>
 </html>
 `
-
-	keyTitleFromH1     = "# "      // The first h1 tag is used as document header title
-	keyTitleFromTag    = ":title " // The first line starting with :title will be parsed as document header title
-	targetFromH1       = "{{from-h1}}"
-	targetFromTag      = "{{from-tag}}"
-	placeholderFromH1  = "<title>" + targetFromH1 + "</title>"
-	placeholderFromTag = "<title>" + targetFromTag + "</title>"
 
 	parallelWritesEnvKey      = "SSG_PARALLEL_WRITES"
 	parallelWritesDefault int = 20
@@ -295,12 +287,12 @@ func (s *Ssg) walkScan(path string, d fs.DirEntry, e error) error {
 			return err
 		}
 
-		var from from
+		var from TitleFrom
 		switch {
 		case bytes.Contains(data, []byte(placeholderFromH1)):
-			from = fromH1
+			from = TitleFromH1
 		case bytes.Contains(data, []byte(placeholderFromTag)):
-			from = fromTag
+			from = TitleFromTag
 		}
 
 		err = s.headers.add(filepath.Dir(path), header{
@@ -417,10 +409,10 @@ func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
 	// so the underlying bytes.Buffer is unchanged and ready for the next file
 	headerText := []byte(header.String()) //nolint:gosimple
 	switch header.titleFrom {
-	case fromH1:
+	case TitleFromH1:
 		headerText = AddTitleFromH1([]byte(s.Title), headerText, data)
 
-	case fromTag:
+	case TitleFromTag:
 		headerText, data = AddTitleFromTag([]byte(s.Title), headerText, data)
 	}
 
@@ -514,111 +506,6 @@ func shouldIgnore(ignores ignorer, path, base string, d fs.DirEntry) (bool, erro
 	}
 
 	return false, nil
-}
-
-func TitleFromH1(markdown []byte) []byte {
-	k := []byte(keyTitleFromH1)
-	s := bufio.NewScanner(bytes.NewBuffer(markdown))
-
-	var title []byte
-	for s.Scan() {
-		line := s.Bytes()
-		if !bytes.HasPrefix(line, k) {
-			continue
-		}
-		parts := bytes.Split(line, k)
-		if len(parts) != 2 {
-			continue
-		}
-
-		title = parts[1]
-		break
-	}
-
-	return title
-}
-
-func TitleFromTag(markdown []byte) []byte {
-	k := []byte(keyTitleFromTag)
-	s := bufio.NewScanner(bytes.NewBuffer(markdown))
-
-	var title []byte
-	for s.Scan() {
-		line := s.Bytes()
-		if !bytes.HasPrefix(line, k) {
-			continue
-		}
-		parts := bytes.Split(line, k)
-		if len(parts) != 2 {
-			continue
-		}
-
-		title = parts[1]
-		break
-	}
-
-	return title
-}
-
-// AddTitleFromH1 finds the first h1 in markdown and uses the h1 title
-// to write to <title> tag in header.
-func AddTitleFromH1(d []byte, header []byte, markdown []byte) []byte {
-	target := []byte(targetFromH1)
-	title := TitleFromH1(markdown)
-	if len(title) == 0 {
-		header = bytes.Replace(header, target, d, 1)
-		return header
-	}
-
-	header = bytes.Replace(header, target, title, 1)
-	return header
-}
-
-// AddTitleFromTag finds title in markdown and then write it to <title> tag in header.
-// It also deletes the tag line from markdown.
-func AddTitleFromTag(
-	d []byte,
-	header []byte,
-	markdown []byte,
-) (
-	[]byte,
-	[]byte,
-) {
-	key := []byte(keyTitleFromTag)
-	target := []byte(targetFromTag)
-	s := bufio.NewScanner(bytes.NewBuffer(markdown))
-
-	for s.Scan() {
-		line := s.Bytes()
-		if !bytes.HasPrefix(line, key) {
-			continue
-		}
-		parts := bytes.Split(line, key)
-		if len(parts) != 2 {
-			continue
-		}
-
-		line = trimRightWhitespace(line)
-		title := parts[1]
-
-		header = bytes.Replace(header, target, title, 1)
-		markdown = bytes.Replace(markdown, append(line, []byte{'\n', '\n'}...), nil, 1)
-		return header, markdown
-	}
-
-	// Remove target and use default header string
-	header = bytes.Replace(header, target, []byte(d), 1)
-	return header, markdown
-}
-
-func trimRightWhitespace(b []byte) []byte {
-	return bytes.TrimRightFunc(b, func(r rune) bool {
-		switch r {
-		case ' ', '\t':
-			return true
-		}
-		return false
-	})
 }
 
 func Output(target string, data []byte, perm fs.FileMode) OutputFile {

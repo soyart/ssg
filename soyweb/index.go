@@ -11,8 +11,6 @@ import (
 	"github.com/soyart/ssg"
 )
 
-const markerIndex = "_index.ssg"
-
 // indexGenerator returns an [ssg.Pipeline] that would look for
 // marker file "_index.ssg" within a directory.
 //
@@ -24,7 +22,7 @@ func indexGenerator(src string, impl ssg.Impl) ssg.Impl {
 		switch {
 		case
 			d.IsDir(),
-			filepath.Base(path) != markerIndex:
+			filepath.Base(path) != MarkerIndex:
 
 			return impl(path, data, d)
 		}
@@ -78,7 +76,7 @@ func genIndex(
 		case
 			ssg.MarkerHeader,
 			ssg.MarkerFooter,
-			markerIndex:
+			MarkerIndex:
 			continue
 		}
 
@@ -175,5 +173,5 @@ func extractTitleFromTag(path string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read article file %s for title extraction: %w", path, err)
 	}
 
-	return ssg.TitleFromTag(articleData), nil
+	return ssg.GetTitleFromTag(articleData), nil
 }
