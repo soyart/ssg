@@ -263,6 +263,6 @@ func assertFs(t *testing.T, p string, dir bool) {
 	}
 
 	if dir != stat.IsDir() {
-		t.Fatalf("expecting isDir=%v, got=%v", dir, stat.IsDir())
+		t.Fatalf("expecting isDir=%v, got=%v for path='%s", dir, stat.IsDir(), p)
 	}
 }
