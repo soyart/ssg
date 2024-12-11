@@ -63,7 +63,7 @@ func genIndex(
 	content := bytes.NewBuffer(template)
 	if len(template) == 0 {
 		heading := filepath.Base(parent)
-		heading = fmt.Sprintf(":title Blog %s\n\n<h1>Blog %s</h1>\n\n", heading, heading)
+		heading = fmt.Sprintf("# Blog %s\n\n", heading)
 		content = bytes.NewBufferString(heading)
 	}
 
@@ -121,21 +121,20 @@ func genIndex(
 				break // switch
 			}
 
-			titleFromTag, err := extractTitleFromTag(filepath.Join(childDir, index))
+			titleFromDoc, err := extractChildTitle(filepath.Join(childDir, index))
 			if err != nil {
 				return "", err
 			}
-			if len(titleFromTag) != 0 {
-				childTitle = string(titleFromTag)
+			if len(titleFromDoc) != 0 {
+				childTitle = string(titleFromDoc)
 			}
 
 		case filepath.Ext(childPath) == ".md":
 			articlePath := filepath.Join(parent, childPath)
-			titleFromTag, err := extractTitleFromTag(articlePath)
+			titleFromTag, err := extractChildTitle(articlePath)
 			if err != nil {
 				return "", err
 			}
-
 			if len(titleFromTag) != 0 {
 				childTitle = string(titleFromTag)
 			}
@@ -167,11 +166,16 @@ func genIndex(
 	return content.String(), nil
 }
 
-func extractTitleFromTag(path string) ([]byte, error) {
-	articleData, err := os.ReadFile(path)
+func extractChildTitle(path string) ([]byte, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read article file %s for title extraction: %w", path, err)
 	}
 
-	return ssg.GetTitleFromTag(articleData), nil
+	title := ssg.GetTitleFromTag(data)
+	if len(title) == 0 {
+		title = ssg.GetTitleFromH1(data)
+	}
+
+	return title, nil
 }

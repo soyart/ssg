@@ -3,7 +3,7 @@
 > This repository also hosts soyweb,
 > an ssg wrapper and replacement for [webtools](https://github.com/soyart/webtools)
 >
-> See also: [soyweb](./soyweb/)
+> See also: [soyweb, a more comprehensive implementation](./soyweb/)
 
 This Nix Flake provides 2 implementations of ssg.
 
@@ -22,6 +22,9 @@ This Nix Flake provides 2 implementations of ssg.
 
   This implementation is good for deploying ssg remotely,
   because it's just 1 Go executable.
+
+  In addition to the executables, ssg-go also provides
+  extensible ssg implementations with Go API.
 
   A Go wrapper for ssg-go is also available in [`soyweb`](./soyweb/).
 
@@ -200,5 +203,5 @@ SSG_PARALLEL_WRITES=1 ssg mySrc myDst myTitle myUrl
 
 ssg-go defines APIs for extending its usefulness called `Option`.
 
-[soyweb](/soyweb/) extends ssg via `Option`, and provide extra functionality
+[soyweb](./soyweb/) extends ssg via `Option`, and provide extra functionality
 such as index generator and minifiers.
