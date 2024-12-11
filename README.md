@@ -3,7 +3,7 @@
 > This repository also hosts soyweb,
 > an ssg wrapper and replacement for [webtools](https://github.com/soyart/webtools)
 >
-> See also: [soyweb](./soyweb/)
+> See also: [soyweb, a more comprehensive implementation](./soyweb/)
 
 This Nix Flake provides 2 implementations of ssg.
 
@@ -22,6 +22,9 @@ This Nix Flake provides 2 implementations of ssg.
 
   This implementation is good for deploying ssg remotely,
   because it's just 1 Go executable.
+
+  In addition to the executables, ssg-go also provides
+  extensible ssg implementations with Go API.
 
   A Go wrapper for ssg-go is also available in [`soyweb`](./soyweb/).
 
@@ -92,6 +95,9 @@ ssg-go recognizes 2 placeholders:
 
   Like with `{{from-h1}}`, but finds the first line starting with `:title` instead,
   i.e. `This is also an H1` from the example above will be used as the page's title.
+
+  > Note: `{{from-tag}}` directive will make ssg look for pattern `:title YourTitle\n\n`,
+  > so users must always append an empty line after the title tag line.
 
 For example, consider the following header/footer templates and a Markdown page:
 
@@ -193,3 +199,9 @@ To write outputs sequentially, run:
 SSG_PARALLEL_WRITES=1 ssg mySrc myDst myTitle myUrl
 ```
 
+# Extending ssg-go
+
+ssg-go defines APIs for extending its usefulness called `Option`.
+
+[soyweb](./soyweb/) extends ssg via `Option`, and provide extra functionality
+such as index generator and minifiers.

@@ -111,3 +111,43 @@ soyweb provides 3 more programs and a library for working with ssg:
     ```shell
     ssg-manifest copy -h
     ```
+
+# ssg options provided by soyweb
+
+## Minifiers
+
+soyweb provides webformat minifiers opitions for ssg, implemented as hooks that
+map 1 input data to 1 output data.
+
+The minifiers is available to all programs under soyweb.
+
+## [Blog article index generator](./index.go)
+
+soyweb provides an [ssg.Impl](/options.go) that will automatically generate indices
+for blog directories. It scans for `_index.ssg`, and, if found, lists all links to the
+children (i.e. "articles"). The marker `_index.ssg` can be blank or contain template,
+in plaintext, Markdown, or HTML.
+
+To be considered an article, a path has to be either:
+
+- A directory with `index.html` or `index.md`
+
+- A file with `.md` extension
+
+If the marker `_index.ssg` is empty, a default content header will be written.
+If the marker has some template, then the index list will be appended to the template
+in the output.
+
+The marker `_index.ssg` could be a Markdown, and apart from having its content
+appended by the generated index, the file is handled normally like with other
+ssg-go input files.
+
+In other words, `_header.html` and `_footer.html` will surround the
+marker content, and [`ssg.TitleFrom`](../title.go) tags are respected and title extraction
+is handled in the familiar fashion.
+
+The only quirks with the generator is that in the index entries, child titles are extracted
+from `:title` tag first, and if there's no such title, then the first Markdown h1 (`# FooTitle`)
+will be picked as the child title.
+
+The generator is currently available to `ssg-manifest` via the site manifest specification

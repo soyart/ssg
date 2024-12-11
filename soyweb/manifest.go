@@ -31,9 +31,10 @@ const (
 type Manifest map[string]Site
 
 type Site struct {
-	ssg     ssg.Ssg                `json:"-"`
-	Copies  map[string]WriteTarget `json:"-"`
-	CleanUp bool                   `json:"-"`
+	ssg          ssg.Ssg                `json:"-"`
+	Copies       map[string]WriteTarget `json:"-"`
+	CleanUp      bool                   `json:"-"`
+	GenerateBlog bool                   `json:"-"`
 }
 
 type WriteTarget struct {
@@ -121,23 +122,21 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 			break
 		}
 
-		site.ssg.With(opts...)
 		old.
 			WithGroup("build").
 			With(
 				"key", key,
 				"url", site.ssg.Url,
 			).
-			WithGroup("options").
-			With(
-			// "parallel_writes", site.ssg.parallelWrites,
-			// "pipeline_enabled", site.ssg.pipeline != nil,
-			// "hook_enabled", site.ssg.hook != nil,
-			).
 			Info("building site")
 
-		err := site.ssg.Generate()
-		if err != nil {
+		s := &site.ssg
+		if site.GenerateBlog {
+			opts = append(opts, IndexGenerator())
+		}
+
+		s.With(opts...)
+		if err := s.Generate(); err != nil {
 			return manifestError{
 				err:   err,
 				key:   key,
@@ -194,13 +193,14 @@ func (s manifestError) Unwrap() error {
 
 func (s *Site) UnmarshalJSON(b []byte) error {
 	var site struct {
-		Src   string `json:"src"`
-		Dst   string `json:"dst"`
-		Title string `json:"title"`
-		Url   string `json:"url"`
+		Copies map[string]interface{} `json:"copies"`
 
-		Copies  map[string]interface{} `json:"copies"`
-		CleanUp bool                   `json:"cleanup"`
+		Src          string `json:"src"`
+		Dst          string `json:"dst"`
+		Title        string `json:"title"`
+		Url          string `json:"url"`
+		CleanUp      bool   `json:"cleanup"`
+		GenerateBlog bool   `json:"generate_blog"`
 	}
 
 	err := json.Unmarshal(b, &site)
@@ -215,9 +215,10 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 	}
 
 	*s = Site{
-		CleanUp: site.CleanUp,
-		Copies:  copies,
-		ssg: ssg.NewWithOptions(
+		Copies:       copies,
+		CleanUp:      site.CleanUp,
+		GenerateBlog: site.GenerateBlog,
+		ssg: ssg.New(
 			site.Src,
 			site.Dst,
 			site.Title,

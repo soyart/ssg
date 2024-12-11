@@ -5,6 +5,7 @@
 		"src": "johndoe.com/src",
 		"dst": "johndoe.com/dst",
 		"cleanup": true,
+		"generate_blog": true,
 		"copies": {
 			"./assets/style.css": {
 				"target": "johndoe.com/src/style.css",

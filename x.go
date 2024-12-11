@@ -11,8 +11,6 @@ import (
 type (
 	Set map[string]struct{}
 
-	from int
-
 	// perDir tracks files under directory in a trie-like fashion.
 	perDir[T any] struct {
 		defaultValue T
@@ -21,7 +19,7 @@ type (
 
 	header struct {
 		*bytes.Buffer
-		titleFrom from
+		titleFrom TitleFrom
 	}
 
 	headers struct {
@@ -31,12 +29,6 @@ type (
 	footers struct {
 		perDir[*bytes.Buffer]
 	}
-)
-
-const (
-	fromNone from = 0
-	fromH1        = 1 << iota
-	fromTag
 )
 
 func FileIs(f os.FileInfo, mode fs.FileMode) bool {
@@ -65,7 +57,7 @@ func newHeaders(defaultHeader string) headers {
 	return headers{
 		perDir: newPerDir(header{
 			Buffer:    bytes.NewBufferString(defaultHeader),
-			titleFrom: fromH1,
+			titleFrom: TitleFromH1,
 		}),
 	}
 }

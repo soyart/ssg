@@ -29,10 +29,10 @@ func main() {
 func run(c *cli) error {
 	minifyOpts := soyweb.SsgOptions(soyweb.Flags{
 		MinifyFlags: soyweb.MinifyFlags{
-			MinifyHtml:     true,
-			MinifyHtmlCopy: true,
-			MinifyCss:      true,
-			MinifyJson:     true,
+			MinifyHtmlGenerate: true,
+			MinifyHtmlCopy:     true,
+			MinifyCss:          true,
+			MinifyJson:         true,
 		},
 		NoMinifyFlags: c.NoMinifyFlags,
 	})
@@ -42,5 +42,5 @@ func run(c *cli) error {
 		minifyOpts...,
 	)
 
-	return ssg.GenerateWithOptions(c.Src, c.Dst, c.Title, c.Url, opts...)
+	return ssg.Generate(c.Src, c.Dst, c.Title, c.Url, opts...)
 }
