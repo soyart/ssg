@@ -5,11 +5,11 @@ import (
 	"bytes"
 )
 
-type TitleFrom int
+type TitleFrom uint8
 
 const (
-	TitleFromNone TitleFrom = 0
-	TitleFromH1   TitleFrom = 1 << iota
+	TitleFromNone TitleFrom = iota
+	TitleFromH1
 	TitleFromTag
 
 	keyTitleFromH1     = "# "      // The first h1 tag is used as document header title
