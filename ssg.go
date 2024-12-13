@@ -236,6 +236,102 @@ func (s *Ssg) WriteOut() error {
 	return nil
 }
 
+func (s *Ssg) buildV2() ([]OutputFile, error) {
+	err := filepath.WalkDir(s.Src, s.walkBuildV2)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.dist, nil
+}
+
+func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
+	if err != nil {
+		return err
+	}
+	if d.IsDir() {
+		return s.collect(path)
+	}
+
+	base := filepath.Base(path)
+	ignore, err := shouldIgnore(s.ssgignores, path, base, d)
+	if err != nil {
+		return err
+	}
+	if ignore {
+		return nil
+	}
+
+	switch base {
+	case
+		MarkerHeader,
+		MarkerFooter:
+		return nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	if s.impl != nil {
+		return s.impl(path, data, d)
+	}
+
+	return s.implDefault(path, data, d)
+}
+
+func (s *Ssg) collect(path string) error {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+
+	for i := range entries {
+		entry := entries[i]
+		base := entry.Name()
+		switch base {
+		case MarkerHeader:
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			err = s.headers.add(filepath.Dir(path), header{
+				Buffer:    bytes.NewBuffer(data),
+				titleFrom: GetTitleFrom(data),
+			})
+			if err != nil {
+				return err
+			}
+
+			continue
+
+		case MarkerFooter:
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			err = s.footers.add(filepath.Dir(path), bytes.NewBuffer(data))
+			if err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		ext := filepath.Ext(base)
+		if ext == ".md" {
+			continue
+		}
+
+		if s.preferred.Insert(path) {
+			return fmt.Errorf("duplicate html file %s", path)
+		}
+	}
+
+	return nil
+}
+
 // build walks the src directory, and converts Markdown into HTML,
 // returning the results as []write.
 //
@@ -255,9 +351,9 @@ func (s *Ssg) build() ([]OutputFile, error) {
 
 // walkScan scans the source directory for header and footer files,
 // and anything required to build a page.
-func (s *Ssg) walkScan(path string, d fs.DirEntry, e error) error {
-	if e != nil {
-		return e
+func (s *Ssg) walkScan(path string, d fs.DirEntry, err error) error {
+	if err != nil {
+		return err
 	}
 
 	base := filepath.Base(path)
@@ -277,17 +373,9 @@ func (s *Ssg) walkScan(path string, d fs.DirEntry, e error) error {
 			return err
 		}
 
-		var from TitleFrom
-		switch {
-		case bytes.Contains(data, []byte(placeholderFromH1)):
-			from = TitleFromH1
-		case bytes.Contains(data, []byte(placeholderFromTag)):
-			from = TitleFromTag
-		}
-
 		err = s.headers.add(filepath.Dir(path), header{
 			Buffer:    bytes.NewBuffer(data),
-			titleFrom: from,
+			titleFrom: GetTitleFrom(data),
 		})
 		if err != nil {
 			return err
@@ -320,9 +408,9 @@ func (s *Ssg) walkScan(path string, d fs.DirEntry, e error) error {
 
 // walkBuild finds and converts Markdown files to HTML,
 // and assembles it with header and footer.
-func (s *Ssg) walkBuild(path string, d fs.DirEntry, e error) error {
-	if e != nil {
-		return e
+func (s *Ssg) walkBuild(path string, d fs.DirEntry, err error) error {
+	if err != nil {
+		return err
 	}
 
 	base := filepath.Base(path)
