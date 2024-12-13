@@ -22,7 +22,7 @@ type (
 	// and Impl is free to do whatever it wants
 	Impl func(path string, data []byte, d fs.DirEntry) error
 
-	option struct {
+	options struct {
 		hookAll        HookAll
 		hookGenerate   HookGenerate
 		impl           Impl

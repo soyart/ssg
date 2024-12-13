@@ -11,20 +11,19 @@ import (
 	"github.com/soyart/ssg"
 )
 
-// indexGenerator returns an [ssg.Pipeline] that would look for
+// indexGenerator returns an [ssg.Impl] that would look for
 // marker file "_index.ssg" within a directory.
 //
 // Once it finds a marked directory, it inspects the children
 // and generate a Markdown list with name index.md,
 // which is later sent to supplied impl.
-func indexGenerator(src string, impl ssg.Impl) ssg.Impl {
+func indexGenerator(src string, next ssg.Impl) ssg.Impl {
 	return func(path string, data []byte, d fs.DirEntry) error {
 		switch {
-		case
-			d.IsDir(),
+		case d.IsDir(),
 			filepath.Base(path) != MarkerIndex:
 
-			return impl(path, data, d)
+			return next(path, data, d)
 		}
 
 		parent := filepath.Dir(path)
@@ -40,14 +39,12 @@ func indexGenerator(src string, impl ssg.Impl) ssg.Impl {
 			return fmt.Errorf("failed to read marker '%s': %w", path, err)
 		}
 
-		content, err := genIndex(src, parent, entries, template)
+		index, err := genIndex(src, parent, entries, template)
 		if err != nil {
 			return fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
 		}
 
-		path = filepath.Join(parent, "index.md")
-		data = []byte(content)
-		return impl(path, data, d)
+		return next(filepath.Join(parent, "index.md"), []byte(index), d)
 	}
 }
 
@@ -131,12 +128,12 @@ func genIndex(
 
 		case filepath.Ext(childPath) == ".md":
 			articlePath := filepath.Join(parent, childPath)
-			titleFromTag, err := extractChildTitle(articlePath)
+			titleFromDoc, err := extractChildTitle(articlePath)
 			if err != nil {
 				return "", err
 			}
-			if len(titleFromTag) != 0 {
-				childTitle = string(titleFromTag)
+			if len(titleFromDoc) != 0 {
+				childTitle = string(titleFromDoc)
 			}
 
 			childPath = strings.TrimSuffix(childPath, ".md")
@@ -158,7 +155,7 @@ func genIndex(
 		fmt.Fprintf(content, "- [%s](/%s)\n\n", childTitle, linkPath)
 	}
 
-	fmt.Fprintln(os.Stdout, "Generated index for directory", parent)
+	fmt.Fprintln(os.Stdout, "Generated Markdown index for directory", parent)
 	fmt.Fprint(os.Stdout, "======= START =======\n")
 	fmt.Fprintln(os.Stdout, content.String())
 	fmt.Fprint(os.Stdout, "======== END ========\n")

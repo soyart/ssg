@@ -62,6 +62,11 @@ func TestGenerateIndex(t *testing.T) {
 			t.Fatalf("missing #%d entry '%s' in %s", i+1, entry, index)
 		}
 	}
+
+	err = os.RemoveAll(dst)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func toGenerated(s string) string {

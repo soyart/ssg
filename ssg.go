@@ -48,7 +48,7 @@ type Ssg struct {
 	Title string
 	Url   string
 
-	option
+	options
 
 	ssgignores ignorer
 	headers    headers

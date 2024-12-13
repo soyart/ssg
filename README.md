@@ -1,9 +1,8 @@
 # ssg (static site generator)
 
-> This repository also hosts soyweb,
+> This repository also hosts [soyweb](./soyweb/),
 > an ssg wrapper and replacement for [webtools](https://github.com/soyart/webtools)
->
-> See also: [soyweb, a more comprehensive implementation](./soyweb/)
+
 
 This Nix Flake provides 2 implementations of ssg.
 
@@ -53,6 +52,9 @@ with `_header.html` and `_footer.html` respectively.
 The output file tree is mirrored into `dst`.
 Files or directories whose names start with `.` are skipped.
 
+Both implementation accepts a CLI parameter `title` (3rd arg)
+that will be used as default `<title>` tag inside `<head>` (*head title*).
+
 Files listed in `${src}/.ssgignore` are also ignored in a fashion similar
 to `.gitignore`. To see how `.ssgignore` works in Go implementation, see
 [the test `TestSsgignore`](./ssg_test.go).
@@ -65,9 +67,6 @@ into mirrored `dst`.
 ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
 
 ## Differences between ssg and ssg-go
-
-- Like the original, ssg-go accepts a CLI parameter `title` (3rd arg)
-that will be used as default `<title>` tag inside `<head>` (*head title*).
 
 ### Custom title tag for `_header.html`
 
@@ -201,7 +200,7 @@ SSG_PARALLEL_WRITES=1 ssg mySrc myDst myTitle myUrl
 
 # Extending ssg-go
 
-ssg-go defines APIs for extending its usefulness called `Option`.
+ssg-go defines its API via `Option` for extending its usefulness.
 
 [soyweb](./soyweb/) extends ssg via `Option`, and provide extra functionality
 such as index generator and minifiers.

@@ -121,14 +121,16 @@ map 1 input data to 1 output data.
 
 The minifiers is available to all programs under soyweb.
 
-## [Blog article index generator](./index.go)
+## [Index generator](./index.go)
 
 soyweb provides an [ssg.Impl](/options.go) that will automatically generate indices
-for blog directories. It scans for `_index.ssg`, and, if found, lists all links to the
-children (i.e. "articles"). The marker `_index.ssg` can be blank or contain template,
+for blog directories. It scans for marker file `_index.ssg`, and, if found,
+lists all links to the children (i.e. "articles").
+
+The marker `_index.ssg` can be empty, or contain template,
 in plaintext, Markdown, or HTML.
 
-To be considered an article, a path has to be either:
+To be considered an entry, a path has to be either:
 
 - A directory with `index.html` or `index.md`
 
@@ -142,11 +144,11 @@ The marker `_index.ssg` could be a Markdown, and apart from having its content
 appended by the generated index, the file is handled normally like with other
 ssg-go input files.
 
-In other words, `_header.html` and `_footer.html` will surround the
-marker content, and [`ssg.TitleFrom`](../title.go) tags are respected and title extraction
-is handled in the familiar fashion.
+In other words, `_header.html` and `_footer.html` will surround the index generated from
+marker files. [`ssg.TitleFrom`](../title.go) tags are respected and title extraction
+for the generated index is handled in the familiar fashion.
 
-The only quirks with the generator is that in the index entries, child titles are extracted
+The only quirks with the generator is that, in the index entries, child titles are extracted
 from `:title` tag first, and if there's no such title, then the first Markdown h1 (`# FooTitle`)
 will be picked as the child title.
 

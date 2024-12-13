@@ -42,9 +42,8 @@ type (
 // index.md/index.html for all unignored _index.ssg marker files.
 func IndexGenerator() ssg.Option {
 	return func(s *ssg.Ssg) {
-		f := indexGenerator(s.Src, s.ImplDefault())
-		opt := ssg.WithImpl(f)
-		opt(s)
+		g := indexGenerator(s.Src, s.ImplDefault())
+		ssg.WithImpl(g)(s)
 	}
 }
 
