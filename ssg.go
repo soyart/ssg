@@ -323,7 +323,7 @@ func (s *Ssg) collect(path string) error {
 		}
 
 		ext := filepath.Ext(base)
-		if ext == ".md" {
+		if ext != ".html" {
 			continue
 		}
 
