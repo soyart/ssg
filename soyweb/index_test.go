@@ -13,6 +13,11 @@ func TestGenerateIndex(t *testing.T) {
 	src := "./testdata/myblog/src"
 	dst := "./testdata/myblog/dst"
 
+	err := os.RemoveAll(dst)
+	if err != nil {
+		panic(err)
+	}
+
 	markers := map[string][]string{
 		"_index.ssg": {
 			`<li><p><a href="/2023/">2023</a></p></li>`,
@@ -39,7 +44,7 @@ func TestGenerateIndex(t *testing.T) {
 		}
 	}
 
-	err := ssg.Generate(src, dst, "TestTitle", "https://my.blog", IndexGenerator())
+	err = ssg.Generate(src, dst, "TestTitle", "https://my.blog", IndexGenerator())
 	if err != nil {
 		t.Fatalf("error during ssg generation: %v", err)
 	}

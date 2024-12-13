@@ -1,11 +1,13 @@
 package ssg
 
 import (
+	"bytes"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/sabhiram/go-gitignore"
+	ignore "github.com/sabhiram/go-gitignore"
 )
 
 func TestToHTML(t *testing.T) {
@@ -133,15 +135,34 @@ Some paragraph2`,
 	}
 }
 
-func TestScan(t *testing.T) {
+func TestGenerate(t *testing.T) {
+	t.Run("build-v1", func(t *testing.T) {
+		testGenerate(t, func(s *Ssg) ([]OutputFile, error) {
+			return s.build()
+		})
+	})
+
+	t.Run("build-v2", func(t *testing.T) {
+		testGenerate(t, func(s *Ssg) ([]OutputFile, error) {
+			return s.buildV2()
+		})
+	})
+}
+
+func testGenerate(t *testing.T, buildFn func(s *Ssg) ([]OutputFile, error)) {
 	root := "./soyweb/testdata/johndoe.com"
 	src := filepath.Join(root, "/src")
 	dst := filepath.Join(root, "/dst")
 	title := "JohnDoe.com"
 	url := "https://johndoe.com"
 
+	err := os.RemoveAll(dst)
+	if err != nil {
+		panic(err)
+	}
+
 	s := New(src, dst, title, url)
-	err := filepath.WalkDir(root, s.walkScan)
+	outputs, err := buildFn(&s)
 	if err != nil {
 		t.Errorf("unexpected error from scan: %v", err)
 	}
@@ -160,32 +181,113 @@ func TestScan(t *testing.T) {
 		}
 	}
 
-	headers := map[string]TitleFrom{
+	titleFroms := map[string]TitleFrom{
 		"/_header.html":           TitleFromH1,
 		"/blog/_header.html":      TitleFromTag,
 		"/blog/2023/_header.html": TitleFromNone,
 	}
 
-	for h, from := range headers {
+	for h, from := range titleFroms {
 		filename := filepath.Join(src, h)
 		dirname := filepath.Dir(filename)
-
 		header, ok := s.headers.perDir.values[dirname]
 		if !ok {
 			t.Fatalf("missing header '%s' for dir '%s'", filename, dirname)
 		}
-
 		if header.titleFrom != from {
 			t.Fatalf("unexpected from '%d', expecting %d", header.titleFrom, from)
 		}
+	}
+
+	type expected struct {
+		subString string
+		titleFrom TitleFrom
+	}
+
+	expecteds := map[string]expected{
+		"/": {
+			titleFrom: TitleFromH1,
+			subString: "<!-- ROOT HEADER -->",
+		},
+		"/blog": {
+			titleFrom: TitleFromTag,
+			subString: "<!-- HEADER FOR BLOG -->",
+		},
+		"/blog/": {
+			titleFrom: TitleFromTag,
+			subString: "<!-- HEADER FOR BLOG -->",
+		},
+		"/blog/2022": {
+			titleFrom: TitleFromTag,
+			subString: "<!-- HEADER FOR BLOG -->",
+		},
+		"/blog/2022/3": {
+			titleFrom: TitleFromTag,
+			subString: "<!-- HEADER FOR BLOG -->",
+		},
+		"/blog/2023": {
+			titleFrom: TitleFromNone,
+			subString: "<!-- HEADER FOR BLOG 2023 -->",
+		},
+		"/notes": {
+			titleFrom: TitleFromTag,
+			subString: "<!-- NOTES HEADER -->",
+		},
+	}
+
+	for parentDir, e := range expecteds {
+		parentDir = filepath.Join(src, parentDir)
+		chosen := s.headers.choose(parentDir)
+		if chosen.titleFrom != e.titleFrom {
+			t.Fatalf("unexpected titleFrom at dir '%s' actual=%d, expecting=%d", parentDir, chosen.titleFrom, e.titleFrom)
+		}
+		if !bytes.Contains(chosen.Bytes(), []byte(e.subString)) {
+			t.Fatalf("missing expecting substr '%s' from dir %s", e.subString, parentDir)
+		}
+	}
+
+	expectedOutputs := map[string][]string{
+		"/index.html": {
+			"<title>Welcome to JohnDoe.com!</title>",
+		},
+		"/blog/2022/index.html": {
+			"<title>2022 Blog index</title>",
+			"<body><h1 id=\"blog-from-the-worst-year\">Blog from the worst year</h1>",
+		},
+		"/testconvert/index.html": {
+			"<!-- Header for testconvert -->",
+			"<title>Embedded-HTML should be correctly preserved</title>",
+		},
+	}
+
+	for path, e := range expectedOutputs {
+		path = filepath.Join(dst, path)
+		for i := range outputs {
+			o := &outputs[i]
+			if o.target != path {
+				continue
+			}
+			for j := range e {
+				s := e[j]
+				if bytes.Contains(o.data, []byte(s)) {
+					continue
+				}
+				t.Fatalf("missing expected substr '%s' from output %s", s, o.target)
+			}
+		}
+	}
+
+	err = os.RemoveAll(dst)
+	if err != nil {
+		panic(err)
 	}
 }
 
 // Test that the library we use actually does what we want it to
 func TestSsgignore(t *testing.T) {
 	type testCase struct {
-		ignores  []string
 		path     string
+		ignores  []string
 		expected bool
 	}
 
