@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -14,7 +16,7 @@ import (
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
 	"github.com/gomarkdown/markdown/parser"
-	"github.com/sabhiram/go-gitignore"
+	ignore "github.com/sabhiram/go-gitignore"
 )
 
 const (
@@ -112,6 +114,10 @@ https://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
 xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
 `)
 
+	sort.Slice(outputs, func(i, j int) bool {
+		return outputs[i].target < outputs[j].target
+	})
+
 	for i := range outputs {
 		o := &outputs[i]
 		target, err := filepath.Rel(dst, o.target)
@@ -149,9 +155,9 @@ xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
 }
 
 func (s *Ssg) AddOutputs(outputs ...OutputFile) {
-	if s.streaming != nil {
+	if s.streaming.c != nil {
 		for i := range outputs {
-			s.streaming <- outputs[i]
+			s.streaming.c <- outputs[i]
 		}
 		return
 	}
@@ -167,6 +173,13 @@ func (s *Ssg) With(opts ...Option) *Ssg {
 }
 
 func (s *Ssg) Generate() error {
+	if s.streaming.c != nil {
+		return s.generateStreaming()
+	}
+	return s.generate()
+}
+
+func (s *Ssg) generate() error {
 	// Reset
 	s.dist = nil
 
@@ -219,9 +232,22 @@ func (s *Ssg) WriteOut() error {
 	}
 
 	files := bytes.NewBuffer(nil)
-	for i := range s.dist {
-		f := &s.dist[i]
-		path, err := filepath.Rel(s.Dst, f.target)
+	writeDotFiles(s.Dst, s.dist, files)
+
+	target := filepath.Join(s.Dst, ".files")
+	err = os.WriteFile(target, files.Bytes(), 0644)
+	if err != nil {
+		return fmt.Errorf("error writing %s: %w", target, err)
+	}
+
+	return nil
+}
+
+func writeDotFiles(dst string, dist []OutputFile, list io.Writer) error {
+	sorted := make([]string, len(dist))
+	for i := range dist {
+		f := &dist[i]
+		path, err := filepath.Rel(dst, f.target)
 		if err != nil {
 			return err
 		}
@@ -231,13 +257,15 @@ func (s *Ssg) WriteOut() error {
 			path += ".md"
 		}
 
-		fmt.Fprintf(files, "./%s\n", path)
+		sorted[i] = path
 	}
 
-	target := filepath.Join(s.Dst, ".files")
-	err = os.WriteFile(target, files.Bytes(), 0644)
-	if err != nil {
-		return fmt.Errorf("error writing %s: %w", target, err)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i] < sorted[j]
+	})
+
+	for i := range sorted {
+		fmt.Fprintf(list, "./%s\n", sorted[i])
 	}
 
 	return nil

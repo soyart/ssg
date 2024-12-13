@@ -23,10 +23,10 @@ type (
 	Impl func(path string, data []byte, d fs.DirEntry) error
 
 	options struct {
-		hookAll        HookAll
-		hookGenerate   HookGenerate
+		hookAll      HookAll
+		hookGenerate HookGenerate
+		streaming
 		impl           Impl
-		streaming      chan OutputFile
 		parallelWrites int
 	}
 )
@@ -54,7 +54,7 @@ func GetEnvParallelWrites() int {
 
 func WriteStreaming() Option {
 	return func(s *Ssg) {
-		s.streaming = make(chan OutputFile)
+		s.streaming.c = make(chan OutputFile)
 	}
 }
 

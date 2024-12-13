@@ -1,6 +1,7 @@
 package ssg
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -8,9 +9,19 @@ import (
 	"sync"
 )
 
-func (s *Ssg) GenerateStreaming() error {
-	if s.streaming == nil {
+type streaming struct {
+	c       chan OutputFile
+	outputs []string
+}
+
+func (s *Ssg) generateStreaming() error {
+	if s.streaming.c == nil {
 		panic("nil streaming channel")
+	}
+
+	stat, err := os.Stat(s.Src)
+	if err != nil {
+		return fmt.Errorf("failed to stat src '%s': %w", s.Src, err)
 	}
 
 	var wg sync.WaitGroup
@@ -27,14 +38,18 @@ func (s *Ssg) GenerateStreaming() error {
 			panic("dist is not empty")
 		}
 
-		close(s.streaming)
+		close(s.streaming.c)
 	}()
 
+	var dist []string
 	var errWrites error
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := WriteOutStreaming(s.streaming, s.parallelWrites)
+		var err error
+
+		dist, err = WriteOutStreaming(s.streaming.c, s.parallelWrites)
 		if err != nil {
 			errWrites = err
 		}
@@ -49,17 +64,42 @@ func (s *Ssg) GenerateStreaming() error {
 		return errWrites
 	}
 
+	outputs := make([]OutputFile, len(dist))
+	for i := range dist {
+		outputs[i] = Output(dist[i], nil, 0)
+	}
+
+	s.dist = outputs
+	sitemap, err := Sitemap(s.Dst, s.Url, stat.ModTime(), s.dist)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(filepath.Join(s.Dst, "sitemap.xml"), []byte(sitemap), 0644)
+	if err != nil {
+		return err
+	}
+
+	files := bytes.NewBuffer(nil)
+	writeDotFiles(s.Dst, s.dist, files)
+	dotfiles := filepath.Join(s.Dst, ".files")
+	err = os.WriteFile(dotfiles, files.Bytes(), 0644)
+	if err != nil {
+		return fmt.Errorf("error writing %s: %w", dotfiles, err)
+	}
+
 	return nil
 }
 
-func WriteOutStreaming(c <-chan OutputFile, parallelWrites int) error {
+func WriteOutStreaming(c <-chan OutputFile, parallelWrites int) ([]string, error) {
 	if parallelWrites == 0 {
 		parallelWrites = ParallelWritesDefault
 	}
 
+	written := make([]string, 0)
 	wg := new(sync.WaitGroup)
 	errs := make(chan writeError)
 	guard := make(chan struct{}, parallelWrites)
+	mut := new(sync.Mutex)
 
 	for o := range c {
 		guard <- struct{}{}
@@ -89,6 +129,9 @@ func WriteOutStreaming(c <-chan OutputFile, parallelWrites int) error {
 				return
 			}
 
+			mut.Lock()
+			defer mut.Unlock()
+			written = append(written, w.target)
 			fmt.Fprintln(os.Stdout, w.target)
 
 		}(&o, wg)
@@ -104,8 +147,8 @@ func WriteOutStreaming(c <-chan OutputFile, parallelWrites int) error {
 		wErrs = append(wErrs, err)
 	}
 	if len(wErrs) > 0 {
-		return errors.Join(wErrs...)
+		return nil, errors.Join(wErrs...)
 	}
 
-	return nil
+	return written, nil
 }

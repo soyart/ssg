@@ -21,7 +21,7 @@ func main() {
 		ssg.WriteStreaming(),
 	)
 
-	err := s.GenerateStreaming()
+	err := s.Generate()
 	if err != nil {
 		fmt.Fprintln(os.Stdout, "error with", "src", src, "dst", dst, "title", title, "url", url)
 		panic(err)
