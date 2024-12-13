@@ -16,7 +16,6 @@ func (s *Ssg) build() ([]OutputFile, error) {
 	// returning the results as []write.
 	//
 	// build also caches the result in s for [WriteOut] later.
-	// deprecated
 
 	err := filepath.WalkDir(s.Src, s.walkScan)
 	if err != nil {
@@ -34,6 +33,7 @@ func (s *Ssg) build() ([]OutputFile, error) {
 func (s *Ssg) walkScan(path string, d fs.DirEntry, err error) error {
 	// walkScan scans the source directory for header and footer files,
 	// and anything required to build a page.
+
 	if err != nil {
 		return err
 	}
@@ -92,6 +92,7 @@ func (s *Ssg) walkScan(path string, d fs.DirEntry, err error) error {
 func (s *Ssg) walkBuild(path string, d fs.DirEntry, err error) error {
 	// walkBuild finds and converts Markdown files to HTML,
 	// and assembles it with header and footer.
+
 	if err != nil {
 		return err
 	}
