@@ -167,7 +167,7 @@ func (s *Ssg) Generate() error {
 	if err != nil {
 		return err
 	}
-	dist, err := s.build()
+	dist, err := s.buildV2()
 	if err != nil {
 		return err
 	}
