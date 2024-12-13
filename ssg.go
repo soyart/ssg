@@ -250,6 +250,7 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 		return err
 	}
 	if d.IsDir() {
+		fmt.Println("collecting", path)
 		return s.collect(path)
 	}
 
@@ -282,21 +283,23 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 }
 
 func (s *Ssg) collect(path string) error {
-	entries, err := os.ReadDir(path)
+	children, err := os.ReadDir(path)
 	if err != nil {
 		return err
 	}
 
-	for i := range entries {
-		entry := entries[i]
-		base := entry.Name()
+	for i := range children {
+		child := children[i]
+		base := child.Name()
+		pathChild := filepath.Join(path, base)
+
 		switch base {
 		case MarkerHeader:
-			data, err := os.ReadFile(path)
+			data, err := os.ReadFile(pathChild)
 			if err != nil {
 				return err
 			}
-			err = s.headers.add(filepath.Dir(path), header{
+			err = s.headers.add(path, header{
 				Buffer:    bytes.NewBuffer(data),
 				titleFrom: GetTitleFrom(data),
 			})
@@ -307,11 +310,11 @@ func (s *Ssg) collect(path string) error {
 			continue
 
 		case MarkerFooter:
-			data, err := os.ReadFile(path)
+			data, err := os.ReadFile(pathChild)
 			if err != nil {
 				return err
 			}
-			err = s.footers.add(filepath.Dir(path), bytes.NewBuffer(data))
+			err = s.footers.add(path, bytes.NewBuffer(data))
 			if err != nil {
 				return err
 			}
@@ -324,7 +327,7 @@ func (s *Ssg) collect(path string) error {
 			continue
 		}
 
-		if s.preferred.Insert(path) {
+		if s.preferred.Insert(pathChild) {
 			return fmt.Errorf("duplicate html file %s", path)
 		}
 	}
