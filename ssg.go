@@ -149,6 +149,13 @@ xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
 }
 
 func (s *Ssg) AddOutputs(outputs ...OutputFile) {
+	if s.streaming != nil {
+		for i := range outputs {
+			s.streaming <- outputs[i]
+		}
+		return
+	}
+
 	s.dist = append(s.dist, outputs...)
 }
 
