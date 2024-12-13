@@ -57,16 +57,6 @@ type Ssg struct {
 	dist       []OutputFile
 }
 
-type OutputFile struct {
-	target string
-	data   []byte
-	perm   fs.FileMode
-}
-
-type ignorer interface {
-	ignore(path string) bool
-}
-
 // Generate creates a one-off [Ssg] that's used to generate a site right away.
 func Generate(src, dst, title, url string, opts ...Option) error {
 	s := New(src, dst, title, url)
@@ -446,8 +436,23 @@ func (s *Ssg) pront(l int) {
 	fmt.Fprintf(os.Stdout, "[ssg-go] wrote %d file(s) to %s\n", l, s.Dst)
 }
 
+type ignorer interface {
+	ignore(path string) bool
+}
+
 type ignorerGitignore struct {
 	*ignore.GitIgnore
+}
+
+func (i *ignorerGitignore) ignore(path string) bool {
+	if i == nil {
+		return false
+	}
+	if i.GitIgnore == nil {
+		return false
+	}
+
+	return i.MatchesPath(path)
 }
 
 func prepare(src, dst string) (*ignorerGitignore, error) {
@@ -508,33 +513,6 @@ func shouldIgnore(ignores ignorer, path, base string, d fs.DirEntry) (bool, erro
 	return false, nil
 }
 
-func Output(target string, data []byte, perm fs.FileMode) OutputFile {
-	return OutputFile{
-		target: target,
-		data:   data,
-		perm:   perm,
-	}
-}
-
-func (o *OutputFile) modeOutput() fs.FileMode {
-	if o.perm == fs.FileMode(0) {
-		return fs.ModePerm
-	}
-
-	return o.perm
-}
-
-func (i *ignorerGitignore) ignore(path string) bool {
-	if i == nil {
-		return false
-	}
-	if i.GitIgnore == nil {
-		return false
-	}
-
-	return i.MatchesPath(path)
-}
-
 // MirrorPath mirrors the target HTML file path under src to under dist
 //
 // i.e. if src="foo/src" and dst="foo/dist",
@@ -560,6 +538,28 @@ func MirrorPath(
 	}
 
 	return filepath.Join(dst, path), nil
+}
+
+type OutputFile struct {
+	target string
+	data   []byte
+	perm   fs.FileMode
+}
+
+func Output(target string, data []byte, perm fs.FileMode) OutputFile {
+	return OutputFile{
+		target: target,
+		data:   data,
+		perm:   perm,
+	}
+}
+
+func (o *OutputFile) modeOutput() fs.FileMode {
+	if o.perm == fs.FileMode(0) {
+		return fs.ModePerm
+	}
+
+	return o.perm
 }
 
 type writeError struct {
