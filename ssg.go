@@ -236,6 +236,23 @@ func (s *Ssg) WriteOut() error {
 	return nil
 }
 
+// build walks the src directory, and converts Markdown into HTML,
+// returning the results as []write.
+//
+// build also caches the result in s for [WriteOut] later.
+func (s *Ssg) build() ([]OutputFile, error) {
+	err := filepath.WalkDir(s.Src, s.walkScan)
+	if err != nil {
+		return nil, err
+	}
+	err = filepath.WalkDir(s.Src, s.walkBuild)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.dist, nil
+}
+
 func (s *Ssg) buildV2() ([]OutputFile, error) {
 	err := filepath.WalkDir(s.Src, s.walkBuildV2)
 	if err != nil {
@@ -250,7 +267,6 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 		return err
 	}
 	if d.IsDir() {
-		fmt.Println("collecting", path)
 		return s.collect(path)
 	}
 
@@ -333,23 +349,6 @@ func (s *Ssg) collect(path string) error {
 	}
 
 	return nil
-}
-
-// build walks the src directory, and converts Markdown into HTML,
-// returning the results as []write.
-//
-// build also caches the result in s for [WriteOut] later.
-func (s *Ssg) build() ([]OutputFile, error) {
-	err := filepath.WalkDir(s.Src, s.walkScan)
-	if err != nil {
-		return nil, err
-	}
-	err = filepath.WalkDir(s.Src, s.walkBuild)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.dist, nil
 }
 
 // walkScan scans the source directory for header and footer files,
