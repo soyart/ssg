@@ -42,13 +42,13 @@ func ParallelWritesEnv() Option {
 // GetEnvParallelWrites returns ENV value for parallel writes,
 // or default value if illgal or undefined
 func GetEnvParallelWrites() int {
-	writesEnv := os.Getenv(parallelWritesEnvKey)
+	writesEnv := os.Getenv(ParallelWritesEnvKey)
 	writes, err := strconv.ParseUint(writesEnv, 10, 32)
 	if err == nil && writes != 0 {
 		return int(writes)
 	}
 
-	return parallelWritesDefault
+	return ParallelWritesDefault
 }
 
 // WithHookAll will make [Ssg] call f(path, fileContent)

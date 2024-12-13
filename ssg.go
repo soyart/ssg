@@ -25,7 +25,7 @@ const (
 		parser.Mmark |
 		parser.AutoHeadingIDs
 
-	headerDefault = `<!DOCTYPE html>
+	HeaderDefault = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -34,12 +34,12 @@ const (
 <body>
 `
 
-	footerDefault = `</body>
+	FooterDefault = `</body>
 </html>
 `
 
-	parallelWritesEnvKey      = "SSG_PARALLEL_WRITES"
-	parallelWritesDefault int = 20
+	ParallelWritesEnvKey      = "SSG_PARALLEL_WRITES"
+	ParallelWritesDefault int = 20
 )
 
 type Ssg struct {
@@ -79,8 +79,8 @@ func New(src, dst, title, url string) Ssg {
 		Url:        url,
 		ssgignores: ignores,
 		preferred:  make(Set),
-		headers:    newHeaders(headerDefault),
-		footers:    newFooters(footerDefault),
+		headers:    newHeaders(HeaderDefault),
+		footers:    newFooters(FooterDefault),
 	}
 }
 
@@ -236,23 +236,6 @@ func (s *Ssg) WriteOut() error {
 	return nil
 }
 
-// build walks the src directory, and converts Markdown into HTML,
-// returning the results as []write.
-//
-// build also caches the result in s for [WriteOut] later.
-func (s *Ssg) build() ([]OutputFile, error) {
-	err := filepath.WalkDir(s.Src, s.walkScan)
-	if err != nil {
-		return nil, err
-	}
-	err = filepath.WalkDir(s.Src, s.walkBuild)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.dist, nil
-}
-
 func (s *Ssg) buildV2() ([]OutputFile, error) {
 	err := filepath.WalkDir(s.Src, s.walkBuildV2)
 	if err != nil {
@@ -349,98 +332,6 @@ func (s *Ssg) collect(path string) error {
 	}
 
 	return nil
-}
-
-// walkScan scans the source directory for header and footer files,
-// and anything required to build a page.
-func (s *Ssg) walkScan(path string, d fs.DirEntry, err error) error {
-	if err != nil {
-		return err
-	}
-
-	base := filepath.Base(path)
-	ignore, err := shouldIgnore(s.ssgignores, path, base, d)
-	if err != nil {
-		return err
-	}
-	if ignore {
-		return nil
-	}
-
-	// Collect cascading headers and footers
-	switch base {
-	case MarkerHeader:
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-
-		err = s.headers.add(filepath.Dir(path), header{
-			Buffer:    bytes.NewBuffer(data),
-			titleFrom: GetTitleFrom(data),
-		})
-		if err != nil {
-			return err
-		}
-
-		return nil
-
-	case MarkerFooter:
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		err = s.footers.add(filepath.Dir(path), bytes.NewBuffer(data))
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	if filepath.Ext(base) != ".html" {
-		return nil
-	}
-	if s.preferred.Insert(path) {
-		return fmt.Errorf("duplicate html file %s", path)
-	}
-
-	return nil
-}
-
-// walkBuild finds and converts Markdown files to HTML,
-// and assembles it with header and footer.
-func (s *Ssg) walkBuild(path string, d fs.DirEntry, err error) error {
-	if err != nil {
-		return err
-	}
-
-	base := filepath.Base(path)
-	ignore, err := shouldIgnore(s.ssgignores, path, base, d)
-	if err != nil {
-		return err
-	}
-	if ignore {
-		return nil
-	}
-
-	switch base {
-	case
-		MarkerHeader,
-		MarkerFooter:
-		return nil
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-
-	if s.impl != nil {
-		return s.impl(path, data, d)
-	}
-
-	return s.implDefault(path, data, d)
 }
 
 func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
@@ -664,7 +555,7 @@ func (w writeError) Error() string {
 // WriteOut blocks and writes concurrently to output locations.
 func WriteOut(writes []OutputFile, parallelWrites int) error {
 	if parallelWrites == 0 {
-		parallelWrites = parallelWritesDefault
+		parallelWrites = ParallelWritesDefault
 	}
 
 	wg := new(sync.WaitGroup)
