@@ -111,7 +111,6 @@ func WriteOutStreaming(c <-chan OutputFile, parallelWrites int) ([]string, error
 				}
 				return
 			}
-
 			err = os.WriteFile(w.target, w.data, w.modeOutput())
 			if err != nil {
 				errs <- writeError{

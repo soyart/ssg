@@ -61,9 +61,7 @@ type Ssg struct {
 // Generate creates a one-off [Ssg] that's used to generate a site right away.
 func Generate(src, dst, title, url string, opts ...Option) error {
 	s := New(src, dst, title, url)
-	return s.
-		With(opts...).
-		Generate()
+	return s.With(opts...).Generate()
 }
 
 // New returns a default, vanilla [Ssg].
@@ -72,7 +70,6 @@ func New(src, dst, title, url string) Ssg {
 	if err != nil {
 		panic(err)
 	}
-
 	return Ssg{
 		Src:        src,
 		Dst:        dst,
@@ -91,20 +88,19 @@ func ToHtml(md []byte) []byte {
 	renderer := html.NewRenderer(html.RendererOptions{
 		Flags: HtmlFlags,
 	})
-
 	return markdown.Render(root, renderer)
 }
 
 func Sitemap(
 	dst string,
 	url string,
-	date time.Time,
+	modTime time.Time,
 	outputs []OutputFile,
 ) (
 	string,
 	error,
 ) {
-	dateStr := date.Format(time.DateOnly)
+	dateStr := modTime.Format(time.DateOnly)
 	sm := bytes.NewBufferString(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset
 xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance"
@@ -155,7 +151,6 @@ func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 		}
 		return
 	}
-
 	s.dist = append(s.dist, outputs...)
 }
 
@@ -248,7 +243,6 @@ func (s *Ssg) WriteOut() error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -341,7 +335,6 @@ func (s *Ssg) collect(path string) error {
 			if err != nil {
 				return err
 			}
-
 			continue
 
 		case MarkerFooter:
@@ -353,7 +346,6 @@ func (s *Ssg) collect(path string) error {
 			if err != nil {
 				return err
 			}
-
 			continue
 		}
 
@@ -575,7 +567,6 @@ func (o *OutputFile) modeOutput() fs.FileMode {
 	if o.perm == fs.FileMode(0) {
 		return fs.ModePerm
 	}
-
 	return o.perm
 }
 

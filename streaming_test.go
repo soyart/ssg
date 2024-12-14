@@ -8,12 +8,12 @@ import (
 	"testing"
 )
 
-// TestStreaming tests that all files are
-// properly flushed to destination when streaming
+// TestStreaming tests that all files are properly flushed to destination when streaming,
+// and that all outputs are identical
 func TestStreaming(t *testing.T) {
 	root := "./soyweb/testdata/johndoe.com"
 	src := filepath.Join(root, "/src")
-	dst := filepath.Join(root, "/dstNoStreaming")
+	dst := filepath.Join(root, "/dst")
 	dstStreaming := filepath.Join(root, "/dstStreaming")
 	title := "JohnDoe.com"
 	url := "https://johndoe.com"
@@ -27,21 +27,18 @@ func TestStreaming(t *testing.T) {
 		panic(err)
 	}
 
-	s := New(src, dst, title, url)
-	streaming := New(src, dstStreaming, title, url)
-	streaming.With(Streaming())
-
-	err = s.Generate()
+	// Generate without streaming
+	err = Generate(src, dst, title, url)
 	if err != nil {
 		panic(err)
 	}
-
-	err = streaming.Generate()
+	// Generate with streaming
+	err = Generate(src, dst, title, url, Streaming())
 	if err != nil {
 		t.Fatalf("error generating with streaming: %v", err)
 	}
 
-	filepath.WalkDir(s.Dst, func(path string, d fs.DirEntry, err error) error {
+	filepath.WalkDir(dst, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -50,7 +47,7 @@ func TestStreaming(t *testing.T) {
 			panic(err)
 		}
 
-		pathStreaming := filepath.Join(streaming.Dst, rel)
+		pathStreaming := filepath.Join(dstStreaming, rel)
 
 		if d.IsDir() {
 			entries, err := os.ReadDir(path)
