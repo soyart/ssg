@@ -97,7 +97,7 @@ func genIndex(
 			recurse := false
 			for j := range grandChildren {
 				name := grandChildren[j].Name()
-				if name == "_index.ssg" {
+				if name == MarkerIndex {
 					index = "index.html"
 					recurse = true
 					break
