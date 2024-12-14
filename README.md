@@ -3,7 +3,6 @@
 > This repository also hosts [soyweb](./soyweb/),
 > an ssg wrapper and replacement for [webtools](https://github.com/soyart/webtools)
 
-
 This Nix Flake provides 2 implementations of ssg.
 
 - POSIX shell ssg
@@ -32,8 +31,8 @@ This Nix Flake provides 2 implementations of ssg.
 
 ## Build from Nix flake
 
-```
-nix build # Build default package - pure POSIX shell ssg
+```sh
+nix build          # Build default package - pure POSIX shell ssg
 nix build .#impure # Build directly from ssg.sh
 nix build .#ssg-go # Build Go implementation of ssg
 nix build .#soyweb # Build soyweb programs
@@ -185,10 +184,10 @@ Then:
 
 ### Concurrent writes and environment variable
 
-ssg-go allows users to configure concurrent write goroutines (green threads).
+ssg-go allows users to configure concurrent writer goroutines (green threads).
 
-ssg-go by default writes 20 files concurrently. This concurrent threads can
-be configured by setting env `SSG_PARALLEL_WRITES` to a non-zero positive integer.
+ssg-go, by default, writes out to 20 files concurrently. The number of concurrent
+threads are configured by setting env `SSG_PARALLEL_WRITES` to a non-zero positive integer.
 
 If the env value is illegal, ssg-go falls back to 20 concurrent write threads.
 
@@ -200,7 +199,7 @@ SSG_PARALLEL_WRITES=1 ssg mySrc myDst myTitle myUrl
 
 # Extending ssg-go
 
-ssg-go defines its API via `Option` for extending its usefulness.
+Go programmers can extend ssg-go via its `Option` type.
 
-[soyweb](./soyweb/) extends ssg via `Option`, and provide extra functionality
-such as index generator and minifiers.
+[soyweb](./soyweb/) extends ssg via `Option`,
+and provide extra functionality such as index generator and minifiers.

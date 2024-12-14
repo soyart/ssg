@@ -23,10 +23,10 @@ type (
 	Impl func(path string, data []byte, d fs.DirEntry) error
 
 	options struct {
-		hookAll      HookAll
-		hookGenerate HookGenerate
-		streaming
+		hookAll        HookAll
+		hookGenerate   HookGenerate
 		impl           Impl
+		streaming      streaming
 		parallelWrites int
 	}
 )

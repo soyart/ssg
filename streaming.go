@@ -1,7 +1,6 @@
 package ssg
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -26,13 +25,13 @@ func (s *Ssg) generateStreaming() error {
 
 	var wg sync.WaitGroup
 
-	var errGen error
+	var errBuild error
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		dist, err := s.buildV2()
 		if err != nil {
-			errGen = err
+			errBuild = err
 		}
 		if len(dist) != 0 {
 			panic("dist is not empty")
@@ -57,11 +56,14 @@ func (s *Ssg) generateStreaming() error {
 
 	wg.Wait()
 
-	if errGen != nil {
-		return errGen
+	if errBuild != nil && errWrites != nil {
+		return fmt.Errorf("streaming_build_error='%w' streaming_write_error='%s'", errBuild, errWrites)
+	}
+	if errBuild != nil {
+		return fmt.Errorf("streaming_build_error: %w", errBuild)
 	}
 	if errWrites != nil {
-		return errWrites
+		return fmt.Errorf("streaming_write_error: %w", errWrites)
 	}
 
 	outputs := make([]OutputFile, len(dist))
@@ -69,22 +71,9 @@ func (s *Ssg) generateStreaming() error {
 		outputs[i] = Output(dist[i], nil, 0)
 	}
 
-	s.dist = outputs
-	sitemap, err := Sitemap(s.Dst, s.Url, stat.ModTime(), s.dist)
+	err = WriteExtraFiles(s.Url, s.Dst, outputs, stat.ModTime())
 	if err != nil {
 		return err
-	}
-	err = os.WriteFile(filepath.Join(s.Dst, "sitemap.xml"), []byte(sitemap), 0644)
-	if err != nil {
-		return err
-	}
-
-	files := bytes.NewBuffer(nil)
-	writeDotFiles(s.Dst, s.dist, files)
-	dotfiles := filepath.Join(s.Dst, ".files")
-	err = os.WriteFile(dotfiles, files.Bytes(), 0644)
-	if err != nil {
-		return fmt.Errorf("error writing %s: %w", dotfiles, err)
 	}
 
 	return nil

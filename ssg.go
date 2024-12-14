@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -113,11 +112,6 @@ xsi:schemaLocation="https://www.sitemaps.org/schemas/sitemap/0.9
 https://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
 xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
 `)
-
-	sort.Slice(outputs, func(i, j int) bool {
-		return outputs[i].target < outputs[j].target
-	})
-
 	for i := range outputs {
 		o := &outputs[i]
 		target, err := filepath.Rel(dst, o.target)
@@ -195,21 +189,39 @@ func (s *Ssg) generate() error {
 	if err != nil {
 		return err
 	}
-	if s.Url == "" {
-		s.pront(len(dist))
-		return nil
-	}
-
-	sitemap, err := Sitemap(s.Dst, s.Url, stat.ModTime(), s.dist)
-	if err != nil {
-		return err
-	}
-	err = os.WriteFile(s.Dst+"/sitemap.xml", []byte(sitemap), 0644)
+	err = WriteExtraFiles(s.Url, s.Dst, dist, stat.ModTime())
 	if err != nil {
 		return err
 	}
 
-	s.pront(len(dist) + 1)
+	s.pront(len(dist) + 2)
+	return nil
+}
+
+func WriteExtraFiles(url, dst string, dist []OutputFile, srcModTime time.Time) error {
+	sort.Slice(dist, func(i, j int) bool {
+		return dist[i].target < dist[j].target
+	})
+
+	dotFiles, err := DotFiles(dst, dist)
+	if err != nil {
+		return err
+	}
+	sitemap, err := Sitemap(dst, url, srcModTime, dist)
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(filepath.Join(dst, "sitemap.xml"), []byte(sitemap), 0644)
+	if err != nil {
+		return err
+	}
+	target := filepath.Join(dst, ".files")
+	err = os.WriteFile(target, []byte(dotFiles), 0644)
+	if err != nil {
+		return fmt.Errorf("error writing %s: %w", target, err)
+	}
+
 	return nil
 }
 
@@ -231,25 +243,16 @@ func (s *Ssg) WriteOut() error {
 		return err
 	}
 
-	files := bytes.NewBuffer(nil)
-	writeDotFiles(s.Dst, s.dist, files)
-
-	target := filepath.Join(s.Dst, ".files")
-	err = os.WriteFile(target, files.Bytes(), 0644)
-	if err != nil {
-		return fmt.Errorf("error writing %s: %w", target, err)
-	}
-
 	return nil
 }
 
-func writeDotFiles(dst string, dist []OutputFile, list io.Writer) error {
-	sorted := make([]string, len(dist))
+func DotFiles(dst string, dist []OutputFile) (string, error) {
+	list := bytes.NewBuffer(nil)
 	for i := range dist {
 		f := &dist[i]
 		path, err := filepath.Rel(dst, f.target)
 		if err != nil {
-			return err
+			return "", err
 		}
 		// Replace Markdown extension
 		if filepath.Ext(path) == ".html" {
@@ -257,18 +260,10 @@ func writeDotFiles(dst string, dist []OutputFile, list io.Writer) error {
 			path += ".md"
 		}
 
-		sorted[i] = path
+		fmt.Fprintf(list, "./%s\n", path)
 	}
 
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i] < sorted[j]
-	})
-
-	for i := range sorted {
-		fmt.Fprintf(list, "./%s\n", sorted[i])
-	}
-
-	return nil
+	return list.String(), nil
 }
 
 func (s *Ssg) buildV2() ([]OutputFile, error) {
