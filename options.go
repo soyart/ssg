@@ -58,6 +58,12 @@ func Streaming() Option {
 	}
 }
 
+func ParallelWrites(u uint) Option {
+	return func(s *Ssg) {
+		s.parallelWrites = int(u)
+	}
+}
+
 // WithHookAll will make [Ssg] call f(path, fileContent)
 // on every unignored files.
 func WithHookAll(f HookAll) Option {

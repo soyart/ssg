@@ -28,12 +28,17 @@ func TestStreaming(t *testing.T) {
 	}
 
 	// Generate without streaming
-	err = Generate(src, dst, title, url)
+	err = Generate(src, dst, title, url,
+		ParallelWrites(uint(ParallelWritesDefault)),
+	)
 	if err != nil {
 		panic(err)
 	}
 	// Generate with streaming
-	err = Generate(src, dst, title, url, Streaming())
+	err = Generate(src, dstStreaming, title, url,
+		ParallelWrites(uint(ParallelWritesDefault)),
+		Streaming(),
+	)
 	if err != nil {
 		t.Fatalf("error generating with streaming: %v", err)
 	}
