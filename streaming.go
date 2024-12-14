@@ -18,14 +18,13 @@ func (s *Ssg) generateStreaming() error {
 		panic("streaming not enabled")
 	}
 
-	s.streaming.c = make(chan OutputFile)
-
 	stat, err := os.Stat(s.Src)
 	if err != nil {
 		return fmt.Errorf("failed to stat src '%s': %w", s.Src, err)
 	}
 
 	var wg sync.WaitGroup
+	s.streaming.c = make(chan OutputFile, s.parallelWrites*2)
 
 	var errBuild error
 	wg.Add(1)
