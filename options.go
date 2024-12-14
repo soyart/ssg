@@ -52,9 +52,9 @@ func GetEnvParallelWrites() int {
 	return ParallelWritesDefault
 }
 
-func WriteStreaming() Option {
+func Streaming() Option {
 	return func(s *Ssg) {
-		s.streaming.c = make(chan OutputFile)
+		s.streaming.enabled = true
 	}
 }
 

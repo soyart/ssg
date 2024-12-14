@@ -18,7 +18,7 @@ func main() {
 	s := ssg.New(src, dst, title, url)
 	s.With(
 		ssg.ParallelWritesEnv(),
-		ssg.WriteStreaming(),
+		ssg.Streaming(),
 	)
 
 	err := s.Generate()

@@ -167,16 +167,22 @@ func (s *Ssg) With(opts ...Option) *Ssg {
 }
 
 func (s *Ssg) Generate() error {
-	if s.streaming.c != nil {
+	if s.streaming.enabled {
 		return s.generateStreaming()
 	}
 	return s.generate()
 }
 
 func (s *Ssg) generate() error {
+	if s.streaming.enabled {
+		panic("streaming is enabled")
+	}
+	if s.streaming.c != nil {
+		panic("streaming channel is not nil")
+	}
+
 	// Reset
 	s.dist = nil
-
 	stat, err := os.Stat(s.Src)
 	if err != nil {
 		return err

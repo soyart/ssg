@@ -10,13 +10,15 @@ import (
 
 type streaming struct {
 	c       chan OutputFile
-	outputs []string
+	enabled bool
 }
 
 func (s *Ssg) generateStreaming() error {
-	if s.streaming.c == nil {
-		panic("nil streaming channel")
+	if !s.streaming.enabled {
+		panic("streaming not enabled")
 	}
+
+	s.streaming.c = make(chan OutputFile)
 
 	stat, err := os.Stat(s.Src)
 	if err != nil {
@@ -76,9 +78,11 @@ func (s *Ssg) generateStreaming() error {
 		return err
 	}
 
+	s.pront(len(dist) + 2)
 	return nil
 }
 
+// WriteOutStreaming blocks and concurrently writes outputs from c until c is closed.
 func WriteOutStreaming(c <-chan OutputFile, parallelWrites int) ([]string, error) {
 	if parallelWrites == 0 {
 		parallelWrites = ParallelWritesDefault

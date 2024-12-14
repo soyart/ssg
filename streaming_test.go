@@ -29,7 +29,7 @@ func TestStreaming(t *testing.T) {
 
 	s := New(src, dst, title, url)
 	streaming := New(src, dstStreaming, title, url)
-	streaming.With(WriteStreaming())
+	streaming.With(Streaming())
 
 	err = s.Generate()
 	if err != nil {
