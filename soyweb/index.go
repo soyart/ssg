@@ -98,7 +98,6 @@ func genIndex(
 			for j := range grandChildren {
 				name := grandChildren[j].Name()
 				if name == MarkerIndex {
-					index = "index.html"
 					recurse = true
 					break
 				}
@@ -108,14 +107,13 @@ func genIndex(
 				}
 			}
 
-			// No index
-			if index == "" {
-				continue
-			}
-
 			// Use dir as childTitle
 			if recurse {
-				break // switch
+				break // break switch
+			}
+			// No index in child, won't build index line
+			if index == "" {
+				continue
 			}
 
 			titleFromDoc, err := extractChildTitle(filepath.Join(childDir, index))

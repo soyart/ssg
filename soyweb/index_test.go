@@ -29,7 +29,12 @@ func TestGenerateIndex(t *testing.T) {
 		},
 		"2023/_index.soyweb": {
 			`<li><p><a href="/2023/baz.html">Bazketball</a></p></li>`,
+			`<li><p><a href="/2023/recurse/">recurse</a></p></li>`,
 			`<li><p><a href="/2023/lol/">LOLOLOL</a></p></li>`,
+		},
+		"2023/recurse/_index.soyweb": {
+			"<li><p><a href=\"/2023/recurse/r1/\">Recursive 1</a></p></li>",
+			"<li><p><a href=\"/2023/recurse/r2/\">Recursive 2</a></p></li>",
 		},
 	}
 
