@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"syscall"
 
@@ -10,7 +9,7 @@ import (
 
 func main() {
 	if len(os.Args) < 5 {
-		fmt.Fprint(os.Stdout, "usage: ssg src dst title base_url\n")
+		ssg.Fprint(os.Stdout, "usage: ssg src dst title base_url\n")
 		syscall.Exit(1)
 	}
 
@@ -21,7 +20,7 @@ func main() {
 		ssg.Streaming(),
 	)
 	if err != nil {
-		fmt.Fprintln(os.Stdout, "error with", "src", src, "dst", dst, "title", title, "url", url)
+		ssg.Fprintln(os.Stdout, "error with", "src", src, "dst", dst, "title", title, "url", url)
 		panic(err)
 	}
 }

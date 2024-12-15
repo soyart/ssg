@@ -27,7 +27,7 @@ func indexGenerator(src string, next ssg.Impl) ssg.Impl {
 		}
 
 		parent := filepath.Dir(path)
-		fmt.Fprintf(os.Stdout, "found blog marker: marker=\"%s\", parent=\"%s\"\n", path, parent)
+		ssg.Fprintf(os.Stdout, "found blog marker: marker=\"%s\", parent=\"%s\"\n", path, parent)
 
 		entries, err := os.ReadDir(parent)
 		if err != nil {
@@ -149,13 +149,13 @@ func genIndex(
 			linkPath += "/"
 		}
 
-		fmt.Fprintf(content, "- [%s](/%s)\n\n", childTitle, linkPath)
+		ssg.Fprintf(content, "- [%s](/%s)\n\n", childTitle, linkPath)
 	}
 
-	fmt.Fprintln(os.Stdout, "Generated Markdown index for directory", parent)
-	fmt.Fprint(os.Stdout, "======= START =======\n")
-	fmt.Fprintln(os.Stdout, content.String())
-	fmt.Fprint(os.Stdout, "======== END ========\n")
+	ssg.Fprintln(os.Stdout, "Generated Markdown index for directory", parent)
+	ssg.Fprint(os.Stdout, "======= START =======\n")
+	ssg.Fprintln(os.Stdout, content.String())
+	ssg.Fprint(os.Stdout, "======== END ========\n")
 
 	return content.String(), nil
 }

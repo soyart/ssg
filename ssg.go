@@ -115,7 +115,7 @@ xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
 			return sm.String(), err
 		}
 
-		fmt.Fprintf(sm, "<url><loc>%s/", url)
+		Fprintf(sm, "<url><loc>%s/", url)
 
 		/* There're 2 possibilities for this
 		1. First is when the HTML is some/path/index.html
@@ -130,14 +130,14 @@ xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
 		case "index.html":
 			d := filepath.Dir(target)
 			if d != "." {
-				fmt.Fprintf(sm, "%s/", d)
+				Fprintf(sm, "%s/", d)
 			}
 
 		default:
 			sm.WriteString(target)
 		}
 
-		fmt.Fprintf(sm, "><lastmod>%s</lastmod><priority>1.0</priority></url>\n", dateStr)
+		Fprintf(sm, "><lastmod>%s</lastmod><priority>1.0</priority></url>\n", dateStr)
 	}
 
 	sm.WriteString("</urlset>\n")
@@ -260,7 +260,7 @@ func DotFiles(dst string, dist []OutputFile) (string, error) {
 			path += ".md"
 		}
 
-		fmt.Fprintf(list, "./%s\n", path)
+		Fprintf(list, "./%s\n", path)
 	}
 
 	return list.String(), nil
@@ -442,7 +442,7 @@ func (s *Ssg) ImplDefault() Impl {
 }
 
 func (s *Ssg) pront(l int) {
-	fmt.Fprintf(os.Stdout, "[ssg-go] wrote %d file(s) to %s\n", l, s.Dst)
+	Fprintf(os.Stdout, "[ssg-go] wrote %d file(s) to %s\n", l, s.Dst)
 }
 
 type ignorer interface {
@@ -616,7 +616,7 @@ func WriteOut(writes []OutputFile, parallelWrites int) error {
 				return
 			}
 
-			fmt.Fprintln(os.Stdout, w.target)
+			Fprintln(os.Stdout, w.target)
 		}(&writes[i], wg)
 	}
 

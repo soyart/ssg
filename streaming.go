@@ -123,7 +123,7 @@ func WriteOutStreaming(c <-chan OutputFile, parallelWrites int) ([]string, error
 			mut.Lock()
 			defer mut.Unlock()
 			written = append(written, w.target)
-			fmt.Fprintln(os.Stdout, w.target)
+			Fprintln(os.Stdout, w.target)
 
 		}(&o, wg)
 	}

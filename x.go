@@ -3,6 +3,7 @@ package ssg
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"strings"
@@ -51,6 +52,27 @@ func (s Set) ContainsAll(items ...string) bool {
 	}
 
 	return true
+}
+
+func Fprint(w io.Writer, data ...interface{}) {
+	_, err := fmt.Fprint(w, data...)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func Fprintf(w io.Writer, format string, data ...interface{}) {
+	_, err := fmt.Fprintf(w, format, data...)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func Fprintln(w io.Writer, data ...interface{}) {
+	_, err := fmt.Fprintln(w, data...)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func newHeaders(defaultHeader string) headers {
