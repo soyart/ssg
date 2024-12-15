@@ -388,6 +388,7 @@ func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
 		return nil
 	}
 
+	// Make way for existing (preferred) html file with matching base name
 	html := strings.TrimSuffix(path, ".md")
 	html += ".html"
 	if s.preferred.ContainsAll(html) {
@@ -402,9 +403,10 @@ func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
 	header := s.headers.choose(path)
 	footer := s.footers.choose(path)
 
-	// Copy header as string,
-	// so the underlying bytes.Buffer is unchanged and ready for the next file
-	headerText := []byte(header.String()) //nolint:gosimple
+	// Copy, leave the underlying data in header unchanged
+	headerText := make([]byte, header.Len())
+	copy(headerText, header.Bytes())
+
 	switch header.titleFrom {
 	case TitleFromH1:
 		headerText = AddTitleFromH1([]byte(s.Title), headerText, data)
