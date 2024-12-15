@@ -20,20 +20,19 @@ import (
 func indexGenerator(src string, next ssg.Impl) ssg.Impl {
 	return func(path string, data []byte, d fs.DirEntry) error {
 		switch {
-		case d.IsDir(),
+		case
+			d.IsDir(),
 			filepath.Base(path) != MarkerIndex:
-
 			return next(path, data, d)
 		}
 
 		parent := filepath.Dir(path)
 		fmt.Fprintf(os.Stdout, "found blog marker: marker=\"%s\", parent=\"%s\"\n", path, parent)
 
-		entries, err := os.ReadDir(filepath.Dir(path))
+		entries, err := os.ReadDir(parent)
 		if err != nil {
 			return fmt.Errorf("failed to read marker dir '%s': %w", path, err)
 		}
-
 		template, err := os.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("failed to read marker '%s': %w", path, err)
@@ -166,11 +165,9 @@ func extractChildTitle(path string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read article file %s for title extraction: %w", path, err)
 	}
-
 	title := ssg.GetTitleFromTag(data)
 	if len(title) == 0 {
 		title = ssg.GetTitleFromH1(data)
 	}
-
 	return title, nil
 }
