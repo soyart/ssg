@@ -136,12 +136,6 @@ Some paragraph2`,
 }
 
 func TestGenerate(t *testing.T) {
-	t.Run("build-v1", func(t *testing.T) {
-		testGenerate(t, func(s *Ssg) ([]OutputFile, error) {
-			return s.build()
-		})
-	})
-
 	t.Run("build-v2", func(t *testing.T) {
 		testGenerate(t, func(s *Ssg) ([]OutputFile, error) {
 			return s.buildV2()

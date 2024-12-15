@@ -39,7 +39,6 @@ func FileIs(f os.FileInfo, mode fs.FileMode) bool {
 func (s Set) Insert(v string) bool {
 	_, ok := s[v]
 	s[v] = struct{}{}
-
 	return ok
 }
 
@@ -50,7 +49,6 @@ func (s Set) ContainsAll(items ...string) bool {
 			return false
 		}
 	}
-
 	return true
 }
 
@@ -117,7 +115,6 @@ func choose[T any](path string, valueDefault T, m map[string]T) T {
 	if ok {
 		return chosen
 	}
-
 	parts := strings.Split(path, "/")
 	chosen, max := valueDefault, 0
 
@@ -128,7 +125,6 @@ outer:
 			if i >= len(prefixes) {
 				break
 			}
-
 			if parts[i] != prefixes[i] {
 				continue outer
 			}
