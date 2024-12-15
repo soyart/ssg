@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -14,7 +15,7 @@ import (
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
 	"github.com/gomarkdown/markdown/parser"
-	"github.com/sabhiram/go-gitignore"
+	ignore "github.com/sabhiram/go-gitignore"
 )
 
 const (
@@ -60,9 +61,7 @@ type Ssg struct {
 // Generate creates a one-off [Ssg] that's used to generate a site right away.
 func Generate(src, dst, title, url string, opts ...Option) error {
 	s := New(src, dst, title, url)
-	return s.
-		With(opts...).
-		Generate()
+	return s.With(opts...).Generate()
 }
 
 // New returns a default, vanilla [Ssg].
@@ -71,7 +70,6 @@ func New(src, dst, title, url string) Ssg {
 	if err != nil {
 		panic(err)
 	}
-
 	return Ssg{
 		Src:        src,
 		Dst:        dst,
@@ -90,20 +88,19 @@ func ToHtml(md []byte) []byte {
 	renderer := html.NewRenderer(html.RendererOptions{
 		Flags: HtmlFlags,
 	})
-
 	return markdown.Render(root, renderer)
 }
 
 func Sitemap(
 	dst string,
 	url string,
-	date time.Time,
+	modTime time.Time,
 	outputs []OutputFile,
 ) (
 	string,
 	error,
 ) {
-	dateStr := date.Format(time.DateOnly)
+	dateStr := modTime.Format(time.DateOnly)
 	sm := bytes.NewBufferString(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset
 xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance"
@@ -111,7 +108,6 @@ xsi:schemaLocation="https://www.sitemaps.org/schemas/sitemap/0.9
 https://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
 xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
 `)
-
 	for i := range outputs {
 		o := &outputs[i]
 		target, err := filepath.Rel(dst, o.target)
@@ -149,6 +145,12 @@ xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
 }
 
 func (s *Ssg) AddOutputs(outputs ...OutputFile) {
+	if s.streaming.c != nil {
+		for i := range outputs {
+			s.streaming.c <- outputs[i]
+		}
+		return
+	}
 	s.dist = append(s.dist, outputs...)
 }
 
@@ -160,9 +162,22 @@ func (s *Ssg) With(opts ...Option) *Ssg {
 }
 
 func (s *Ssg) Generate() error {
+	if s.streaming.enabled {
+		return s.generateStreaming()
+	}
+	return s.generate()
+}
+
+func (s *Ssg) generate() error {
+	if s.streaming.enabled {
+		panic("streaming is enabled")
+	}
+	if s.streaming.c != nil {
+		panic("streaming channel is not nil")
+	}
+
 	// Reset
 	s.dist = nil
-
 	stat, err := os.Stat(s.Src)
 	if err != nil {
 		return err
@@ -175,21 +190,39 @@ func (s *Ssg) Generate() error {
 	if err != nil {
 		return err
 	}
-	if s.Url == "" {
-		s.pront(len(dist))
-		return nil
-	}
-
-	sitemap, err := Sitemap(s.Dst, s.Url, stat.ModTime(), s.dist)
-	if err != nil {
-		return err
-	}
-	err = os.WriteFile(s.Dst+"/sitemap.xml", []byte(sitemap), 0644)
+	err = WriteExtraFiles(s.Url, s.Dst, dist, stat.ModTime())
 	if err != nil {
 		return err
 	}
 
-	s.pront(len(dist) + 1)
+	s.pront(len(dist) + 2)
+	return nil
+}
+
+func WriteExtraFiles(url, dst string, dist []OutputFile, srcModTime time.Time) error {
+	sort.Slice(dist, func(i, j int) bool {
+		return dist[i].target < dist[j].target
+	})
+
+	dotFiles, err := DotFiles(dst, dist)
+	if err != nil {
+		return err
+	}
+	sitemap, err := Sitemap(dst, url, srcModTime, dist)
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(filepath.Join(dst, "sitemap.xml"), []byte(sitemap), 0644)
+	if err != nil {
+		return err
+	}
+	target := filepath.Join(dst, ".files")
+	err = os.WriteFile(target, []byte(dotFiles), 0644)
+	if err != nil {
+		return fmt.Errorf("error writing %s: %w", target, err)
+	}
+
 	return nil
 }
 
@@ -210,13 +243,16 @@ func (s *Ssg) WriteOut() error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
 
-	files := bytes.NewBuffer(nil)
-	for i := range s.dist {
-		f := &s.dist[i]
-		path, err := filepath.Rel(s.Dst, f.target)
+func DotFiles(dst string, dist []OutputFile) (string, error) {
+	list := bytes.NewBuffer(nil)
+	for i := range dist {
+		f := &dist[i]
+		path, err := filepath.Rel(dst, f.target)
 		if err != nil {
-			return err
+			return "", err
 		}
 		// Replace Markdown extension
 		if filepath.Ext(path) == ".html" {
@@ -224,16 +260,10 @@ func (s *Ssg) WriteOut() error {
 			path += ".md"
 		}
 
-		fmt.Fprintf(files, "./%s\n", path)
+		fmt.Fprintf(list, "./%s\n", path)
 	}
 
-	target := filepath.Join(s.Dst, ".files")
-	err = os.WriteFile(target, files.Bytes(), 0644)
-	if err != nil {
-		return fmt.Errorf("error writing %s: %w", target, err)
-	}
-
-	return nil
+	return list.String(), nil
 }
 
 func (s *Ssg) buildV2() ([]OutputFile, error) {
@@ -305,7 +335,6 @@ func (s *Ssg) collect(path string) error {
 			if err != nil {
 				return err
 			}
-
 			continue
 
 		case MarkerFooter:
@@ -317,7 +346,6 @@ func (s *Ssg) collect(path string) error {
 			if err != nil {
 				return err
 			}
-
 			continue
 		}
 
@@ -539,7 +567,6 @@ func (o *OutputFile) modeOutput() fs.FileMode {
 	if o.perm == fs.FileMode(0) {
 		return fs.ModePerm
 	}
-
 	return o.perm
 }
 

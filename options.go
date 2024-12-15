@@ -26,6 +26,7 @@ type (
 		hookAll        HookAll
 		hookGenerate   HookGenerate
 		impl           Impl
+		streaming      streaming
 		parallelWrites int
 	}
 )
@@ -49,6 +50,18 @@ func GetEnvParallelWrites() int {
 	}
 
 	return ParallelWritesDefault
+}
+
+func Streaming() Option {
+	return func(s *Ssg) {
+		s.streaming.enabled = true
+	}
+}
+
+func ParallelWrites(u uint) Option {
+	return func(s *Ssg) {
+		s.parallelWrites = int(u)
+	}
 }
 
 // WithHookAll will make [Ssg] call f(path, fileContent)
