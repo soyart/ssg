@@ -19,15 +19,15 @@ func TestGenerateIndex(t *testing.T) {
 	}
 
 	markers := map[string][]string{
-		"_index.ssg": {
+		"_index.soyweb": {
 			`<li><p><a href="/2023/">2023</a></p></li>`,
 			`<li><p><a href="/2022/">2022</a></p></li>`,
 		},
-		"2022/_index.ssg": {
+		"2022/_index.soyweb": {
 			`<li><p><a href="/2022/bar/">bar</a></p></li>`,
 			`<li><p><a href="/2022/foo.html">Foo</a></p></li>`,
 		},
-		"2023/_index.ssg": {
+		"2023/_index.soyweb": {
 			`<li><p><a href="/2023/baz.html">Bazketball</a></p></li>`,
 			`<li><p><a href="/2023/lol/">LOLOLOL</a></p></li>`,
 		},

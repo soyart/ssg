@@ -7,12 +7,10 @@ import (
 )
 
 const (
-	MarkerIndex = "_index.ssg"
+	MarkerIndex = "_index.soyweb"
 )
 
-var (
-	ErrNotSupported = errors.New("unsupported web format")
-)
+var ErrNotSupported = errors.New("unsupported web format")
 
 type (
 	MinifyFlags struct {
@@ -34,12 +32,12 @@ type (
 	Flags struct {
 		MinifyFlags
 		NoMinifyFlags
-		GenerateIndex bool `arg:"--gen-index" default:"true" help:"Generate index on _index.ssg"`
+		GenerateIndex bool `arg:"--gen-index" default:"true" help:"Generate index on _index.soyweb"`
 	}
 )
 
 // IndexGenerator returns an option that will make ssg generates
-// index.md/index.html for all unignored _index.ssg marker files.
+// index.md/index.html for all unignored _index.soyweb marker files.
 func IndexGenerator() ssg.Option {
 	return func(s *ssg.Ssg) {
 		g := indexGenerator(s.Src, s.ImplDefault())

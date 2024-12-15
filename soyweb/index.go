@@ -12,7 +12,7 @@ import (
 )
 
 // indexGenerator returns an [ssg.Impl] that would look for
-// marker file "_index.ssg" within a directory.
+// marker file "_index.soyweb" within a directory.
 //
 // Once it finds a marked directory, it inspects the children
 // and generate a Markdown list with name index.md,

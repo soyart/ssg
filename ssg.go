@@ -213,12 +213,12 @@ func WriteExtraFiles(url, dst string, dist []OutputFile, srcModTime time.Time) e
 		return err
 	}
 
-	err = os.WriteFile(filepath.Join(dst, "sitemap.xml"), []byte(sitemap), 0644)
+	err = os.WriteFile(filepath.Join(dst, "sitemap.xml"), []byte(sitemap), 0o644)
 	if err != nil {
 		return err
 	}
 	target := filepath.Join(dst, ".files")
-	err = os.WriteFile(target, []byte(dotFiles), 0644)
+	err = os.WriteFile(target, []byte(dotFiles), 0o644)
 	if err != nil {
 		return fmt.Errorf("error writing %s: %w", target, err)
 	}
@@ -293,9 +293,7 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 	}
 
 	switch base {
-	case
-		MarkerHeader,
-		MarkerFooter:
+	case MarkerHeader, MarkerFooter:
 		return nil
 	}
 
@@ -617,7 +615,6 @@ func WriteOut(writes []OutputFile, parallelWrites int) error {
 			}
 
 			fmt.Fprintln(os.Stdout, w.target)
-
 		}(&writes[i], wg)
 	}
 

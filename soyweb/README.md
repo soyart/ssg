@@ -124,10 +124,10 @@ The minifiers is available to all programs under soyweb.
 ## [Index generator](./index.go)
 
 soyweb provides an [ssg.Impl](/options.go) that will automatically generate indices
-for blog directories. It scans for marker file `_index.ssg`, and, if found,
+for blog directories. It scans for marker file `_index.soyweb`, and, if found,
 lists all links to the children (i.e. "articles").
 
-The marker `_index.ssg` can be empty, or contain template,
+The marker `_index.soyweb` can be empty, or contain template,
 in plaintext, Markdown, or HTML.
 
 To be considered an entry, a path has to be either:
@@ -136,11 +136,11 @@ To be considered an entry, a path has to be either:
 
 - A file with `.md` extension
 
-If the marker `_index.ssg` is empty, a default content header will be written.
+If the marker `_index.soyweb` is empty, a default content header will be written.
 If the marker has some template, then the index list will be appended to the template
 in the output.
 
-The marker `_index.ssg` could be a Markdown, and apart from having its content
+The marker `_index.soyweb` could be a Markdown, and apart from having its content
 appended by the generated index, the file is handled normally like with other
 ssg-go input files.
 
