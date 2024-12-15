@@ -107,4 +107,13 @@ func TestStreaming(t *testing.T) {
 
 		return nil
 	})
+
+	err = os.RemoveAll(dst)
+	if err != nil {
+		panic(err)
+	}
+	err = os.RemoveAll(dstStreaming)
+	if err != nil {
+		panic(err)
+	}
 }
