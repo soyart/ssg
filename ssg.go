@@ -19,13 +19,17 @@ import (
 )
 
 const (
-	MarkerHeader  = "_header.html"
-	MarkerFooter  = "_footer.html"
-	HtmlFlags     = html.CommonFlags
-	SsgExtensions = parser.CommonExtensions |
+	MarkerHeader          = "_header.html"
+	MarkerFooter          = "_footer.html"
+	HtmlFlags             = html.CommonFlags
+	ConcurrencyEnvKey     = "SSG_CONCURRENT"
+	ConcurrentDefault int = 20
+	SsgExtensions         = parser.CommonExtensions |
 		parser.Mmark |
 		parser.AutoHeadingIDs
+)
 
+const (
 	HeaderDefault = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -34,13 +38,9 @@ const (
 </head>
 <body>
 `
-
 	FooterDefault = `</body>
 </html>
 `
-
-	ParallelWritesEnvKey      = "SSG_PARALLEL_WRITES"
-	ParallelWritesDefault int = 20
 )
 
 type Ssg struct {
@@ -239,7 +239,7 @@ func (s *Ssg) WriteOut() error {
 		return err
 	}
 
-	err = WriteOut(s.dist, s.parallelWrites)
+	err = WriteOut(s.dist, s.concurrent)
 	if err != nil {
 		return err
 	}
@@ -580,14 +580,14 @@ func (w writeError) Error() string {
 }
 
 // WriteOut blocks and writes concurrently to output locations.
-func WriteOut(writes []OutputFile, parallelWrites int) error {
-	if parallelWrites == 0 {
-		parallelWrites = ParallelWritesDefault
+func WriteOut(writes []OutputFile, concurrent int) error {
+	if concurrent == 0 {
+		concurrent = 1
 	}
 
 	wg := new(sync.WaitGroup)
 	errs := make(chan writeError)
-	guard := make(chan struct{}, parallelWrites)
+	guard := make(chan struct{}, concurrent)
 
 	for i := range writes {
 		guard <- struct{}{}

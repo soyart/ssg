@@ -14,6 +14,8 @@ type streaming struct {
 }
 
 func (s *Ssg) generateStreaming() error {
+	const bufferMultiplier = 2
+
 	if !s.streaming.enabled {
 		panic("streaming not enabled")
 	}
@@ -24,7 +26,12 @@ func (s *Ssg) generateStreaming() error {
 	}
 
 	var wg sync.WaitGroup
-	s.streaming.c = make(chan OutputFile, s.parallelWrites*2)
+	bufSz := s.concurrent * bufferMultiplier
+	if bufSz == 0 {
+		bufSz = ConcurrentDefault * bufferMultiplier
+	}
+
+	s.streaming.c = make(chan OutputFile, bufSz)
 
 	var errBuild error
 	wg.Add(1)
@@ -49,7 +56,7 @@ func (s *Ssg) generateStreaming() error {
 		defer wg.Done()
 		var err error
 
-		dist, err = WriteOutStreaming(s.streaming.c, s.parallelWrites)
+		dist, err = WriteOutStreaming(s.streaming.c, s.concurrent)
 		if err != nil {
 			errWrites = err
 		}
@@ -81,16 +88,12 @@ func (s *Ssg) generateStreaming() error {
 	return nil
 }
 
-// WriteOutStreaming blocks and concurrently writes outputs from c until c is closed.
-func WriteOutStreaming(c <-chan OutputFile, parallelWrites int) ([]string, error) {
-	if parallelWrites == 0 {
-		parallelWrites = ParallelWritesDefault
-	}
-
+// WriteOutStreaming blocks and concurrently writes outputs recevied from c until c is closed.
+func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]string, error) {
 	written := make([]string, 0)
 	wg := new(sync.WaitGroup)
 	errs := make(chan writeError)
-	guard := make(chan struct{}, parallelWrites)
+	guard := make(chan struct{}, concurrent)
 	mut := new(sync.Mutex)
 
 	for o := range c {

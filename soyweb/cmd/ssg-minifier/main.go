@@ -38,7 +38,7 @@ func run(c *cli) error {
 	})
 
 	opts := append(
-		[]ssg.Option{ssg.ParallelWritesEnv()},
+		[]ssg.Option{ssg.ConcurrentFromEnv()},
 		minifyOpts...,
 	)
 

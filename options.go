@@ -23,33 +23,33 @@ type (
 	Impl func(path string, data []byte, d fs.DirEntry) error
 
 	options struct {
-		hookAll        HookAll
-		hookGenerate   HookGenerate
-		impl           Impl
-		streaming      streaming
-		parallelWrites int
+		hookAll      HookAll
+		hookGenerate HookGenerate
+		impl         Impl
+		streaming    streaming
+		concurrent   int
 	}
 )
 
-// ParallelWritesEnv returns an option that sets the parallel writes
-// to whatever [GetEnvParallelWrites] returns
-func ParallelWritesEnv() Option {
+// ConcurrentFromEnv returns an option that sets the parallel writes
+// to whatever [GetEnvConcurrent] returns
+func ConcurrentFromEnv() Option {
 	return func(s *Ssg) {
-		writes := GetEnvParallelWrites()
-		s.parallelWrites = int(writes)
+		writes := GetEnvConcurrent()
+		s.concurrent = int(writes)
 	}
 }
 
-// GetEnvParallelWrites returns ENV value for parallel writes,
+// GetEnvConcurrent returns ENV value for parallel writes,
 // or default value if illgal or undefined
-func GetEnvParallelWrites() int {
-	writesEnv := os.Getenv(ParallelWritesEnvKey)
+func GetEnvConcurrent() int {
+	writesEnv := os.Getenv(ConcurrencyEnvKey)
 	writes, err := strconv.ParseUint(writesEnv, 10, 32)
 	if err == nil && writes != 0 {
 		return int(writes)
 	}
 
-	return ParallelWritesDefault
+	return ConcurrentDefault
 }
 
 func Streaming() Option {
@@ -58,29 +58,31 @@ func Streaming() Option {
 	}
 }
 
-func ParallelWrites(u uint) Option {
+func Concurrent(u uint) Option {
 	return func(s *Ssg) {
-		s.parallelWrites = int(u)
+		s.concurrent = int(u)
 	}
 }
 
-// WithHookAll will make [Ssg] call f(path, fileContent)
+// WithHookAll will make [Ssg] call hook(path, fileContent)
 // on every unignored files.
-func WithHookAll(f HookAll) Option {
+func WithHookAll(hook HookAll) Option {
 	return func(s *Ssg) {
-		s.hookAll = f
+		s.hookAll = hook
 	}
 }
 
-// WithHookGenerate assigns f to be called on full output of files
+// WithHookGenerate assigns hook to be called on full output of files
 // that will be converted by ssg from Markdown to HTML.
-func WithHookGenerate(f HookGenerate) Option {
+func WithHookGenerate(hook HookGenerate) Option {
 	return func(s *Ssg) {
-		s.hookGenerate = f
+		s.hookGenerate = hook
 	}
 }
 
 // WithImpl takes f, which will called during build process.
+// Ignored files, _header.html and _footer.html
+// are skipped by ssg-go.
 func WithImpl(f Impl) Option {
 	return func(s *Ssg) {
 		s.impl = f

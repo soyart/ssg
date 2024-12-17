@@ -182,24 +182,93 @@ Then:
 
 - `/blog/2023/baz/index.md` will use `/blog/2023/_header.html`
 
-### Concurrent writes and environment variable
+## ssg-go quirks
 
-ssg-go allows users to configure concurrent writer goroutines (green threads).
+### Concurrent writer
 
-ssg-go, by default, writes out to 20 files concurrently. The number of concurrent
-threads are configured by setting env `SSG_PARALLEL_WRITES` to a non-zero positive integer.
+ssg-go has built-in concurrent output writer.
 
-If the env value is illegal, ssg-go falls back to 20 concurrent write threads.
+The writer forks (with goroutines) `n` number of writer threads,
+where `n` is determined at runtime by environment variable `SSG_CONCURRENT`,
+i.e. At any point in time, at most `n` number of threads are writing output files.
 
-To write outputs sequentially, run:
+The default value for concurrent writer is 20. If the supplied value is illegal,
+ssg-go falls back to 20 concurrent write threads.
 
-```shell
-SSG_PARALLEL_WRITES=1 ssg mySrc myDst myTitle myUrl
-```
+> To write outputs sequentially, set the concurrency value to 1:
+> 
+> ```shell
+> SSG_CONCURRENT=1 ssg mySrc myDst myTitle myUrl
+> ```
+
+### Streaming and caching builds
+
+ssg-go provides 2 flavors of generating outputs, with exactly identical outputs.
+
+- Streaming builds (default mode for ssg-go executable)
+
+  In streaming builds, there're 2 main threads:
+  one is for building the outputs, and the other is for writing the outputs.
+
+  The main thread *sequentially* reads and sends outputs to the writer
+  via a Go channel, which is buffered.
+  
+  Bufffering allows the builder thread to continue to build and send outputs
+  to the writer until the buffer is full.
+
+  This means that, at any point in time during a generation of any number of files
+  with concurrency value set to 20, ssg-go will at most only hold 40 output files
+  in memory (in the buffered channel).
+  
+  This helps reduce back pressure, and keeps memory usage low.
+  The buffer size is, by default, 2x of the writer concurrency value.
+
+- Caching builds
+
+  This mode used to be default for ssg-go, but has some disadvantage - it holds
+  everything in memory until the program exits.
+
+  In this mode, outputs are built sequentially and stored inside the builder until
+  all of the inputs are consumed.
+  
+  After that, the stored data (the whole of ssg-go outputs) gets sent to the concurrent writer.
+
+  This mode is useful if you are extending ssg-go and wants to use the output bytes
+  of all output files after some operations.
 
 # Extending ssg-go
 
-Go programmers can extend ssg-go via its `Option` type.
+Go programmers can extend ssg-go via its [`Option` type](./options.go).
 
-[soyweb](./soyweb/) extends ssg via `Option`,
-and provide extra functionality such as index generator and minifiers.
+[soyweb](./soyweb/) also extends ssg via `Option`,
+and provides extra functionality such as index generator and minifiers.
+
+## `HookAll` option
+
+`HookAll` is a Go function called on every unignored input file.
+soyweb uses this option to implement global minifiers.
+
+## `HookGenerate`
+
+`HookGenerate` is a Go function called on every generated HTML.
+soyweb uses this option to implement output minifier.
+
+## `Impl`
+
+`Impl` is a Go function called on a file during filesystem directory walk,
+To reduce complexity, ignored files and ssg headers/footers are not sent
+to `Impl`. This preserves the core functionality of the original ssg.
+
+> When using `Impl`, `HookAll` or `HookGenerate` are not called
+> unless explicitly called in the Impl.
+>
+> HTTP-back-end-style *middlewares* can be implemented with `Impl`,
+> as shown in the [soyweb index generator](./soyweb/index.go). Here,
+> the generator `Impl` sees if it needs to create an index for a directory,
+> 
+> and, if not, simply passes the data back to ssg-go default implementation.
+> If it needs to generate an index, then it creates a new output file,
+> and passes that to the standard ssg-go implementation, allowing all
+> the features such as header/footer combination and hooks to continue to work.
+
+

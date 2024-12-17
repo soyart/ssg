@@ -57,10 +57,8 @@ func genIndex(
 	error,
 ) {
 	content := bytes.NewBuffer(template)
-	if len(template) == 0 {
-		heading := filepath.Base(parent)
-		heading = fmt.Sprintf("# Blog %s\n\n", heading)
-		content = bytes.NewBufferString(heading)
+	if content.Len() == 0 {
+		ssg.Fprintf(content, "# Index of %s\n\n", filepath.Base(parent))
 	}
 
 	for i := range children {
@@ -96,12 +94,12 @@ func genIndex(
 			recurse := false
 			for j := range grandChildren {
 				name := grandChildren[j].Name()
-				if name == MarkerIndex {
-					recurse = true
-					break
-				}
 				if name == "index.md" || name == "index.html" {
 					index = name
+					break
+				}
+				if name == MarkerIndex {
+					recurse = true
 					break
 				}
 			}
