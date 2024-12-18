@@ -164,7 +164,7 @@ func (s *Ssg) With(opts ...Option) *Ssg {
 
 // Generate builds from s.Src and writes the outputs to s.Dst
 func (s *Ssg) Generate() error {
-	return generateStreaming(s)
+	return generate(s)
 }
 
 func (s *Ssg) AddOutputs(outputs ...OutputFile) {

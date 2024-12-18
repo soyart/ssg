@@ -8,11 +8,7 @@ import (
 	"sync"
 )
 
-type streaming struct {
-	c chan OutputFile
-}
-
-func generateStreaming(s *Ssg) error {
+func generate(s *Ssg) error {
 	const bufferMultiplier = 2
 	stat, err := os.Stat(s.Src)
 	if err != nil {
@@ -26,12 +22,9 @@ func generateStreaming(s *Ssg) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		dist, err := s.buildV2()
+		_, err := s.buildV2()
 		if err != nil {
 			errBuild = err
-		}
-		if len(dist) != 0 {
-			panic("dist is not empty")
 		}
 
 		close(s.stream)
