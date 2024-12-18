@@ -49,7 +49,7 @@ func run(c *cli) error {
 		return err
 	}
 
-	err = ssg.WriteOut(writes, ssg.GetEnvConcurrent())
+	err = ssg.WriteOut(writes, ssg.GetEnvWriters())
 	if err != nil {
 		return fmt.Errorf("error writing out: %w", err)
 	}

@@ -164,8 +164,8 @@ func testGenerate(t *testing.T, buildFn func(s *Ssg) ([]OutputFile, error)) {
 		t.Fatalf("missing preferred html file /blog/index.html")
 	}
 
-	for i := range s.dist {
-		o := &s.dist[i]
+	for i := range s.cache {
+		o := &s.cache[i]
 
 		if strings.HasSuffix(o.target, "_header.html") {
 			t.Fatalf("unexpected _header.html output in '%s'", o.target)
