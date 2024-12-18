@@ -51,11 +51,21 @@ type Ssg struct {
 
 	options
 
+	stream     chan OutputFile
 	ssgignores ignorer
 	headers    headers
 	footers    footers
 	preferred  Set // Used to prefer html and ignore md files with identical names, as with the original ssg
-	dist       []OutputFile
+	cache      []OutputFile
+}
+
+// Build returns the ssg outputs built from src
+func Build(src, dst, title, url string, opts ...Option) ([]OutputFile, error) {
+	s := New(src, dst, title, url)
+	return s.
+		With(opts...).
+		With(Caching()).
+		buildV2()
 }
 
 // Generate creates a one-off [Ssg] that's used to generate a site right away.
@@ -144,16 +154,7 @@ xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
 	return sm.String(), nil
 }
 
-func (s *Ssg) AddOutputs(outputs ...OutputFile) {
-	if s.streaming.c != nil {
-		for i := range outputs {
-			s.streaming.c <- outputs[i]
-		}
-		return
-	}
-	s.dist = append(s.dist, outputs...)
-}
-
+// With applies opts to s sequentially
 func (s *Ssg) With(opts ...Option) *Ssg {
 	for i := range opts {
 		opts[i](s)
@@ -161,42 +162,21 @@ func (s *Ssg) With(opts ...Option) *Ssg {
 	return s
 }
 
+// Generate builds from s.Src and writes the outputs to s.Dst
 func (s *Ssg) Generate() error {
-	if s.streaming.enabled {
-		return s.generateStreaming()
-	}
-	return s.generate()
+	return generateStreaming(s)
 }
 
-func (s *Ssg) generate() error {
-	if s.streaming.enabled {
-		panic("streaming is enabled")
+func (s *Ssg) AddOutputs(outputs ...OutputFile) {
+	if s.options.caching {
+		s.cache = append(s.cache, outputs...)
 	}
-	if s.streaming.c != nil {
-		panic("streaming channel is not nil")
+	if s.stream == nil {
+		return
 	}
-
-	// Reset
-	s.dist = nil
-	stat, err := os.Stat(s.Src)
-	if err != nil {
-		return err
+	for i := range outputs {
+		s.stream <- outputs[i]
 	}
-	dist, err := s.buildV2()
-	if err != nil {
-		return err
-	}
-	err = s.WriteOut()
-	if err != nil {
-		return err
-	}
-	err = WriteExtraFiles(s.Url, s.Dst, dist, stat.ModTime())
-	if err != nil {
-		return err
-	}
-
-	s.pront(len(dist) + 2)
-	return nil
 }
 
 func WriteExtraFiles(url, dst string, dist []OutputFile, srcModTime time.Time) error {
@@ -226,26 +206,6 @@ func WriteExtraFiles(url, dst string, dist []OutputFile, srcModTime time.Time) e
 	return nil
 }
 
-// WriteOut blocks and concurrently writes out s.writes
-// to their target locations.
-//
-// If targets is empty, WriteOut writes to s.dst
-func (s *Ssg) WriteOut() error {
-	_, err := os.Stat(s.Dst)
-	if os.IsNotExist(err) {
-		err = os.MkdirAll(s.Dst, os.ModePerm)
-	}
-	if err != nil {
-		return err
-	}
-
-	err = WriteOut(s.dist, s.concurrent)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func DotFiles(dst string, dist []OutputFile) (string, error) {
 	list := bytes.NewBuffer(nil)
 	for i := range dist {
@@ -271,8 +231,7 @@ func (s *Ssg) buildV2() ([]OutputFile, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	return s.dist, nil
+	return s.cache, nil
 }
 
 func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {

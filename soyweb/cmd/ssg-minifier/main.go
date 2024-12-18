@@ -27,19 +27,18 @@ func main() {
 }
 
 func run(c *cli) error {
-	minifyOpts := soyweb.SsgOptions(soyweb.Flags{
-		MinifyFlags: soyweb.MinifyFlags{
-			MinifyHtmlGenerate: true,
-			MinifyHtmlCopy:     true,
-			MinifyCss:          true,
-			MinifyJson:         true,
-		},
-		NoMinifyFlags: c.NoMinifyFlags,
-	})
-
-	opts := append(
-		[]ssg.Option{ssg.ConcurrentFromEnv()},
-		minifyOpts...,
+	opts := []ssg.Option{ssg.ConcurrentFromEnv()}
+	opts = append(
+		opts,
+		soyweb.SsgOptions(soyweb.Flags{
+			MinifyFlags: soyweb.MinifyFlags{
+				MinifyHtmlGenerate: true,
+				MinifyHtmlCopy:     true,
+				MinifyCss:          true,
+				MinifyJson:         true,
+			},
+			NoMinifyFlags: c.NoMinifyFlags,
+		})...,
 	)
 
 	return ssg.Generate(c.Src, c.Dst, c.Title, c.Url, opts...)

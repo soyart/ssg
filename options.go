@@ -26,7 +26,7 @@ type (
 		hookAll      HookAll
 		hookGenerate HookGenerate
 		impl         Impl
-		streaming    streaming
+		caching      bool
 		concurrent   int
 	}
 )
@@ -52,15 +52,15 @@ func GetEnvConcurrent() int {
 	return ConcurrentDefault
 }
 
-func Streaming() Option {
+func Caching() Option {
 	return func(s *Ssg) {
-		s.streaming.enabled = true
+		s.options.caching = true
 	}
 }
 
 func Concurrent(u uint) Option {
 	return func(s *Ssg) {
-		s.concurrent = int(u)
+		s.options.concurrent = int(u)
 	}
 }
 
@@ -68,7 +68,7 @@ func Concurrent(u uint) Option {
 // on every unignored files.
 func WithHookAll(hook HookAll) Option {
 	return func(s *Ssg) {
-		s.hookAll = hook
+		s.options.hookAll = hook
 	}
 }
 
@@ -76,7 +76,7 @@ func WithHookAll(hook HookAll) Option {
 // that will be converted by ssg from Markdown to HTML.
 func WithHookGenerate(hook HookGenerate) Option {
 	return func(s *Ssg) {
-		s.hookGenerate = hook
+		s.options.hookGenerate = hook
 	}
 }
 

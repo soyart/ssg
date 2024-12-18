@@ -17,7 +17,6 @@ func main() {
 	err := ssg.Generate(
 		src, dst, title, url,
 		ssg.ConcurrentFromEnv(),
-		ssg.Streaming(),
 	)
 	if err != nil {
 		ssg.Fprintln(os.Stdout, "error with", "src", src, "dst", dst, "title", title, "url", url)

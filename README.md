@@ -203,38 +203,21 @@ ssg-go falls back to 20 concurrent write threads.
 
 ### Streaming and caching builds
 
-ssg-go provides 2 flavors of generating outputs, with exactly identical outputs.
+There're 2 main ssg threads: one is for building the outputs,
+and the other is the concurrent writer.
 
-- Streaming builds (default mode for ssg-go executable)
+The main thread *sequentially* reads and sends outputs to the writer
+via a buffered Go channel.
 
-  In streaming builds, there're 2 main threads:
-  one is for building the outputs, and the other is for writing the outputs.
+Bufffering allows the builder thread to continue to build and send outputs
+to the writer until the buffer is full.
 
-  The main thread *sequentially* reads and sends outputs to the writer
-  via a Go channel, which is buffered.
-  
-  Bufffering allows the builder thread to continue to build and send outputs
-  to the writer until the buffer is full.
+This means that, at any point in time during a generation of any number of files
+with concurrency value set to 20, ssg-go will at most only hold 40 output files
+in memory (in the buffered channel).
 
-  This means that, at any point in time during a generation of any number of files
-  with concurrency value set to 20, ssg-go will at most only hold 40 output files
-  in memory (in the buffered channel).
-  
-  This helps reduce back pressure, and keeps memory usage low.
-  The buffer size is, by default, 2x of the writer concurrency value.
-
-- Caching builds
-
-  This mode used to be default for ssg-go, but has some disadvantage - it holds
-  everything in memory until the program exits.
-
-  In this mode, outputs are built sequentially and stored inside the builder until
-  all of the inputs are consumed.
-  
-  After that, the stored data (the whole of ssg-go outputs) gets sent to the concurrent writer.
-
-  This mode is useful if you are extending ssg-go and wants to use the output bytes
-  of all output files after some operations.
+This helps reduce back pressure, and keeps memory usage low.
+The buffer size is, by default, 2x of the writer concurrency value.
 
 # Extending ssg-go
 

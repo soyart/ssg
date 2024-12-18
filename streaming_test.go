@@ -8,6 +8,49 @@ import (
 	"testing"
 )
 
+func generateCaching(s *Ssg) error {
+	// Reset
+	s.cache = nil
+	stat, err := os.Stat(s.Src)
+	if err != nil {
+		return err
+	}
+	dist, err := s.buildV2()
+	if err != nil {
+		return err
+	}
+	err = writeOutFromCache(s)
+	if err != nil {
+		return err
+	}
+	err = WriteExtraFiles(s.Url, s.Dst, dist, stat.ModTime())
+	if err != nil {
+		return err
+	}
+
+	s.pront(len(dist) + 2)
+	return nil
+}
+
+// writeOutFromCache blocks and concurrently writes out s.writes
+// to their target locations.
+//
+// If targets is empty, writeOutFromCache writes to s.dst
+func writeOutFromCache(s *Ssg) error {
+	_, err := os.Stat(s.Dst)
+	if os.IsNotExist(err) {
+		err = os.MkdirAll(s.Dst, os.ModePerm)
+	}
+	if err != nil {
+		return err
+	}
+	err = WriteOut(s.cache, s.concurrent)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // TestStreaming tests that all files are properly flushed to destination when streaming,
 // and that all outputs are identical
 func TestStreaming(t *testing.T) {
@@ -28,16 +71,19 @@ func TestStreaming(t *testing.T) {
 	}
 
 	// Generate without streaming
-	err = Generate(src, dst, title, url,
+	s := New(src, dst, title, url)
+	s.With(
+		Caching(),
 		Concurrent(uint(ConcurrentDefault)),
 	)
+	err = generateCaching(&s)
 	if err != nil {
 		panic(err)
 	}
+
 	// Generate with streaming
 	err = Generate(src, dstStreaming, title, url,
 		Concurrent(uint(ConcurrentDefault)),
-		Streaming(),
 	)
 	if err != nil {
 		t.Fatalf("error generating with streaming: %v", err)
