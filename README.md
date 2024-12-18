@@ -184,27 +184,27 @@ Then:
 
 ## ssg-go quirks
 
-### Concurrent writer
+### Concurrent writers
 
 ssg-go has built-in concurrent output writer.
 
 The writer forks (with goroutines) `n` number of writer threads,
-where `n` is determined at runtime by environment variable `SSG_CONCURRENT`,
+where `n` is determined at runtime by environment variable `SSG_WRITERS`,
 i.e. At any point in time, at most `n` number of threads are writing output files.
 
 The default value for concurrent writer is 20. If the supplied value is illegal,
 ssg-go falls back to 20 concurrent write threads.
 
-> To write outputs sequentially, set the concurrency value to 1:
+> To write outputs sequentially, set the write concurrency value to 1:
 > 
 > ```shell
-> SSG_CONCURRENT=1 ssg mySrc myDst myTitle myUrl
+> SSG_WRITERS=1 ssg mySrc myDst myTitle myUrl
 > ```
 
 ### Streaming and caching builds
 
 There're 2 main ssg threads: one is for building the outputs,
-and the other is the concurrent writer.
+and the other is the writer thread.
 
 The main thread *sequentially* reads and sends outputs to the writer
 via a buffered Go channel.
@@ -217,7 +217,7 @@ with concurrency value set to 20, ssg-go will at most only hold 40 output files
 in memory (in the buffered channel).
 
 This helps reduce back pressure, and keeps memory usage low.
-The buffer size is, by default, 2x of the writer concurrency value.
+The buffer size is, by default, 2x of the number of writers.
 
 # Extending ssg-go
 

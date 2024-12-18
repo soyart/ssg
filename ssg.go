@@ -19,12 +19,12 @@ import (
 )
 
 const (
-	MarkerHeader          = "_header.html"
-	MarkerFooter          = "_footer.html"
-	HtmlFlags             = html.CommonFlags
-	ConcurrencyEnvKey     = "SSG_CONCURRENT"
-	ConcurrentDefault int = 20
-	SsgExtensions         = parser.CommonExtensions |
+	MarkerHeader       = "_header.html"
+	MarkerFooter       = "_footer.html"
+	HtmlFlags          = html.CommonFlags
+	WritersEnvKey      = "SSG_WRITERS"
+	WritersDefault int = 20
+	SsgExtensions      = parser.CommonExtensions |
 		parser.Mmark |
 		parser.AutoHeadingIDs
 )

@@ -27,29 +27,29 @@ type (
 		hookGenerate HookGenerate
 		impl         Impl
 		caching      bool
-		concurrent   int
+		writers      int
 	}
 )
 
-// ConcurrentFromEnv returns an option that sets the parallel writes
-// to whatever [GetEnvConcurrent] returns
-func ConcurrentFromEnv() Option {
+// WritersFromEnv returns an option that sets the parallel writes
+// to whatever [GetEnvWriters] returns
+func WritersFromEnv() Option {
 	return func(s *Ssg) {
-		writes := GetEnvConcurrent()
-		s.concurrent = int(writes)
+		writes := GetEnvWriters()
+		s.writers = int(writes)
 	}
 }
 
-// GetEnvConcurrent returns ENV value for parallel writes,
+// GetEnvWriters returns ENV value for parallel writes,
 // or default value if illgal or undefined
-func GetEnvConcurrent() int {
-	writesEnv := os.Getenv(ConcurrencyEnvKey)
+func GetEnvWriters() int {
+	writesEnv := os.Getenv(WritersEnvKey)
 	writes, err := strconv.ParseUint(writesEnv, 10, 32)
 	if err == nil && writes != 0 {
 		return int(writes)
 	}
 
-	return ConcurrentDefault
+	return WritersDefault
 }
 
 func Caching() Option {
@@ -58,9 +58,9 @@ func Caching() Option {
 	}
 }
 
-func Concurrent(u uint) Option {
+func Writers(u uint) Option {
 	return func(s *Ssg) {
-		s.options.concurrent = int(u)
+		s.options.writers = int(u)
 	}
 }
 

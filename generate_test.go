@@ -44,7 +44,7 @@ func writeOutFromCache(s *Ssg) error {
 	if err != nil {
 		return err
 	}
-	err = WriteOut(s.cache, s.concurrent)
+	err = WriteOut(s.cache, s.writers)
 	if err != nil {
 		return err
 	}
@@ -72,14 +72,14 @@ func TestGenerateStreaming(t *testing.T) {
 
 	// Generate with streaming
 	streaming := New(src, dstStreaming, title, url)
-	streaming.With(Concurrent(uint(ConcurrentDefault)))
+	streaming.With(Writers(uint(WritersDefault)))
 
 	// Generate without streaming, and with caching
 	// (old v2 flow)
 	caching := New(src, dst, title, url)
 	caching.With(
 		Caching(),
-		Concurrent(uint(ConcurrentDefault)),
+		Writers(uint(WritersDefault)),
 	)
 
 	testCmpDeepEqual(t, &caching, &streaming)

@@ -27,7 +27,7 @@ func main() {
 }
 
 func run(c *cli) error {
-	opts := []ssg.Option{ssg.ConcurrentFromEnv()}
+	opts := []ssg.Option{ssg.WritersFromEnv()}
 	opts = append(
 		opts,
 		soyweb.SsgOptions(soyweb.Flags{
