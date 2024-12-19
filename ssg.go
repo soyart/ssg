@@ -179,31 +179,32 @@ func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	}
 }
 
-func GenerateMetadata(url, dst string, dist []OutputFile, srcModTime time.Time) error {
+func Metadata(url, dst string, dist []OutputFile, srcModTime time.Time) ([]OutputFile, error) {
 	sort.Slice(dist, func(i, j int) bool {
 		return dist[i].target < dist[j].target
 	})
 
 	dotFiles, err := DotFiles(dst, dist)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	sitemap, err := Sitemap(dst, url, srcModTime, dist)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = os.WriteFile(filepath.Join(dst, "sitemap.xml"), []byte(sitemap), 0o644)
+	return []OutputFile{
+		Output(filepath.Join(dst, "sitemap.xml"), []byte(sitemap), 0644),
+		Output(filepath.Join(dst, ".files"), []byte(dotFiles), 0644),
+	}, nil
+}
+
+func GenerateMetadata(url, dst string, dist []OutputFile, srcModTime time.Time) error {
+	metadata, err := Metadata(url, dst, dist, srcModTime)
 	if err != nil {
 		return err
 	}
-	target := filepath.Join(dst, ".files")
-	err = os.WriteFile(target, []byte(dotFiles), 0o644)
-	if err != nil {
-		return fmt.Errorf("error writing %s: %w", target, err)
-	}
-
-	return nil
+	return WriteOut(metadata, 2)
 }
 
 func DotFiles(dst string, dist []OutputFile) (string, error) {
@@ -522,11 +523,19 @@ func Output(target string, data []byte, perm fs.FileMode) OutputFile {
 	}
 }
 
-func (o *OutputFile) modeOutput() fs.FileMode {
+func (o *OutputFile) Perm() fs.FileMode {
 	if o.perm == fs.FileMode(0) {
 		return fs.ModePerm
 	}
 	return o.perm
+}
+
+func (o *OutputFile) Target() string {
+	return o.target
+}
+
+func (o *OutputFile) Data() []byte {
+	return o.data
 }
 
 type writeError struct {
@@ -566,7 +575,7 @@ func WriteOut(writes []OutputFile, concurrent int) error {
 				}
 				return
 			}
-			err = os.WriteFile(w.target, w.data, w.modeOutput())
+			err = os.WriteFile(w.target, w.data, w.Perm())
 			if err != nil {
 				errs <- writeError{
 					err:    err,

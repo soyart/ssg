@@ -100,7 +100,7 @@ func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]string, error) {
 				}
 				return
 			}
-			err = os.WriteFile(w.target, w.data, w.modeOutput())
+			err = os.WriteFile(w.target, w.data, w.Perm())
 			if err != nil {
 				errs <- writeError{
 					err:    err,
