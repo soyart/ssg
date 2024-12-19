@@ -51,7 +51,7 @@ type Ssg struct {
 
 	options
 
-	stream     chan OutputFile
+	stream     chan<- OutputFile
 	ssgignores ignorer
 	headers    headers
 	footers    footers
@@ -179,7 +179,7 @@ func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	}
 }
 
-func WriteExtraFiles(url, dst string, dist []OutputFile, srcModTime time.Time) error {
+func GenerateMetadata(url, dst string, dist []OutputFile, srcModTime time.Time) error {
 	sort.Slice(dist, func(i, j int) bool {
 		return dist[i].target < dist[j].target
 	})

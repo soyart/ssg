@@ -23,7 +23,7 @@ func generateCaching(s *Ssg) error {
 	if err != nil {
 		return err
 	}
-	err = WriteExtraFiles(s.Url, s.Dst, dist, stat.ModTime())
+	err = GenerateMetadata(s.Url, s.Dst, dist, stat.ModTime())
 	if err != nil {
 		return err
 	}
@@ -103,17 +103,21 @@ func testCmpDeepEqual(t *testing.T, s1, s2 *Ssg) {
 		panic(err)
 	}
 
-	fn := deepEqual(t, s1.Dst, s2.Dst)
-	err = filepath.WalkDir(s1.Dst, fn)
+	testDeepEqual(t, s1.Dst, s2.Dst)
+}
+
+func testDeepEqual(t *testing.T, dst1, dst2 string) {
+	fn := deepEqual(t, dst1, dst2)
+	err := filepath.WalkDir(dst1, fn)
 	if err != nil {
 		panic(err)
 	}
 
-	err = os.RemoveAll(s1.Dst)
+	err = os.RemoveAll(dst1)
 	if err != nil {
 		panic(err)
 	}
-	err = os.RemoveAll(s2.Dst)
+	err = os.RemoveAll(dst2)
 	if err != nil {
 		panic(err)
 	}

@@ -16,7 +16,8 @@ func generate(s *Ssg) error {
 	}
 
 	var wg sync.WaitGroup
-	s.stream = make(chan OutputFile, s.writers*bufferMultiplier)
+	stream := make(chan OutputFile, s.writers*bufferMultiplier)
+	s.stream = stream
 
 	var errBuild error
 	wg.Add(1)
@@ -37,7 +38,7 @@ func generate(s *Ssg) error {
 		defer wg.Done()
 		var err error
 
-		written, err = WriteOutStreaming(s.stream, s.writers)
+		written, err = WriteOutStreaming(stream, s.writers)
 		if err != nil {
 			errWrites = err
 		}
@@ -60,7 +61,7 @@ func generate(s *Ssg) error {
 		outputs[i] = Output(written[i], nil, 0)
 	}
 
-	err = WriteExtraFiles(s.Url, s.Dst, outputs, stat.ModTime())
+	err = GenerateMetadata(s.Url, s.Dst, outputs, stat.ModTime())
 	if err != nil {
 		return err
 	}

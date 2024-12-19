@@ -186,14 +186,13 @@ Then:
 
 ### Concurrent writers
 
-ssg-go has built-in concurrent output writer.
+ssg-go has built-in concurrent output writers.
 
-The writer forks (with goroutines) `n` number of writer threads,
-where `n` is determined at runtime by environment variable `SSG_WRITERS`,
-i.e. At any point in time, at most `n` number of threads are writing output files.
+The number of writers can be set at runtime by environment variable `SSG_WRITERS`.
+At any point in time, at most `SSG_WRITERS` number of threads are writing output files.
 
 The default value for concurrent writer is 20. If the supplied value is illegal,
-ssg-go falls back to 20 concurrent write threads.
+ssg-go falls back to 20 concurrent writers.
 
 > To write outputs sequentially, set the write concurrency value to 1:
 > 
@@ -204,20 +203,41 @@ ssg-go falls back to 20 concurrent write threads.
 ### Streaming and caching builds
 
 There're 2 main ssg threads: one is for building the outputs,
-and the other is the writer thread.
+and the other is the write thread.
 
-The main thread *sequentially* reads and sends outputs to the writer
-via a buffered Go channel.
+The main thread *sequentially* reads and sends outputs to the write
+thread via a buffered Go channel.
 
 Bufffering allows the builder thread to continue to build and send outputs
 to the writer until the buffer is full.
 
 This means that, at any point in time during a generation of any number of files
-with concurrency value set to 20, ssg-go will at most only hold 40 output files
+with 20 writers, ssg-go will at most only hold 40 output files
 in memory (in the buffered channel).
 
 This helps reduce back pressure, and keeps memory usage low.
 The buffer size is, by default, 2x of the number of writers.
+
+If you are importing ssg-go to your code and you don't want this
+streaming behavior, you can use the exposed function `Build`, `WriteOut`,
+and `GenerateMetadata`:
+
+```go
+dist, err := ssg.Build(src, dst, title, url)
+if err != nil {
+  panic(err)
+}
+
+err = ssg.WriteOut(dist)
+if err != nil {
+  panic(err)
+}
+
+err = GenerateMetadata(url, dst, dist, time.Time{})
+if err != nil {
+  panic(err)
+}
+```
 
 # Extending ssg-go
 

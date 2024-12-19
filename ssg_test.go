@@ -372,3 +372,47 @@ func TestSsgignore(t *testing.T) {
 		t.Fatalf("[case %d] unexpected ignore value, expecting %v, got %v", i+1, tc.expected, ignored)
 	}
 }
+
+// TestBuildAndWriteOut tests that Build+WriteOut functions
+// work as expected (identical to streaming Generate)
+func TestBuildAndWriteOut(t *testing.T) {
+	root := "./soyweb/testdata/johndoe.com"
+	src := filepath.Join(root, "/src")
+	dstGenerate := filepath.Join(root, "/dstGenerate")
+	dstBuild := filepath.Join(root, "/dstBuild")
+	title := "JohnDoe.com"
+	url := "https://johndoe.com"
+
+	err := os.RemoveAll(dstGenerate)
+	if err != nil {
+		panic(err)
+	}
+	err = os.RemoveAll(dstBuild)
+	if err != nil {
+		panic(err)
+	}
+
+	err = Generate(src, dstGenerate, title, url)
+	if err != nil {
+		panic(err)
+	}
+
+	dist, err := Build(src, dstBuild, title, url)
+	if err != nil {
+		panic(err)
+	}
+	err = WriteOut(dist, 1)
+	if err != nil {
+		panic(err)
+	}
+	stat, err := os.Stat(dstBuild)
+	if err != nil {
+		panic(err)
+	}
+	err = GenerateMetadata(url, dstBuild, dist, stat.ModTime())
+	if err != nil {
+		panic(err)
+	}
+
+	testDeepEqual(t, dstGenerate, dstBuild)
+}
