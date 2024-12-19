@@ -1,0 +1,5 @@
+testignore/ignored.md
+
+# Note: ignoreroot is a directory
+testignore/ignoreroot
+!**/ignoreroot/*keep*
