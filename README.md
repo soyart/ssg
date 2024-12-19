@@ -184,57 +184,60 @@ Then:
 
 ## ssg-go quirks
 
-### Concurrent writer
+### Concurrent writers
 
-ssg-go has built-in concurrent output writer.
+ssg-go has built-in concurrent output writers.
 
-The writer forks (with goroutines) `n` number of writer threads,
-where `n` is determined at runtime by environment variable `SSG_CONCURRENT`,
-i.e. At any point in time, at most `n` number of threads are writing output files.
+The number of writers can be set at runtime by environment variable `SSG_WRITERS`.
+At any point in time, at most `SSG_WRITERS` number of threads are writing output files.
 
 The default value for concurrent writer is 20. If the supplied value is illegal,
-ssg-go falls back to 20 concurrent write threads.
+ssg-go falls back to 20 concurrent writers.
 
-> To write outputs sequentially, set the concurrency value to 1:
+> To write outputs sequentially, set the write concurrency value to 1:
 > 
 > ```shell
-> SSG_CONCURRENT=1 ssg mySrc myDst myTitle myUrl
+> SSG_WRITERS=1 ssg mySrc myDst myTitle myUrl
 > ```
 
 ### Streaming and caching builds
 
-ssg-go provides 2 flavors of generating outputs, with exactly identical outputs.
+There're 2 main ssg threads: one is for building the outputs,
+and the other is the write thread.
 
-- Streaming builds (default mode for ssg-go executable)
+The main thread *sequentially* reads and sends outputs to the write
+thread via a buffered Go channel.
 
-  In streaming builds, there're 2 main threads:
-  one is for building the outputs, and the other is for writing the outputs.
+Bufffering allows the builder thread to continue to build and send outputs
+to the writer until the buffer is full.
 
-  The main thread *sequentially* reads and sends outputs to the writer
-  via a Go channel, which is buffered.
-  
-  Bufffering allows the builder thread to continue to build and send outputs
-  to the writer until the buffer is full.
+This means that, at any point in time during a generation of any number of files
+with 20 writers, ssg-go will at most only hold 40 output files
+in memory (in the buffered channel).
 
-  This means that, at any point in time during a generation of any number of files
-  with concurrency value set to 20, ssg-go will at most only hold 40 output files
-  in memory (in the buffered channel).
-  
-  This helps reduce back pressure, and keeps memory usage low.
-  The buffer size is, by default, 2x of the writer concurrency value.
+This helps reduce back pressure, and keeps memory usage low.
+The buffer size is, by default, 2x of the number of writers.
 
-- Caching builds
+If you are importing ssg-go to your code and you don't want this
+streaming behavior, you can use the exposed function `Build`, `WriteOut`,
+and `GenerateMetadata`:
 
-  This mode used to be default for ssg-go, but has some disadvantage - it holds
-  everything in memory until the program exits.
+```go
+dist, err := ssg.Build(src, dst, title, url)
+if err != nil {
+  panic(err)
+}
 
-  In this mode, outputs are built sequentially and stored inside the builder until
-  all of the inputs are consumed.
-  
-  After that, the stored data (the whole of ssg-go outputs) gets sent to the concurrent writer.
+err = ssg.WriteOut(dist)
+if err != nil {
+  panic(err)
+}
 
-  This mode is useful if you are extending ssg-go and wants to use the output bytes
-  of all output files after some operations.
+err = GenerateMetadata(url, dst, dist, time.Time{})
+if err != nil {
+  panic(err)
+}
+```
 
 # Extending ssg-go
 

@@ -8,55 +8,37 @@ import (
 	"sync"
 )
 
-type streaming struct {
-	c       chan OutputFile
-	enabled bool
-}
-
-func (s *Ssg) generateStreaming() error {
+func generate(s *Ssg) error {
 	const bufferMultiplier = 2
-
-	if !s.streaming.enabled {
-		panic("streaming not enabled")
-	}
-
 	stat, err := os.Stat(s.Src)
 	if err != nil {
 		return fmt.Errorf("failed to stat src '%s': %w", s.Src, err)
 	}
 
 	var wg sync.WaitGroup
-	bufSz := s.concurrent * bufferMultiplier
-	if bufSz == 0 {
-		bufSz = ConcurrentDefault * bufferMultiplier
-	}
-
-	s.streaming.c = make(chan OutputFile, bufSz)
+	stream := make(chan OutputFile, s.writers*bufferMultiplier)
+	s.stream = stream
 
 	var errBuild error
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		dist, err := s.buildV2()
+		_, err := s.buildV2()
 		if err != nil {
 			errBuild = err
 		}
-		if len(dist) != 0 {
-			panic("dist is not empty")
-		}
 
-		close(s.streaming.c)
+		close(s.stream)
 	}()
 
-	var dist []string
+	var written []string
 	var errWrites error
-
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		var err error
 
-		dist, err = WriteOutStreaming(s.streaming.c, s.concurrent)
+		written, err = WriteOutStreaming(stream, s.writers)
 		if err != nil {
 			errWrites = err
 		}
@@ -74,22 +56,26 @@ func (s *Ssg) generateStreaming() error {
 		return fmt.Errorf("streaming_write_error: %w", errWrites)
 	}
 
-	outputs := make([]OutputFile, len(dist))
-	for i := range dist {
-		outputs[i] = Output(dist[i], nil, 0)
+	outputs := make([]OutputFile, len(written))
+	for i := range written {
+		outputs[i] = Output(written[i], nil, 0)
 	}
 
-	err = WriteExtraFiles(s.Url, s.Dst, outputs, stat.ModTime())
+	err = GenerateMetadata(s.Url, s.Dst, outputs, stat.ModTime())
 	if err != nil {
 		return err
 	}
 
-	s.pront(len(dist) + 2)
+	s.pront(len(written) + 2)
 	return nil
 }
 
 // WriteOutStreaming blocks and concurrently writes outputs recevied from c until c is closed.
 func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]string, error) {
+	if concurrent == 0 {
+		concurrent = 1
+	}
+
 	written := make([]string, 0)
 	wg := new(sync.WaitGroup)
 	errs := make(chan writeError)
@@ -114,7 +100,7 @@ func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]string, error) {
 				}
 				return
 			}
-			err = os.WriteFile(w.target, w.data, w.modeOutput())
+			err = os.WriteFile(w.target, w.data, w.Perm())
 			if err != nil {
 				errs <- writeError{
 					err:    err,

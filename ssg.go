@@ -19,12 +19,12 @@ import (
 )
 
 const (
-	MarkerHeader          = "_header.html"
-	MarkerFooter          = "_footer.html"
-	HtmlFlags             = html.CommonFlags
-	ConcurrencyEnvKey     = "SSG_CONCURRENT"
-	ConcurrentDefault int = 20
-	SsgExtensions         = parser.CommonExtensions |
+	MarkerHeader       = "_header.html"
+	MarkerFooter       = "_footer.html"
+	HtmlFlags          = html.CommonFlags
+	WritersEnvKey      = "SSG_WRITERS"
+	WritersDefault int = 20
+	SsgExtensions      = parser.CommonExtensions |
 		parser.Mmark |
 		parser.AutoHeadingIDs
 )
@@ -51,11 +51,21 @@ type Ssg struct {
 
 	options
 
+	stream     chan<- OutputFile
 	ssgignores ignorer
 	headers    headers
 	footers    footers
 	preferred  Set // Used to prefer html and ignore md files with identical names, as with the original ssg
-	dist       []OutputFile
+	cache      []OutputFile
+}
+
+// Build returns the ssg outputs built from src
+func Build(src, dst, title, url string, opts ...Option) ([]OutputFile, error) {
+	s := New(src, dst, title, url)
+	return s.
+		With(opts...).
+		With(Caching()).
+		buildV2()
 }
 
 // Generate creates a one-off [Ssg] that's used to generate a site right away.
@@ -144,16 +154,7 @@ xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
 	return sm.String(), nil
 }
 
-func (s *Ssg) AddOutputs(outputs ...OutputFile) {
-	if s.streaming.c != nil {
-		for i := range outputs {
-			s.streaming.c <- outputs[i]
-		}
-		return
-	}
-	s.dist = append(s.dist, outputs...)
-}
-
+// With applies opts to s sequentially
 func (s *Ssg) With(opts ...Option) *Ssg {
 	for i := range opts {
 		opts[i](s)
@@ -161,89 +162,49 @@ func (s *Ssg) With(opts ...Option) *Ssg {
 	return s
 }
 
+// Generate builds from s.Src and writes the outputs to s.Dst
 func (s *Ssg) Generate() error {
-	if s.streaming.enabled {
-		return s.generateStreaming()
-	}
-	return s.generate()
+	return generate(s)
 }
 
-func (s *Ssg) generate() error {
-	if s.streaming.enabled {
-		panic("streaming is enabled")
+func (s *Ssg) AddOutputs(outputs ...OutputFile) {
+	if s.options.caching {
+		s.cache = append(s.cache, outputs...)
 	}
-	if s.streaming.c != nil {
-		panic("streaming channel is not nil")
+	if s.stream == nil {
+		return
 	}
-
-	// Reset
-	s.dist = nil
-	stat, err := os.Stat(s.Src)
-	if err != nil {
-		return err
+	for i := range outputs {
+		s.stream <- outputs[i]
 	}
-	dist, err := s.buildV2()
-	if err != nil {
-		return err
-	}
-	err = s.WriteOut()
-	if err != nil {
-		return err
-	}
-	err = WriteExtraFiles(s.Url, s.Dst, dist, stat.ModTime())
-	if err != nil {
-		return err
-	}
-
-	s.pront(len(dist) + 2)
-	return nil
 }
 
-func WriteExtraFiles(url, dst string, dist []OutputFile, srcModTime time.Time) error {
+func Metadata(url, dst string, dist []OutputFile, srcModTime time.Time) ([]OutputFile, error) {
 	sort.Slice(dist, func(i, j int) bool {
 		return dist[i].target < dist[j].target
 	})
 
 	dotFiles, err := DotFiles(dst, dist)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	sitemap, err := Sitemap(dst, url, srcModTime, dist)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = os.WriteFile(filepath.Join(dst, "sitemap.xml"), []byte(sitemap), 0o644)
-	if err != nil {
-		return err
-	}
-	target := filepath.Join(dst, ".files")
-	err = os.WriteFile(target, []byte(dotFiles), 0o644)
-	if err != nil {
-		return fmt.Errorf("error writing %s: %w", target, err)
-	}
-
-	return nil
+	return []OutputFile{
+		Output(filepath.Join(dst, "sitemap.xml"), []byte(sitemap), 0644),
+		Output(filepath.Join(dst, ".files"), []byte(dotFiles), 0644),
+	}, nil
 }
 
-// WriteOut blocks and concurrently writes out s.writes
-// to their target locations.
-//
-// If targets is empty, WriteOut writes to s.dst
-func (s *Ssg) WriteOut() error {
-	_, err := os.Stat(s.Dst)
-	if os.IsNotExist(err) {
-		err = os.MkdirAll(s.Dst, os.ModePerm)
-	}
+func GenerateMetadata(url, dst string, dist []OutputFile, srcModTime time.Time) error {
+	metadata, err := Metadata(url, dst, dist, srcModTime)
 	if err != nil {
 		return err
 	}
-
-	err = WriteOut(s.dist, s.concurrent)
-	if err != nil {
-		return err
-	}
-	return nil
+	return WriteOut(metadata, 2)
 }
 
 func DotFiles(dst string, dist []OutputFile) (string, error) {
@@ -271,8 +232,7 @@ func (s *Ssg) buildV2() ([]OutputFile, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	return s.dist, nil
+	return s.cache, nil
 }
 
 func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
@@ -563,11 +523,19 @@ func Output(target string, data []byte, perm fs.FileMode) OutputFile {
 	}
 }
 
-func (o *OutputFile) modeOutput() fs.FileMode {
+func (o *OutputFile) Perm() fs.FileMode {
 	if o.perm == fs.FileMode(0) {
 		return fs.ModePerm
 	}
 	return o.perm
+}
+
+func (o *OutputFile) Target() string {
+	return o.target
+}
+
+func (o *OutputFile) Data() []byte {
+	return o.data
 }
 
 type writeError struct {
@@ -607,7 +575,7 @@ func WriteOut(writes []OutputFile, concurrent int) error {
 				}
 				return
 			}
-			err = os.WriteFile(w.target, w.data, w.modeOutput())
+			err = os.WriteFile(w.target, w.data, w.Perm())
 			if err != nil {
 				errs <- writeError{
 					err:    err,

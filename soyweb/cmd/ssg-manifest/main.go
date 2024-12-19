@@ -41,7 +41,7 @@ func main() {
 func run(c *cli) {
 	stages := soyweb.StagesAll
 	opts := []ssg.Option{
-		ssg.ConcurrentFromEnv(),
+		ssg.WritersFromEnv(),
 	}
 
 	var manifests []string
