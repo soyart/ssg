@@ -3,6 +3,9 @@ on:
     types: [created]
 
   push:
+    branches:
+      - 'poc/cicd'
+
     tags:
       - 'v*'
       - 'dev-*'
@@ -23,9 +26,18 @@ jobs:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build ssg-go from flake
-        run: 'nix build .#ssg-go'
+        run: |
+          nix build .#ssg-go
 
-      - name: Zip built binaries
+      - name: Zip ssg-go binaries
+        run: |
+          zip -r ssg-go-x86_64_linux.zip result/bin
+
+      - name: Build soyweb from flake
+        run: |
+          nix build .#soyweb
+
+      - name: Zip soyweb binaries
         run: |
           zip -r ssg-go-x86_64_linux.zip result/bin
 
