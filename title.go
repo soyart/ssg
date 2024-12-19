@@ -15,8 +15,9 @@ const (
 	TargetFromH1  = "{{from-h1}}"
 	TargetFromTag = "{{from-tag}}"
 
-	keyTitleFromH1     = "# "      // The first h1 tag is used as document header title
-	keyTitleFromTag    = ":title " // The first line starting with :title will be parsed as document header title
+	keyTitleFromH1  = "# "          // The first h1 tag is used as document header title
+	keyTitleFromTag = ":ssg-title " // The first line starting with :ssg-title will be parsed as document header title
+
 	placeholderFromH1  = "<title>" + TargetFromH1 + "</title>"
 	placeholderFromTag = "<title>" + TargetFromTag + "</title>"
 )

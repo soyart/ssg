@@ -82,7 +82,7 @@ ssg-go recognizes 2 placeholders:
 
   # This is H1
 
-  : This is also an H1
+  :ssg-title This is also an H1
 
   This is paragraph
   ```
@@ -91,10 +91,10 @@ ssg-go recognizes 2 placeholders:
 
 - `{{from-tag}}`
 
-  Like with `{{from-h1}}`, but finds the first line starting with `:title` instead,
+  Like with `{{from-h1}}`, but finds the first line starting with `:ssg-title` instead,
   i.e. `This is also an H1` from the example above will be used as the page's title.
 
-  > Note: `{{from-tag}}` directive will make ssg look for pattern `:title YourTitle\n\n`,
+  > Note: `{{from-tag}}` directive will make ssg look for pattern `:ssg-title YourTitle\n\n`,
   > so users must always append an empty line after the title tag line.
 
 For example, consider the following header/footer templates and a Markdown page:
@@ -123,7 +123,7 @@ For example, consider the following header/footer templates and a Markdown page:
 
 Mar 24 2024
 
-:title Real Header
+:ssg-title Real Header
 
 # Some Header 2
 
@@ -258,7 +258,7 @@ soyweb uses this option to implement output minifier.
 
 ## `Impl`
 
-`Impl` is a Go function called on a file during filesystem directory walk,
+`Impl` is a Go function called on a file during filesystem directory walk.
 To reduce complexity, ignored files and ssg headers/footers are not sent
 to `Impl`. This preserves the core functionality of the original ssg.
 

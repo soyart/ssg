@@ -1,4 +1,4 @@
-:title Foo
+:ssg-title Foo
 
 # Foo!
 

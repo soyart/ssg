@@ -1,4 +1,4 @@
-:title LOLOLOL
+:ssg-title LOLOLOL
 
 # Have a laugh, lol
 

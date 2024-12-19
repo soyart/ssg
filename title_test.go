@@ -50,7 +50,7 @@ Some para`,
 			markdown: `
 Mar 24 1998
 
-:title Not a title
+:ssg-title Not a title
 
 ## Some h2
 
@@ -86,6 +86,7 @@ Some para`,
 		}
 	}
 }
+
 func TestTitleFromTag(t *testing.T) {
 	type testCase struct {
 		head             string
@@ -107,7 +108,7 @@ func TestTitleFromTag(t *testing.T) {
 			markdown: `
 Mar 24 1998
 
-:title My title
+:ssg-title My title
 
 # Some h1
 
@@ -137,9 +138,9 @@ Some para`,
 			markdown: `
 Mar 24 1998
 
-	:title Not actually title
+	:ssg-title Not actually title
 
-:title This is the title
+:ssg-title This is the title
 
 # Some h1
 
@@ -154,7 +155,7 @@ Some para  `,
 			expectedMarkdown: `
 Mar 24 1998
 
-	:title Not actually title
+	:ssg-title Not actually title
 
 # Some h1
 
@@ -170,11 +171,11 @@ Some para  `,
 			markdown: `
 Mar 24 1998
 
-	:title Not actually title
+	:ssg-title Not actually title
 
-:title This is the title
+:ssg-title This is the title
 
-:title This should persist
+:ssg-title This should persist
 
 # Some h1
 
@@ -189,9 +190,9 @@ Some para  `,
 			expectedMarkdown: `
 Mar 24 1998
 
-	:title Not actually title
+	:ssg-title Not actually title
 
-:title This should persist
+:ssg-title This should persist
 
 # Some h1
 

@@ -149,7 +149,7 @@ marker files. [`ssg.TitleFrom`](../title.go) tags are respected and title extrac
 for the generated index is handled in the familiar fashion.
 
 The only quirks with the generator is that, in the index entries, child titles are extracted
-from `:title` tag first, and if there's no such title, then the first Markdown h1 (`# FooTitle`)
-will be picked as the child title.
+from `:ssg-title` tag first, and if there's no such title, then the first Markdown h1 (`# FooTitle`)
+will be picked as the child title *within* the index.
 
-The generator is currently available to `ssg-manifest` via the site manifest specification
+The generator is currently available to `ssg-manifest` via the site manifest specification.
