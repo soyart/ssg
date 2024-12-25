@@ -76,10 +76,13 @@ func Generate(src, dst, title, url string, opts ...Option) error {
 
 // New returns a default, vanilla [Ssg].
 func New(src, dst, title, url string) Ssg {
+	src = filepath.Clean(src)
+	dst = filepath.Clean(dst)
 	ignores, err := prepare(src, dst)
 	if err != nil {
 		panic(err)
 	}
+
 	return Ssg{
 		Src:        src,
 		Dst:        dst,
@@ -228,11 +231,7 @@ func DotFiles(dst string, dist []OutputFile) (string, error) {
 }
 
 func (s *Ssg) buildV2() ([]OutputFile, error) {
-	rel, err := filepath.Rel(".", s.Src) // Eliminate preceding './', so that chooser will not be confused
-	if err != nil {
-		return nil, err
-	}
-	err = filepath.WalkDir(rel, s.walkBuildV2)
+	err := filepath.WalkDir(s.Src, s.walkBuildV2)
 	if err != nil {
 		return nil, err
 	}
