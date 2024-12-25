@@ -14,13 +14,14 @@ func TestGenerateIndex(t *testing.T) {
 	src := "./testdata/myblog/src"
 	dst := "./testdata/myblog/dst"
 	title := "TestTitle"
-	defaultTitleHtml := fmt.Sprintf("<title>%s</title>", title)
+	url := "https://my.blog"
 
 	err := os.RemoveAll(dst)
 	if err != nil {
 		panic(err)
 	}
 
+	defaultTitleHtml := fmt.Sprintf("<title>%s</title>", title)
 	markers := map[string][]string{
 		"_index.soyweb": {
 			`<title>My blog (title tag)</title>`,
@@ -51,21 +52,21 @@ func TestGenerateIndex(t *testing.T) {
 		markerPath := filepath.Join(src, marker)
 		assertFs(t, markerPath, false)
 
-		index := toGenerated(markerPath)
+		index := formatIndexPath(markerPath)
 		_, err := os.Stat(index)
 		if err == nil {
 			t.Fatalf("unexpected index.html before generator runs")
 		}
 	}
 
-	err = ssg.Generate(src, dst, "TestTitle", "https://my.blog", IndexGenerator())
+	err = ssg.Generate(src, dst, title, url, IndexGenerator())
 	if err != nil {
 		t.Fatalf("error during ssg generation: %v", err)
 	}
 
 	for marker, entries := range markers {
 		markerPath := filepath.Join(dst, marker)
-		index := toGenerated(markerPath)
+		index := formatIndexPath(markerPath)
 		assertFs(t, index, false)
 
 		content, err := os.ReadFile(index)
@@ -88,7 +89,7 @@ func TestGenerateIndex(t *testing.T) {
 	}
 }
 
-func toGenerated(s string) string {
-	s = filepath.Dir(s)
-	return filepath.Join(s, "index.html")
+func formatIndexPath(marker string) string {
+	marker = filepath.Dir(marker)
+	return filepath.Join(marker, "index.html")
 }

@@ -23,7 +23,7 @@ func main() {
 		title = os.Args[3]
 	}
 	if len(os.Args) >= 5 {
-		title = os.Args[4]
+		url = os.Args[4]
 	}
 
 	err := ssg.Generate(
