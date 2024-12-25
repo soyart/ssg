@@ -1,6 +1,7 @@
 package soyweb
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,8 @@ import (
 func TestGenerateIndex(t *testing.T) {
 	src := "./testdata/myblog/src"
 	dst := "./testdata/myblog/dst"
+	title := "TestTitle"
+	defaultTitleHtml := fmt.Sprintf("<title>%s</title>", title)
 
 	err := os.RemoveAll(dst)
 	if err != nil {
@@ -20,23 +23,25 @@ func TestGenerateIndex(t *testing.T) {
 
 	markers := map[string][]string{
 		"_index.soyweb": {
-			// `<title>My blog (title tag)</title>`,
+			`<title>My blog (title tag)</title>`,
 			`<li><p><a href="/2023/">2023</a></p></li>`,
 			`<li><p><a href="/2022/">2022</a></p></li>`,
 		},
 		"2022/_index.soyweb": {
-			`Index of 2022`,
+			`<title>twenty and twenty-two (from-tag)</title>`,
 			`<li><p><a href="/2022/bar/">bar</a></p></li>`,
 			`<li><p><a href="/2022/foo.html">Foo</a></p></li>`,
 		},
 		"2023/_index.soyweb": {
-			`Index of 2023`,
+			defaultTitleHtml,
+			`Index of 2023`, // because _index.soyweb was empty
 			`<li><p><a href="/2023/baz.html">Bazketball</a></p></li>`,
 			`<li><p><a href="/2023/recurse/">recurse</a></p></li>`,
 			`<li><p><a href="/2023/lol/">LOLOLOL</a></p></li>`,
 		},
 		"2023/recurse/_index.soyweb": {
-			`<title>Recurse Index</title>`,
+			defaultTitleHtml,
+			`<h1 id="recurse-index">Recurse Index</h1>`,
 			"<li><p><a href=\"/2023/recurse/r1/\">Recursive 1</a></p></li>",
 			"<li><p><a href=\"/2023/recurse/r2/\">Recursive 2</a></p></li>",
 		},

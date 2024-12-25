@@ -228,7 +228,11 @@ func DotFiles(dst string, dist []OutputFile) (string, error) {
 }
 
 func (s *Ssg) buildV2() ([]OutputFile, error) {
-	err := filepath.WalkDir(s.Src, s.walkBuildV2)
+	rel, err := filepath.Rel(".", s.Src) // Eliminate preceding './', so that chooser will not be confused
+	if err != nil {
+		return nil, err
+	}
+	err = filepath.WalkDir(rel, s.walkBuildV2)
 	if err != nil {
 		return nil, err
 	}

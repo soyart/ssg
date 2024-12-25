@@ -7,8 +7,8 @@ import (
 
 func main() {
 	err := ssg.Generate(
-		"testdata/myblog/src",
-		"testdata/myblog/dst",
+		"./testdata/myblog/src",
+		"./testdata/myblog/dst",
 		"TestIndexGenerator",
 		"https://myblog.com",
 		soyweb.IndexGenerator(),
