@@ -76,10 +76,13 @@ func Generate(src, dst, title, url string, opts ...Option) error {
 
 // New returns a default, vanilla [Ssg].
 func New(src, dst, title, url string) Ssg {
+	src = filepath.Clean(src)
+	dst = filepath.Clean(dst)
 	ignores, err := prepare(src, dst)
 	if err != nil {
 		panic(err)
 	}
+
 	return Ssg{
 		Src:        src,
 		Dst:        dst,
