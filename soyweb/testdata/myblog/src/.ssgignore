@@ -1,1 +1,4 @@
-testdir
+ignore1.md
+ignore2
+testdir/ignore3
+testdir/ignore4
