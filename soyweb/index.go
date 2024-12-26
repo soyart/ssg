@@ -17,17 +17,24 @@ import (
 // Once it finds a marked directory, it inspects the children
 // and generate a Markdown list with name index.md,
 // which is later sent to supplied impl.
-func indexGenerator(src string, next ssg.Impl) ssg.Impl {
+func indexGenerator(s *ssg.Ssg) ssg.Impl {
+	src := s.Src
+	next := s.ImplDefault() // HTTP middleware-style
+	ignore := s.Ignore
+
 	return func(path string, data []byte, d fs.DirEntry) error {
 		switch {
 		case
 			d.IsDir(),
 			filepath.Base(path) != MarkerIndex:
 			return next(path, data, d)
+
+		case ignore(path):
+			panic("unexpected ignored file for index-generator: " + path)
 		}
 
 		parent := filepath.Dir(path)
-		ssg.Fprintf(os.Stdout, "found blog marker: marker=\"%s\", parent=\"%s\"\n", path, parent)
+		ssg.Fprintf(os.Stdout, "found index-generator marker: marker=\"%s\", parent=\"%s\"\n", path, parent)
 
 		entries, err := os.ReadDir(parent)
 		if err != nil {
@@ -38,7 +45,7 @@ func indexGenerator(src string, next ssg.Impl) ssg.Impl {
 			return fmt.Errorf("failed to read marker '%s': %w", path, err)
 		}
 
-		index, err := genIndex(src, parent, entries, template)
+		index, err := genIndex(src, ignore, parent, entries, template)
 		if err != nil {
 			return fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
 		}
@@ -49,6 +56,7 @@ func indexGenerator(src string, next ssg.Impl) ssg.Impl {
 
 func genIndex(
 	src string,
+	ignore func(path string) bool,
 	parent string,
 	children []fs.DirEntry,
 	template []byte,
@@ -65,6 +73,10 @@ func genIndex(
 		child := children[i]
 		childPath := child.Name()
 		childTitle := childPath
+
+		if ignore(childPath) {
+			continue
+		}
 
 		switch childPath {
 		case
@@ -85,6 +97,9 @@ func genIndex(
 			// e.g. /parent/article/index.html
 			// or   /parent/article/index.md
 			childDir := filepath.Join(parent, childPath)
+			if ignore(childDir) {
+				continue
+			}
 			grandChildren, err := os.ReadDir(childDir)
 			if err != nil {
 				return "", fmt.Errorf("failed to read child dir %s: %w", childPath, err)

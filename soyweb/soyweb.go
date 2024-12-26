@@ -40,8 +40,8 @@ type (
 // index.md/index.html for all unignored _index.soyweb marker files.
 func IndexGenerator() ssg.Option {
 	return func(s *ssg.Ssg) {
-		g := indexGenerator(s.Src, s.ImplDefault())
-		ssg.WithImpl(g)(s)
+		generator := indexGenerator(s)
+		ssg.WithImpl(generator)(s)
 	}
 }
 

@@ -404,6 +404,10 @@ func (s *Ssg) ImplDefault() Impl {
 	return s.implDefault
 }
 
+func (s *Ssg) Ignore(path string) bool {
+	return s.ssgignores.ignore(path)
+}
+
 func (s *Ssg) pront(l int) {
 	Fprintf(os.Stdout, "[ssg-go] wrote %d file(s) to %s\n", l, s.Dst)
 }
