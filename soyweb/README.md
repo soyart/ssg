@@ -1,12 +1,19 @@
 # soyweb
 
-soyweb is a collection of tools meant to replace [webtools](https://github.com/soyart/webtools).
+soyweb is a collection of ssg-go wrapper and extensions.
 
-At the core, it uses its own [Go implementation](https://github.com/soyart/ssg)
+At the core, soyweb uses [ssg-go](https://github.com/soyart/ssg)
 of [ssg](https://romanzolotarev.com/ssg.html) to convert Markdown files
 into HTML files.
 
-soyweb provides 3 more programs and a library for working with ssg:
+soyweb extensions respect ssg-go quirks such as ssgignore,
+header and footer handling, preference of source HTML files over Markdown,
+file permissions, etc.
+
+In addition to extension library, soyweb provides a few programs that
+serve as a collection of tools meant to replace [webtools](https://github.com/soyart/webtools).
+The main purpose is to build [artnoi.com](https://artnoi.com) with a single binary
+to streamline the site's CI/CD pipelines.
 
 > Most of these programs share the same CLI flags, and the help messagee
 > can be accessible via `-h` or `--help`
@@ -123,12 +130,12 @@ The minifiers is available to all programs under soyweb.
 
 ## [Index generator](./index.go)
 
-soyweb provides an [ssg.Impl](/options.go) that will automatically generate indices
+soyweb provides an [ssg.Impl](/options.go) that will automatically generate index
 for blog directories. It scans for marker file `_index.soyweb`, and, if found,
 lists all links to the children (i.e. "articles").
 
-The marker `_index.soyweb` can be empty, or contain template,
-in plaintext, Markdown, or HTML.
+The marker `_index.soyweb` can be empty, or contain template. If not empty, the
+template inside the marker will be treated as Markdown.
 
 To be considered an entry, a path has to be either:
 
@@ -144,6 +151,10 @@ The marker `_index.soyweb` could be a Markdown, and apart from having its conten
 appended by the generated index, the file is handled normally like with other
 ssg-go input files.
 
+The generator is currently available to `ssg-manifest` via the site manifest specification.
+
+### Index generator title extraction
+
 In other words, `_header.html` and `_footer.html` will surround the index generated from
 marker files. [`ssg.TitleFrom`](../title.go) tags are respected and title extraction
 for the generated index is handled in the familiar fashion.
@@ -152,4 +163,122 @@ The only quirks with the generator is that, in the index entries, child titles a
 from `:ssg-title` tag first, and if there's no such title, then the first Markdown h1 (`# FooTitle`)
 will be picked as the child title *within* the index.
 
-The generator is currently available to `ssg-manifest` via the site manifest specification.
+### Index generator practical examples
+
+For example, consider ssg source directory `src`:
+
+```
+src
+├── 2022
+│   ├── _index.soyweb
+│   ├── lol.md
+│   └── not_article.svg
+├── 2023
+│   ├── hahaha
+│   │   └── index.md
+│   ├── _index.soyweb
+│   └── baz.md
+├── _footer.html
+├── _header.html
+├── _index.soyweb
+└── somedir
+```
+
+We see 3 markers, in `src`, `src/2022`, and `src/2023`. This means
+that we should get 3 generated `index.html`s. But we also see that
+`src/2022/index.html` already exists.
+
+This means that ssg will not pass the `src/2022/_index.soyweb` to
+the generator, and only 2 indexes will be generated.
+
+Let us first focus on the root marker. We see that there're 3 top-level children,
+namely, `2022`, `2023`, `somedir`.
+
+The generated index should have links to these 3 children.
+If the destination is `dst`, then the generated index from this root marker
+will be at `dst/index.html`, mirroring `src/_index.soyweb` location in `src`.
+
+We can look up the special ssg files so that we can compare the output:
+
+`src/_header.html`:
+
+```html
+<!-- My blog header! -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{{from-tag}}</title>
+</head>
+<body>
+```
+
+`src/_footer.html`:
+
+```html
+<!-- My blog footer! -->
+</body>
+</html>
+```
+
+`src/_index.soyweb`:
+
+```markdown
+:ssg-title FooTitle
+
+# Welcome to my blog!
+
+Below is the list of my articles!
+
+```
+
+Now, the generated index `dst/index.html` looks like this:
+
+```html
+<!-- My blog header! -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FooTitle</title>
+</head>
+<body>
+<h1>Welcome to my blog!</h1>
+<p>Below is the list of my articles!</p>
+<ul>
+  <li><p><a href="/2023/">2023</a></p></li>
+  <li><p><a href="/2022/">2022</a></p></li>
+  <li><p><a href="/somedir/">SomeDir title</a></p></li>
+</ul>
+<!-- My blog footer! -->
+</body>
+</html>
+```
+
+What about `src/2023/_index.soyweb` marker? If it's not empty,
+then the output will be generated in a fashion similar
+to the root marker example above.
+
+But what if the marker `src/2023/_index.soyweb` is empty?
+If so, then the default heading will be used, and the generated
+`dst/2023/index.html` looks like this:
+
+```html
+<!-- My blog header! -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SomeDefaultTitle</title>
+</head>
+<body>
+<h1>Index of somedir</h1>
+<ul>
+  <li><p><a href="/hahaha/">BarTitle</a></p></li>
+  <li><p><a href="/baz.html">BazTitle</a></p></li>
+</ul>
+<!-- My blog footer! -->
+</body>
+</html>
+```
+

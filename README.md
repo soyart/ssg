@@ -205,18 +205,18 @@ ssg-go falls back to 20 concurrent writers.
 There're 2 main ssg threads: one is for building the outputs,
 and the other is the write thread.
 
-The main thread *sequentially* reads and sends outputs to the write
-thread via a buffered Go channel.
+The build thread *sequentially* reads, builds and sends outputs
+to the write thread via a buffered Go channel.
 
 Bufffering allows the builder thread to continue to build and send outputs
 to the writer until the buffer is full.
 
+This helps reduce back pressure, and keeps memory usage low.
+The buffer size is, by default, 2x of the number of writers.
+
 This means that, at any point in time during a generation of any number of files
 with 20 writers, ssg-go will at most only hold 40 output files
 in memory (in the buffered channel).
-
-This helps reduce back pressure, and keeps memory usage low.
-The buffer size is, by default, 2x of the number of writers.
 
 If you are importing ssg-go to your code and you don't want this
 streaming behavior, you can use the exposed function `Build`, `WriteOut`,
@@ -262,6 +262,9 @@ soyweb uses this option to implement output minifier.
 To reduce complexity, ignored files and ssg headers/footers are not sent
 to `Impl`. This preserves the core functionality of the original ssg.
 
+An example of `Impl` would be the [index generator](./index.go),
+which intercept all unignored files
+
 > When using `Impl`, `HookAll` or `HookGenerate` are not called
 > unless explicitly called in the Impl.
 >
@@ -273,5 +276,4 @@ to `Impl`. This preserves the core functionality of the original ssg.
 > If it needs to generate an index, then it creates a new output file,
 > and passes that to the standard ssg-go implementation, allowing all
 > the features such as header/footer combination and hooks to continue to work.
-
 

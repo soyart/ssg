@@ -220,8 +220,7 @@ func DotFiles(dst string, dist []OutputFile) (string, error) {
 		}
 		// Replace Markdown extension
 		if filepath.Ext(path) == ".html" {
-			path = strings.TrimSuffix(path, ".html")
-			path += ".md"
+			path = ChangeExt(path, ".html", ".md")
 		}
 
 		Fprintf(list, "./%s\n", path)
@@ -351,11 +350,9 @@ func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
 		return nil
 	}
 
-	// Make way for existing (preferred) html file with matching base name
-	html := strings.TrimSuffix(path, ".md")
-	html += ".html"
+	html := ChangeExt(path, ".md", ".html")
 	if s.preferred.ContainsAll(html) {
-		return nil
+		return nil // Make way for existing (preferred) html file with matching base name
 	}
 
 	target, err := MirrorPath(s.Src, s.Dst, path, ".html")
@@ -505,8 +502,7 @@ func MirrorPath(
 ) {
 	ext := filepath.Ext(path)
 	if ext != newExt {
-		path = strings.TrimSuffix(path, ext)
-		path += newExt
+		path = ChangeExt(path, ext, newExt)
 	}
 	path, err := filepath.Rel(src, path)
 	if err != nil {

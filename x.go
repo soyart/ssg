@@ -36,6 +36,11 @@ func FileIs(f os.FileInfo, mode fs.FileMode) bool {
 	return f.Mode()&mode != 0
 }
 
+func ChangeExt(path, old, new string) string {
+	path = strings.TrimSuffix(path, old)
+	return path + new
+}
+
 func (s Set) Insert(v string) bool {
 	_, ok := s[v]
 	s[v] = struct{}{}
