@@ -83,7 +83,7 @@ func genIndex(
 
 		isDir := sib.IsDir()
 		sibExt := filepath.Ext(sibName)
-		if !isDir && sibExt != ".md" {
+		if !isDir && (sibExt != ".md" && sibExt != ".html") {
 			continue
 		}
 
@@ -137,7 +137,7 @@ func genIndex(
 				linkTitle = string(title)
 			}
 
-		case sibExt == ".md":
+		case sibExt == ".md" || sibExt == ".html":
 			title, err := extractTitle(sibPath)
 			if err != nil {
 				return "", err
@@ -145,8 +145,9 @@ func genIndex(
 			if len(title) != 0 {
 				linkTitle = string(title)
 			}
-
-			sibName = ssg.ChangeExt(sibName, ".md", ".html")
+			if sibExt == ".md" {
+				sibName = ssg.ChangeExt(sibName, ".md", ".html")
+			}
 
 		default:
 			panic("unhandled case for child: " + filepath.Join(parent, sibName))
