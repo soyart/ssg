@@ -44,16 +44,11 @@ nix build .#soyweb # Build soyweb programs
 ssg <src> <dst> <title> <url>
 ```
 
-Each implementation of ssg reads Markdown files under `src`,
-converts each to HTML and prepends and appends the resulting HTML
-with `_header.html` and `_footer.html` respectively.
+ssg reads Markdown files under `src`, converts each to HTML,
+and prepends and appends the resulting HTML with `_header.html`
+and `_footer.html` respectively. The output file tree is mirrored into `dst`.
 
-The output file tree is mirrored into `dst`.
-Files or directories whose names start with `.` are skipped.
-
-Both implementation accepts a CLI parameter `title` (3rd arg)
-that will be used as default `<title>` tag inside `<head>` (*head title*).
-
+Files or directories whose names start with `.` are ignored.
 Files listed in `${src}/.ssgignore` are also ignored in a fashion similar
 to `.gitignore`. To see how `.ssgignore` works in Go implementation, see
 [the test `TestSsgignore`](./ssg_test.go).
@@ -65,12 +60,18 @@ into mirrored `dst`.
 
 ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
 
+HTML tags `<head><title>` is extracted from the first Markdown h1 (default),
+or a default value provided at the command-line (the 3rd argument).
+
+> With ssg-go, the titles can also be extracted from special line starting
+> with `:ssg-title` tag. This line will be removed from the output.
+
 ## Differences between ssg and ssg-go
 
 ### Custom title tag for `_header.html`
 
-ssg-go also parses `_header.go` for title replacement placeholder. Currently,
-ssg-go recognizes 2 placeholders:
+ssg-go also parses `_header.go` for title replacement placeholder.
+Currently, ssg-go recognizes 2 placeholders:
 
 - `{{from-h1}}`
 
@@ -202,6 +203,7 @@ ssg-go falls back to 20 concurrent writers.
 
 ### Streaming and caching builds
 
+To minimize runtime memory usage, ssg-go builds and writes concurrently.
 There're 2 main ssg threads: one is for building the outputs,
 and the other is the write thread.
 
@@ -258,21 +260,20 @@ soyweb uses this option to implement output minifier.
 
 ## `Impl`
 
-`Impl` is a Go function called on a file during filesystem directory walk.
+`Impl` is a Go function called on a file during directory walk.
 To reduce complexity, ignored files and ssg headers/footers are not sent
 to `Impl`. This preserves the core functionality of the original ssg.
 
-An example of `Impl` would be the [index generator](./index.go),
-which intercept all unignored files
-
 > When using `Impl`, `HookAll` or `HookGenerate` are not called
-> unless explicitly called in the Impl.
+> unless explicitly implemented to do so.
 >
-> HTTP-back-end-style *middlewares* can be implemented with `Impl`,
-> as shown in the [soyweb index generator](./soyweb/index.go). Here,
-> the generator `Impl` sees if it needs to create an index for a directory,
-> 
+> Type `ssg.Ssg` provides a method `ImplDefault() Impl`,
+> and the return value can be used to implement vanilla ssg-go behavior,
+> enabling HTTP-middleware-style composing as shown in the [soyweb index generator](./soyweb/index.go).
+>
+> Here, the generator `Impl` sees if it needs to create an index for a directory,
 > and, if not, simply passes the data back to ssg-go default implementation.
+>
 > If it needs to generate an index, then it creates a new output file,
 > and passes that to the standard ssg-go implementation, allowing all
 > the features such as header/footer combination and hooks to continue to work.

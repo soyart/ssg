@@ -218,6 +218,7 @@ func DotFiles(dst string, dist []OutputFile) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		// TODO: use original file that results in this output
 		// Replace Markdown extension
 		if filepath.Ext(path) == ".html" {
 			path = ChangeExt(path, ".html", ".md")
