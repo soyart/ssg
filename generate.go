@@ -94,22 +94,25 @@ func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]OutputFile, error
 			err := os.MkdirAll(filepath.Dir(w.target), os.ModePerm)
 			if err != nil {
 				errs <- writeError{
-					err:    err,
-					target: w.target,
+					err:        err,
+					target:     w.target,
+					originator: w.originator,
 				}
 				return
 			}
 			err = os.WriteFile(w.target, w.data, w.Perm())
 			if err != nil {
 				errs <- writeError{
-					err:    err,
-					target: w.target,
+					err:        err,
+					target:     w.target,
+					originator: w.originator,
 				}
 				return
 			}
 
 			mut.Lock()
 			defer mut.Unlock()
+
 			written = append(written, Output(w.target, w.originator, nil, w.perm))
 			Fprintln(os.Stdout, w.target)
 

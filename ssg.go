@@ -270,6 +270,9 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 	}
 
 	// Remember input files for .files
+	//
+	// Original ssg does not include _header.html
+	// and _footer.html in .files
 	s.files = append(s.files, path)
 
 	data, err := os.ReadFile(path)
@@ -527,6 +530,11 @@ func MirrorPath(
 	return filepath.Join(dst, path), nil
 }
 
+// OutputFile is the main output struct for ssg-go.
+//
+// Its values are not supposed to be changed by other packages,
+// and thus the only ways other packages can work with OutputFile
+// is via the constructor [Output] and the type's getter methods.
 type OutputFile struct {
 	target     string
 	originator string
@@ -543,6 +551,18 @@ func Output(target string, originator string, data []byte, perm fs.FileMode) Out
 	}
 }
 
+func (o *OutputFile) Target() string {
+	return o.target
+}
+
+func (o *OutputFile) Originator() string {
+	return o.originator
+}
+
+func (o *OutputFile) Data() []byte {
+	return o.data
+}
+
 func (o *OutputFile) Perm() fs.FileMode {
 	if o.perm == fs.FileMode(0) {
 		return fs.ModePerm
@@ -550,21 +570,14 @@ func (o *OutputFile) Perm() fs.FileMode {
 	return o.perm
 }
 
-func (o *OutputFile) Target() string {
-	return o.target
-}
-
-func (o *OutputFile) Data() []byte {
-	return o.data
-}
-
 type writeError struct {
-	err    error
-	target string
+	err        error
+	target     string
+	originator string
 }
 
 func (w writeError) Error() string {
-	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
+	return fmt.Errorf("WriteError(target='%s',originator='%s'): %w", w.target, w.originator, w.err).Error()
 }
 
 // WriteOut blocks and writes concurrently to output locations.
@@ -590,16 +603,18 @@ func WriteOut(writes []OutputFile, concurrent int) error {
 			err := os.MkdirAll(filepath.Dir(w.target), os.ModePerm)
 			if err != nil {
 				errs <- writeError{
-					err:    err,
-					target: w.target,
+					err:        err,
+					target:     w.target,
+					originator: w.originator,
 				}
 				return
 			}
 			err = os.WriteFile(w.target, w.data, w.Perm())
 			if err != nil {
 				errs <- writeError{
-					err:    err,
-					target: w.target,
+					err:        err,
+					target:     w.target,
+					originator: w.originator,
 				}
 				return
 			}
