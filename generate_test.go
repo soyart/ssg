@@ -23,7 +23,7 @@ func generateCaching(s *Ssg) error {
 	if err != nil {
 		return err
 	}
-	err = GenerateMetadata(s.Url, s.Dst, dist, stat.ModTime())
+	err = GenerateMetadata(s.Src, s.Dst, s.Url, s.files, dist, stat.ModTime())
 	if err != nil {
 		return err
 	}

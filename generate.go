@@ -61,7 +61,7 @@ func generate(s *Ssg) error {
 		outputs[i] = Output(written[i], nil, 0)
 	}
 
-	err = GenerateMetadata(s.Url, s.Dst, outputs, stat.ModTime())
+	err = GenerateMetadata(s.Src, s.Dst, s.Url, s.files, outputs, stat.ModTime())
 	if err != nil {
 		return err
 	}

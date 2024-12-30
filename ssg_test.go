@@ -392,12 +392,13 @@ func TestBuildAndWriteOut(t *testing.T) {
 		panic(err)
 	}
 
-	err = Generate(src, dstGenerate, title, url)
+	sGenerate := New(src, dstGenerate, title, url)
+	err = sGenerate.Generate()
 	if err != nil {
 		panic(err)
 	}
 
-	dist, err := Build(src, dstBuild, title, url)
+	files, dist, err := Build(src, dstBuild, title, url)
 	if err != nil {
 		panic(err)
 	}
@@ -409,7 +410,7 @@ func TestBuildAndWriteOut(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	err = GenerateMetadata(url, dstBuild, dist, stat.ModTime())
+	err = GenerateMetadata(src, dstBuild, url, files, dist, stat.ModTime())
 	if err != nil {
 		panic(err)
 	}

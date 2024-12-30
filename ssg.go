@@ -55,17 +55,25 @@ type Ssg struct {
 	ssgignores ignorer
 	headers    headers
 	footers    footers
-	preferred  Set // Used to prefer html and ignore md files with identical names, as with the original ssg
+	preferred  Set      // Used to prefer html and ignore md files with identical names, as with the original ssg
+	files      []string // Files read (unignored)
 	cache      []OutputFile
 }
 
-// Build returns the ssg outputs built from src
-func Build(src, dst, title, url string, opts ...Option) ([]OutputFile, error) {
+// Build returns the ssg outputs built from src,
+// returning files read (for .files), outputs, and error.
+func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile, error) {
 	s := New(src, dst, title, url)
-	return s.
+	dist, err := s.
 		With(opts...).
 		With(Caching()).
 		buildV2()
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return s.files, dist, nil
 }
 
 // Generate creates a one-off [Ssg] that's used to generate a site right away.
@@ -182,15 +190,26 @@ func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	}
 }
 
-func Metadata(url, dst string, dist []OutputFile, srcModTime time.Time) ([]OutputFile, error) {
+func Metadata(
+	src string,
+	dst string,
+	url string,
+	files []string,
+	dist []OutputFile,
+	srcModTime time.Time,
+) (
+	[]OutputFile,
+	error,
+) {
+	dotFiles, err := DotFiles(src, files)
+	if err != nil {
+		return nil, err
+	}
+
 	sort.Slice(dist, func(i, j int) bool {
 		return dist[i].target < dist[j].target
 	})
 
-	dotFiles, err := DotFiles(dst, dist)
-	if err != nil {
-		return nil, err
-	}
 	sitemap, err := Sitemap(dst, url, srcModTime, dist)
 	if err != nil {
 		return nil, err
@@ -202,19 +221,26 @@ func Metadata(url, dst string, dist []OutputFile, srcModTime time.Time) ([]Outpu
 	}, nil
 }
 
-func GenerateMetadata(url, dst string, dist []OutputFile, srcModTime time.Time) error {
-	metadata, err := Metadata(url, dst, dist, srcModTime)
+func GenerateMetadata(
+	src string,
+	dst string,
+	url string,
+	files []string,
+	dist []OutputFile,
+	srcModTime time.Time,
+) error {
+	metadata, err := Metadata(src, dst, url, files, dist, srcModTime)
 	if err != nil {
 		return err
 	}
 	return WriteOut(metadata, 2)
 }
 
-func DotFiles(dst string, dist []OutputFile) (string, error) {
+func DotFiles(src string, dist []string) (string, error) {
 	list := bytes.NewBuffer(nil)
 	for i := range dist {
-		f := &dist[i]
-		path, err := filepath.Rel(dst, f.target)
+		f := dist[i]
+		path, err := filepath.Rel(src, f)
 		if err != nil {
 			return "", err
 		}
@@ -254,6 +280,8 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 	if ignore {
 		return nil
 	}
+
+	s.files = append(s.files, path)
 
 	switch base {
 	case MarkerHeader, MarkerFooter:
