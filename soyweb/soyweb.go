@@ -41,7 +41,7 @@ type (
 func IndexGenerator() ssg.Option {
 	return func(s *ssg.Ssg) {
 		generator := indexGenerator(s)
-		ssg.WithImpl(generator)(s)
+		ssg.WithPipeline(generator)(s)
 	}
 }
 

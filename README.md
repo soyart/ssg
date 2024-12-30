@@ -44,9 +44,9 @@ nix build .#soyweb # Build soyweb programs
 ssg <src> <dst> <title> <url>
 ```
 
-ssg reads Markdown files under `src`, converts each to HTML,
+ssg reads Markdown files under `${src}`, converts each to HTML,
 and prepends and appends the resulting HTML with `_header.html`
-and `_footer.html` respectively. The output file tree is mirrored into `dst`.
+and `_footer.html` respectively. The output file tree is mirrored into `${dst}`.
 
 Files or directories whose names start with `.` are ignored.
 Files listed in `${src}/.ssgignore` are also ignored in a fashion similar
@@ -56,9 +56,9 @@ to `.gitignore`. To see how `.ssgignore` works in Go implementation, see
 If we have `foo.html` and `foo.md`, the HTML file wins.
 
 Files with extensions other than `.md` will simply be copied
-into mirrored `dst`.
+into mirrored `${dst}`.
 
-ssg also generates `dst/sitemap.xml` with data from the CLI parameter.
+ssg also generates `${dst}/sitemap.xml` with data from the CLI parameter.
 
 HTML tags `<head><title>` is extracted from the first Markdown h1 (default),
 or a default value provided at the command-line (the 3rd argument).
@@ -258,20 +258,21 @@ soyweb uses this option to implement global minifiers.
 `HookGenerate` is a Go function called on every generated HTML.
 soyweb uses this option to implement output minifier.
 
-## `Impl`
+## `Pipeline`
 
-`Impl` is a Go function called on a file during directory walk.
+`Pipeline` is a Go function called on a file during directory walk.
 To reduce complexity, ignored files and ssg headers/footers are not sent
-to `Impl`. This preserves the core functionality of the original ssg.
+to `Pipeline`. This preserves the core functionality of the original ssg.
 
-> When using `Impl`, `HookAll` or `HookGenerate` are not called
-> unless explicitly implemented to do so.
+> When using `Pipeline` option, options `HookAll` or `HookGenerate`
+> are not used unless explicitly implemented in the `Pipeline` option
+> to do so. This helps reduce complexity.
 >
-> Type `ssg.Ssg` provides a method `ImplDefault() Impl`,
-> and the return value can be used to implement vanilla ssg-go behavior,
-> enabling HTTP-middleware-style composing as shown in the [soyweb index generator](./soyweb/index.go).
+> Type `Ssg` provides a method `PipelineDefault() Pipeline`,
+> and the return value can be used to perform vanilla ssg-go behavior.
+> This allows HTTP-middleware-style composing as shown in the [soyweb index generator](./soyweb/index.go).
 >
-> Here, the generator `Impl` sees if it needs to create an index for a directory,
+> Here, the generator `Pipeline` sees if it needs to create an index for a directory,
 > and, if not, simply passes the data back to ssg-go default implementation.
 >
 > If it needs to generate an index, then it creates a new output file,

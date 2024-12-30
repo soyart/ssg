@@ -131,28 +131,43 @@ The minifiers is available to all programs under soyweb.
 
 ### [Index generator](./index.go)
 
-soyweb provides an [ssg.Impl](/options.go) that will automatically generate index
-for blog directories. It scans for marker file `_index.soyweb`, and, if found,
-lists all links to the children (i.e. "articles").
+soyweb provides an automatic index generator implemented as a [ssg.Pipeline](/options.go).
+This pipeline will automatically generate index sibling Markdowns, HTMLs, and directories.
+
+It looks for marker file `_index.soyweb` somewhere under `${src}`, and,
+if found, lists all links to the children (i.e. "articles").
 
 The marker `_index.soyweb` can be empty, or contain template. If not empty, the
 template inside the marker will be treated as Markdown.
 
-To be considered an entry, a path has to be either:
+To be considered an entry by the generator, the marker's sibling has to satisfy
+at least one of the criteria:
+
+- A file with `.md` or `.html` extension
+
+  The generated index will point to HTML extensions
 
 - A directory with `index.html` or `index.md`
 
-- A file with `.md` extension
+  The generated index will point to HTML extensions
 
-If the marker `_index.soyweb` is empty, a default content header will be written.
-If the marker has some template, then the index list will be appended to the template
-in the output.
+- A directory with another marker `_index.soyweb` (recursive)
+
+  The generated index will point to `${sibling}/index.html`
+
+The generator is currently available to `ssg-manifest` via the site manifest specification.
+
+#### Index generator: templates in markers
+
+The generator allows markers to contain partial template.
 
 The marker `_index.soyweb` could be a Markdown, and apart from having its content
 appended by the generated index, the file is handled normally like with other
 ssg-go input files.
 
-The generator is currently available to `ssg-manifest` via the site manifest specification.
+If the marker `_index.soyweb` is empty, a default content header will be written.
+If the marker has some template, then the index list will be appended to the template
+in the output.
 
 #### Index generator: how it's generated
 

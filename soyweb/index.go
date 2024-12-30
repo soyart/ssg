@@ -10,15 +10,15 @@ import (
 	"github.com/soyart/ssg"
 )
 
-// indexGenerator returns an [ssg.Impl] that would look for
+// indexGenerator returns an [ssg.Pipeline] that would look for
 // marker file "_index.soyweb" within a directory.
 //
 // Once it finds a marked directory, it inspects the children
 // and generate a Markdown list with name index.md,
 // which is later sent to supplied impl.
-func indexGenerator(s *ssg.Ssg) ssg.Impl {
+func indexGenerator(s *ssg.Ssg) ssg.Pipeline {
 	src := s.Src
-	next := s.ImplDefault() // HTTP middleware-style
+	next := s.PipelineDefault() // next as in HTTP middleware-style
 	ignore := s.Ignore
 
 	return func(path string, data []byte, d fs.DirEntry) error {

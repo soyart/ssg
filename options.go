@@ -17,15 +17,15 @@ type (
 	// and returns modified HTML output (e.g. minified) to be written at destination
 	HookGenerate func(generatedHtml []byte) (output []byte, err error)
 
-	// Impl is called during directory tree walks.
+	// Pipeline is called during directory tree walks.
 	// ssg-go provides path and data from the file,
-	// and Impl is free to do whatever it wants
-	Impl func(path string, data []byte, d fs.DirEntry) error
+	// and Pipeline is free to do whatever it wants
+	Pipeline func(path string, data []byte, d fs.DirEntry) error
 
 	options struct {
 		hookAll      HookAll
 		hookGenerate HookGenerate
-		impl         Impl
+		pipeline     Pipeline
 		caching      bool
 		writers      int
 	}
@@ -80,11 +80,11 @@ func WithHookGenerate(hook HookGenerate) Option {
 	}
 }
 
-// WithImpl takes f, which will called during build process.
+// WithPipeline takes f, which will called during build process.
 // Ignored files, _header.html and _footer.html
 // are skipped by ssg-go.
-func WithImpl(f Impl) Option {
+func WithPipeline(f Pipeline) Option {
 	return func(s *Ssg) {
-		s.impl = f
+		s.pipeline = f
 	}
 }

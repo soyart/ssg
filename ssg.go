@@ -280,11 +280,11 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 		return err
 	}
 
-	if s.impl != nil {
-		return s.impl(path, data, d)
+	if s.pipeline != nil {
+		return s.pipeline(path, data, d)
 	}
 
-	return s.implDefault(path, data, d)
+	return s.pipelineDefault(path, data, d)
 }
 
 func (s *Ssg) collect(path string) error {
@@ -338,7 +338,7 @@ func (s *Ssg) collect(path string) error {
 	return nil
 }
 
-func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
+func (s *Ssg) pipelineDefault(path string, data []byte, d fs.DirEntry) error {
 	info, err := d.Info()
 	if err != nil {
 		return err
@@ -415,8 +415,8 @@ func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
 	return nil
 }
 
-func (s *Ssg) ImplDefault() Impl {
-	return s.implDefault
+func (s *Ssg) PipelineDefault() Pipeline {
+	return s.pipelineDefault
 }
 
 func (s *Ssg) Ignore(path string) bool {
