@@ -52,6 +52,6 @@ jobs:
         with:
           name: test_result-go${{ matrix.go-version }}_${{ matrix.os }}
           path: |
-            $ARTIFACT_SSG_GO
-            soyweb/$ARTIFACT_SOYWEB
+            ${{ env.ARTIFACT_SSG_GO }}
+            soyweb/${{ env.ARTIFACT_SOYWEB }}
 
