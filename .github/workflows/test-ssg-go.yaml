@@ -33,12 +33,20 @@ jobs:
           cache: false
           check-latest: true
 
-      - name: Test with Go
-        run: go test -json ./... > ssg-go-test_result-go${{ matrix.go-version }}_${{ matrix.os }}.json
+      - name: Test ssg-go
+        run: |
+          go test -race -count=1 -json ./... > ssg-go-test_result-go${{ matrix.go-version }}_${{ matrix.os }}.json
+
+      - name: Test soyweb
+        run: |
+          cd ./soyweb/
+          go test -race -count=1 -json ./... > soyweb-test_result-go${{ matrix.go-version }}_${{ matrix.os }}.json
 
       - name: Upload Go test results
         uses: actions/upload-artifact@v4
         with:
-          name: ssg-go-test_result-go${{ matrix.go-version }}_${{ matrix.os }}
-          path: ssg-go-test_result-go${{ matrix.go-version }}_${{ matrix.os }}.json
+          name: test_result-go${{ matrix.go-version }}_${{ matrix.os }}
+          path: |
+            ssg-go-test_result-go${{ matrix.go-version }}_${{ matrix.os }}.json
+            soyweb-test_result-go${{ matrix.go-version }}_${{ matrix.os }}.json
 
