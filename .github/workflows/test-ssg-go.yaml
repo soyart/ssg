@@ -45,7 +45,7 @@ jobs:
         run: |
           echo Testing soyweb and writing JSON report to $ARTIFACT_SOYWEB
           cd ./soyweb/
-          go test -race -count=1 -json ./... > ../$ARTIFACT_SOYWEB
+          go test -race -count=1 -json ./... > $ARTIFACT_SOYWEB
 
       - name: Upload Go test results
         uses: actions/upload-artifact@v4
@@ -53,5 +53,5 @@ jobs:
           name: test_result-go${{ matrix.go-version }}_${{ matrix.os }}
           path: |
             $ARTIFACT_SSG_GO
-            $ARTIFACT_SOYWEB
+            soyweb/$ARTIFACT_SOYWEB
 
