@@ -55,12 +55,13 @@ type Ssg struct {
 	ssgignores ignorer
 	headers    headers
 	footers    footers
-	preferred  Set // Used to prefer html and ignore md files with identical names, as with the original ssg
+	preferred  Set      // Used to prefer html and ignore md files with identical names, as with the original ssg
+	files      []string // Input files read (not ignored)
 	cache      []OutputFile
 }
 
 // Build returns the ssg outputs built from src
-func Build(src, dst, title, url string, opts ...Option) ([]OutputFile, error) {
+func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile, error) {
 	s := New(src, dst, title, url)
 	return s.
 		With(opts...).
@@ -182,12 +183,22 @@ func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	}
 }
 
-func Metadata(url, dst string, dist []OutputFile, srcModTime time.Time) ([]OutputFile, error) {
+func Metadata(
+	src string,
+	dst string,
+	url string,
+	files []string,
+	dist []OutputFile,
+	srcModTime time.Time,
+) (
+	[]OutputFile,
+	error,
+) {
 	sort.Slice(dist, func(i, j int) bool {
 		return dist[i].target < dist[j].target
 	})
 
-	dotFiles, err := DotFiles(dst, dist)
+	dotFiles, err := DotFiles(src, files)
 	if err != nil {
 		return nil, err
 	}
@@ -197,45 +208,43 @@ func Metadata(url, dst string, dist []OutputFile, srcModTime time.Time) ([]Outpu
 	}
 
 	return []OutputFile{
-		Output(filepath.Join(dst, "sitemap.xml"), []byte(sitemap), 0644),
-		Output(filepath.Join(dst, ".files"), []byte(dotFiles), 0644),
+		Output(filepath.Join(dst, "sitemap.xml"), "", []byte(sitemap), 0644),
+		Output(filepath.Join(dst, ".files"), "", []byte(dotFiles), 0644),
 	}, nil
 }
 
-func GenerateMetadata(url, dst string, dist []OutputFile, srcModTime time.Time) error {
-	metadata, err := Metadata(url, dst, dist, srcModTime)
+func GenerateMetadata(src, dst, url string, files []string, dist []OutputFile, srcModTime time.Time) error {
+	metadata, err := Metadata(src, dst, url, files, dist, srcModTime)
 	if err != nil {
 		return err
 	}
 	return WriteOut(metadata, 2)
 }
 
-func DotFiles(dst string, dist []OutputFile) (string, error) {
+func DotFiles(src string, files []string) (string, error) {
 	list := bytes.NewBuffer(nil)
-	for i := range dist {
-		f := &dist[i]
-		path, err := filepath.Rel(dst, f.target)
+	for _, f := range files {
+		if f == "" {
+			panic("found empty file for .files")
+		}
+		rel, err := filepath.Rel(src, f)
 		if err != nil {
 			return "", err
 		}
-		// TODO: use original file that results in this output
-		// Replace Markdown extension
-		if filepath.Ext(path) == ".html" {
-			path = ChangeExt(path, ".html", ".md")
-		}
 
-		Fprintf(list, "./%s\n", path)
+		Fprintf(list, "./%s\n", rel)
 	}
 
 	return list.String(), nil
 }
 
-func (s *Ssg) buildV2() ([]OutputFile, error) {
+func (s *Ssg) buildV2() ([]string, []OutputFile, error) {
 	err := filepath.WalkDir(s.Src, s.walkBuildV2)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return s.cache, nil
+
+	return s.files, s.cache, nil
 }
 
 func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
@@ -259,6 +268,12 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 	case MarkerHeader, MarkerFooter:
 		return nil
 	}
+
+	// Remember input files for .files
+	//
+	// Original ssg does not include _header.html
+	// and _footer.html in .files
+	s.files = append(s.files, path)
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -344,6 +359,7 @@ func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
 		}
 		s.AddOutputs(Output(
 			target,
+			path,
 			data,
 			info.Mode().Perm(),
 		))
@@ -391,6 +407,7 @@ func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
 
 	s.AddOutputs(Output(
 		target,
+		path,
 		out.Bytes(),
 		info.Mode().Perm(),
 	))
@@ -513,18 +530,37 @@ func MirrorPath(
 	return filepath.Join(dst, path), nil
 }
 
+// OutputFile is the main output struct for ssg-go.
+//
+// Its values are not supposed to be changed by other packages,
+// and thus the only ways other packages can work with OutputFile
+// is via the constructor [Output] and the type's getter methods.
 type OutputFile struct {
-	target string
-	data   []byte
-	perm   fs.FileMode
+	target     string
+	originator string
+	data       []byte
+	perm       fs.FileMode
 }
 
-func Output(target string, data []byte, perm fs.FileMode) OutputFile {
+func Output(target string, originator string, data []byte, perm fs.FileMode) OutputFile {
 	return OutputFile{
-		target: target,
-		data:   data,
-		perm:   perm,
+		target:     target,
+		originator: originator,
+		data:       data,
+		perm:       perm,
 	}
+}
+
+func (o *OutputFile) Target() string {
+	return o.target
+}
+
+func (o *OutputFile) Originator() string {
+	return o.originator
+}
+
+func (o *OutputFile) Data() []byte {
+	return o.data
 }
 
 func (o *OutputFile) Perm() fs.FileMode {
@@ -534,21 +570,14 @@ func (o *OutputFile) Perm() fs.FileMode {
 	return o.perm
 }
 
-func (o *OutputFile) Target() string {
-	return o.target
-}
-
-func (o *OutputFile) Data() []byte {
-	return o.data
-}
-
 type writeError struct {
-	err    error
-	target string
+	err        error
+	target     string
+	originator string
 }
 
 func (w writeError) Error() string {
-	return fmt.Errorf("WriteError(%s): %w", w.target, w.err).Error()
+	return fmt.Errorf("WriteError(target='%s',originator='%s'): %w", w.target, w.originator, w.err).Error()
 }
 
 // WriteOut blocks and writes concurrently to output locations.
@@ -574,16 +603,18 @@ func WriteOut(writes []OutputFile, concurrent int) error {
 			err := os.MkdirAll(filepath.Dir(w.target), os.ModePerm)
 			if err != nil {
 				errs <- writeError{
-					err:    err,
-					target: w.target,
+					err:        err,
+					target:     w.target,
+					originator: w.originator,
 				}
 				return
 			}
 			err = os.WriteFile(w.target, w.data, w.Perm())
 			if err != nil {
 				errs <- writeError{
-					err:    err,
-					target: w.target,
+					err:        err,
+					target:     w.target,
+					originator: w.originator,
 				}
 				return
 			}

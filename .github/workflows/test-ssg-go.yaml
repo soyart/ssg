@@ -19,6 +19,9 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    env:
+      ARTIFACT_SSG_GO: "ssg-go-test_result-go${{ matrix.go-version }}_${{ matrix.os }}.json"
+      ARTIFACT_SOYWEB: "soyweb-test_result-go${{ matrix.go-version }}_${{ matrix.os }}.json"
     steps:
       - name: Checkout code
         uses: actions/checkout@master
@@ -33,12 +36,22 @@ jobs:
           cache: false
           check-latest: true
 
-      - name: Test with Go
-        run: go test -json ./... > ssg-go-test_result-go${{ matrix.go-version }}_${{ matrix.os }}.json
+      - name: Test ssg-go
+        run: |
+          echo Testing soyweb and writing JSON report to $ARTIFACT_SSG_GO
+          go test -race -count=1 -json ./... > $ARTIFACT_SSG_GO
+
+      - name: Test soyweb
+        run: |
+          echo Testing soyweb and writing JSON report to $ARTIFACT_SOYWEB
+          cd ./soyweb/
+          go test -race -count=1 -json ./... > $ARTIFACT_SOYWEB
 
       - name: Upload Go test results
         uses: actions/upload-artifact@v4
         with:
-          name: ssg-go-test_result-go${{ matrix.go-version }}_${{ matrix.os }}
-          path: ssg-go-test_result-go${{ matrix.go-version }}_${{ matrix.os }}.json
+          name: test_result-go${{ matrix.go-version }}_${{ matrix.os }}
+          path: |
+            ${{ env.ARTIFACT_SSG_GO }}
+            soyweb/${{ env.ARTIFACT_SOYWEB }}
 
