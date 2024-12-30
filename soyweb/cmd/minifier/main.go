@@ -75,15 +75,16 @@ func (m *minifier) minify() ([]ssg.OutputFile, error) {
 		return m.dist, nil
 	}
 
-	output, err := soyweb.MinifyFile(m.src)
+	data, err := os.ReadFile(m.src)
 	if err != nil {
-		output, err = os.ReadFile(m.src)
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
+	}
+	output, err := soyweb.MinifyAll(m.src, data)
+	if err != nil {
+		output = data
 	}
 
-	out := ssg.Output(m.dst, output, stat.Mode().Perm())
+	out := ssg.Output(m.dst, m.src, output, stat.Mode().Perm())
 	return []ssg.OutputFile{out}, nil
 }
 
@@ -110,7 +111,7 @@ func (m *minifier) walk(path string, d fs.DirEntry, e error) error {
 			return err
 		}
 
-		m.dist = append(m.dist, ssg.Output(dst, copied, info.Mode().Perm()))
+		m.dist = append(m.dist, ssg.Output(dst, path, copied, info.Mode().Perm()))
 		return nil
 	}
 
@@ -119,6 +120,6 @@ func (m *minifier) walk(path string, d fs.DirEntry, e error) error {
 		return err
 	}
 
-	m.dist = append(m.dist, ssg.Output(dst, minified, info.Mode().Perm()))
+	m.dist = append(m.dist, ssg.Output(dst, path, minified, info.Mode().Perm()))
 	return nil
 }

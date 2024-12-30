@@ -1,14 +1,20 @@
 # soyweb
 
-soyweb is a collection of tools meant to replace [webtools](https://github.com/soyart/webtools).
+soyweb is a collection of [ssg-go](https://github.com/soyart/ssg)
+wrappers and extensions.
 
-At the core, it uses its own [Go implementation](https://github.com/soyart/ssg)
-of [ssg](https://romanzolotarev.com/ssg.html) to convert Markdown files
-into HTML files.
+soyweb extensions respect ssg-go quirks such as ssgignore,
+handling of header and footer templates, preference of source HTML files
+over the Markdown, file permissions, etc.
 
-soyweb provides 3 more programs and a library for working with ssg:
+## soyweb programs
 
-> Most of these programs share the same CLI flags, and the help messagee
+In addition to extension library, soyweb provides a few programs that
+serve as a collection of tools meant to replace [webtools](https://github.com/soyart/webtools).
+The main purpose is to build [artnoi.com](https://artnoi.com) with a single binary
+to streamline the site's CI/CD pipelines.
+
+> Most of these programs share the same CLI flags, and the help messages
 > can be accessible via `-h` or `--help`
 
 - [minifier](./cmd/minifier)
@@ -112,23 +118,25 @@ soyweb provides 3 more programs and a library for working with ssg:
     ssg-manifest copy -h
     ```
 
-# ssg options provided by soyweb
+## soyweb ssg-go options
 
-## Minifiers
+soyweb extends ssg-go options using `ssg.Option` type.
 
-soyweb provides webformat minifiers opitions for ssg, implemented as hooks that
-map 1 input data to 1 output data.
+### Minifiers
+
+soyweb provides webformat minifiers opitions for ssg, implemented as
+hooks that map 1 input data to 1 output data.
 
 The minifiers is available to all programs under soyweb.
 
-## [Index generator](./index.go)
+### [Index generator](./index.go)
 
-soyweb provides an [ssg.Impl](/options.go) that will automatically generate indices
+soyweb provides an [ssg.Impl](/options.go) that will automatically generate index
 for blog directories. It scans for marker file `_index.soyweb`, and, if found,
 lists all links to the children (i.e. "articles").
 
-The marker `_index.soyweb` can be empty, or contain template,
-in plaintext, Markdown, or HTML.
+The marker `_index.soyweb` can be empty, or contain template. If not empty, the
+template inside the marker will be treated as Markdown.
 
 To be considered an entry, a path has to be either:
 
@@ -144,12 +152,189 @@ The marker `_index.soyweb` could be a Markdown, and apart from having its conten
 appended by the generated index, the file is handled normally like with other
 ssg-go input files.
 
+The generator is currently available to `ssg-manifest` via the site manifest specification.
+
+#### Index generator: how it's generated
+
+The generated indexes are treated just like any other source Markdown files.
+
 In other words, `_header.html` and `_footer.html` will surround the index generated from
 marker files. [`ssg.TitleFrom`](../title.go) tags are respected and title extraction
 for the generated index is handled in the familiar fashion.
 
-The only quirks with the generator is that, in the index entries, child titles are extracted
-from `:ssg-title` tag first, and if there's no such title, then the first Markdown h1 (`# FooTitle`)
-will be picked as the child title *within* the index.
+#### Index generator: link title extraction (files)
 
-The generator is currently available to `ssg-manifest` via the site manifest specification.
+Only Markdown and HTML siblings are to be linked. For example, if we have 2 files
+`1.md` and `2.html`, then links will be generated for `1.html` and `2.html`.
+
+Link titles are extracted from tag `:ssg-title` first (`:ssg-title FooTitle`),
+and if there's no such title, then the generator falls back to Markdown h1 titles
+(`# FooTitle`) will be picked as the child title *within* the index.
+
+#### Index generator: link title extraction (directories)
+
+If a marker's sibling is a directory with `index.md`, then the titles will be extracted
+from the Markdown index like with files.
+
+If there's no `index.md`, then the directory names will be used as titles. And instead
+of linking to `/some/path/targetdir/index.md`, the directory links ends with a slash,
+so `/some/path/targetdir/` is the hyperlink generated.
+
+#### Index generator: practical examples
+
+Consider a ssg source directory `src`:
+
+```
+src
+│
+├── _footer.html
+├── _header.html
+├── _index.soyweb
+│
+├── foo.md
+├── bar.md
+│
+├── 2022
+│   ├── _index.soyweb
+│   ├── lol.md
+│   └── not_article.svg
+│
+├── 2023
+│   ├── hahaha
+│   │   └── index.md
+│   ├── _index.soyweb
+│   └── baz.md
+│
+└── somedir
+    └── index.md
+```
+
+We see 3 markers, in `src`, `src/2022`, and `src/2023`. This means
+that we should get 3 generated `index.html`s. But we also see that
+`src/2022/index.html` already exists.
+
+Because ssg-go gives preferences to HTML files with matching base names,
+and because the generator respects this behavior, the source HTML will be
+copied and new index not generated.
+
+If we focus on the root marker. We see that it has 5 siblings, namely,
+`foo.md`, `bar.md`, `2022`, `2023`, and `somedir`.
+
+The generated index should have links to these 3 children.
+If the destination is `dst`, then the generated index from this root marker
+will be at `dst/index.html`, mirroring `src/_index.soyweb` location in `src`.
+
+We can look up the special ssg files so that we can compare the output:
+
+`src/_header.html`:
+
+```html
+<!-- My blog header! -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{{from-tag}}</title>
+</head>
+<body>
+```
+
+`src/_footer.html`:
+
+```html
+<!-- My blog footer! -->
+</body>
+</html>
+```
+
+`src/_index.soyweb`:
+
+```markdown
+:ssg-title My blog!
+
+# Welcome to my blog!
+
+Below is the list of my articles!
+
+```
+
+`src/foo.md`:
+
+```
+# Foo article
+
+Foo is better than fu
+```
+
+`src/bar.md`:
+
+```
+:ssg-title Bar article
+
+# Barbarbarbar
+
+Greeks called other peoples babarians because all they hear is barbarbar
+```
+
+`src/somedir/index.md`:
+
+```markdown
+:ssg-title SomeDir title
+
+# Welcome to SomeDir!
+
+This is some directory
+```
+
+Now, the generated index `dst/index.html` looks like this:
+
+```html
+<!-- My blog header! -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>My blog!</title>
+</head>
+<body>
+<h1>Welcome to my blog!</h1>
+<p>Below is the list of my articles!</p>
+<ul>
+  <li><p><a href="/2023/">2023</a></p></li>
+  <li><p><a href="/2022/">2022</a></p></li>
+  <li><p><a href="/bar.html">Bar article</a></p></li>
+  <li><p><a href="/foo.html">Foo article</a></p></li>
+  <li><p><a href="/somedir/">SomeDir title</a></p></li>
+</ul>
+<!-- My blog footer! -->
+</body>
+</html>
+```
+
+What about `src/2023/_index.soyweb` marker? If it's not empty,
+then the output will be generated in a fashion similar
+to the root marker example above.
+
+But what if the marker `src/2023/_index.soyweb` is empty?
+If so, then the default heading will be used, and the generated
+`dst/2023/index.html` looks something like this:
+
+```html
+<!-- My blog header! -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SomeDefaultSsgGoTitle</title>
+</head>
+<body>
+<h1>Index of somedir</h1>
+<ul>
+  <li><p><a href="/hahaha/">BarTitle</a></p></li>
+  <li><p><a href="/baz.html">BazTitle</a></p></li>
+</ul>
+<!-- My blog footer! -->
+</body>
+</html>
+```
+
