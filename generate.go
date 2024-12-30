@@ -31,7 +31,7 @@ func generate(s *Ssg) error {
 		close(s.stream)
 	}()
 
-	var written []string
+	var written []OutputFile
 	var errWrites error
 	wg.Add(1)
 	go func() {
@@ -56,12 +56,7 @@ func generate(s *Ssg) error {
 		return fmt.Errorf("streaming_write_error: %w", errWrites)
 	}
 
-	outputs := make([]OutputFile, len(written))
-	for i := range written {
-		outputs[i] = Output(written[i], nil, 0)
-	}
-
-	err = GenerateMetadata(s.Url, s.Dst, outputs, stat.ModTime())
+	err = GenerateMetadata(s.Src, s.Dst, s.Url, written, stat.ModTime())
 	if err != nil {
 		return err
 	}
@@ -71,12 +66,13 @@ func generate(s *Ssg) error {
 }
 
 // WriteOutStreaming blocks and concurrently writes outputs recevied from c until c is closed.
-func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]string, error) {
+// It returns metadata for all outputs written without the data.
+func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]OutputFile, error) {
 	if concurrent == 0 {
 		concurrent = 1
 	}
 
-	written := make([]string, 0)
+	written := make([]OutputFile, 0) // No data, only metadata
 	wg := new(sync.WaitGroup)
 	errs := make(chan writeError)
 	guard := make(chan struct{}, concurrent)
@@ -111,7 +107,7 @@ func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]string, error) {
 
 			mut.Lock()
 			defer mut.Unlock()
-			written = append(written, w.target)
+			written = append(written, Output(w.target, w.originator, nil, w.perm))
 			Fprintln(os.Stdout, w.target)
 
 		}(&o, wg)

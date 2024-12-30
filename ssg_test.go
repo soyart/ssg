@@ -409,7 +409,7 @@ func TestBuildAndWriteOut(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	err = GenerateMetadata(url, dstBuild, dist, stat.ModTime())
+	err = GenerateMetadata(src, dstBuild, url, dist, stat.ModTime())
 	if err != nil {
 		panic(err)
 	}

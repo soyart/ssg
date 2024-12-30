@@ -182,12 +182,21 @@ func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	}
 }
 
-func Metadata(url, dst string, dist []OutputFile, srcModTime time.Time) ([]OutputFile, error) {
+func Metadata(
+	src string,
+	dst string,
+	url string,
+	dist []OutputFile,
+	srcModTime time.Time,
+) (
+	[]OutputFile,
+	error,
+) {
 	sort.Slice(dist, func(i, j int) bool {
 		return dist[i].target < dist[j].target
 	})
 
-	dotFiles, err := DotFiles(dst, dist)
+	dotFiles, err := DotFiles(src, dist)
 	if err != nil {
 		return nil, err
 	}
@@ -197,34 +206,33 @@ func Metadata(url, dst string, dist []OutputFile, srcModTime time.Time) ([]Outpu
 	}
 
 	return []OutputFile{
-		Output(filepath.Join(dst, "sitemap.xml"), []byte(sitemap), 0644),
-		Output(filepath.Join(dst, ".files"), []byte(dotFiles), 0644),
+		Output(filepath.Join(dst, "sitemap.xml"), "", []byte(sitemap), 0644),
+		Output(filepath.Join(dst, ".files"), "", []byte(dotFiles), 0644),
 	}, nil
 }
 
-func GenerateMetadata(url, dst string, dist []OutputFile, srcModTime time.Time) error {
-	metadata, err := Metadata(url, dst, dist, srcModTime)
+func GenerateMetadata(src, dst, url string, dist []OutputFile, srcModTime time.Time) error {
+	metadata, err := Metadata(src, dst, url, dist, srcModTime)
 	if err != nil {
 		return err
 	}
 	return WriteOut(metadata, 2)
 }
 
-func DotFiles(dst string, dist []OutputFile) (string, error) {
+func DotFiles(src string, dist []OutputFile) (string, error) {
 	list := bytes.NewBuffer(nil)
 	for i := range dist {
 		f := &dist[i]
-		path, err := filepath.Rel(dst, f.target)
+		if f.originator == "" {
+			continue
+		}
+
+		rel, err := filepath.Rel(src, f.originator)
 		if err != nil {
 			return "", err
 		}
-		// TODO: use original file that results in this output
-		// Replace Markdown extension
-		if filepath.Ext(path) == ".html" {
-			path = ChangeExt(path, ".html", ".md")
-		}
 
-		Fprintf(list, "./%s\n", path)
+		Fprintf(list, "./%s\n", rel)
 	}
 
 	return list.String(), nil
@@ -344,6 +352,7 @@ func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
 		}
 		s.AddOutputs(Output(
 			target,
+			path,
 			data,
 			info.Mode().Perm(),
 		))
@@ -391,6 +400,7 @@ func (s *Ssg) implDefault(path string, data []byte, d fs.DirEntry) error {
 
 	s.AddOutputs(Output(
 		target,
+		path,
 		out.Bytes(),
 		info.Mode().Perm(),
 	))
@@ -514,16 +524,18 @@ func MirrorPath(
 }
 
 type OutputFile struct {
-	target string
-	data   []byte
-	perm   fs.FileMode
+	target     string
+	originator string
+	data       []byte
+	perm       fs.FileMode
 }
 
-func Output(target string, data []byte, perm fs.FileMode) OutputFile {
+func Output(target string, originator string, data []byte, perm fs.FileMode) OutputFile {
 	return OutputFile{
-		target: target,
-		data:   data,
-		perm:   perm,
+		target:     target,
+		originator: originator,
+		data:       data,
+		perm:       perm,
 	}
 }
 
