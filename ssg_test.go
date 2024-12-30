@@ -137,13 +137,13 @@ Some paragraph2`,
 
 func TestGenerate(t *testing.T) {
 	t.Run("build-v2", func(t *testing.T) {
-		testGenerate(t, func(s *Ssg) ([]OutputFile, error) {
+		testGenerate(t, func(s *Ssg) ([]string, []OutputFile, error) {
 			return s.buildV2()
 		})
 	})
 }
 
-func testGenerate(t *testing.T, buildFn func(s *Ssg) ([]OutputFile, error)) {
+func testGenerate(t *testing.T, buildFn func(s *Ssg) ([]string, []OutputFile, error)) {
 	root := "./soyweb/testdata/johndoe.com"
 	src := filepath.Join(root, "/src")
 	dst := filepath.Join(root, "/dst")
@@ -156,7 +156,7 @@ func testGenerate(t *testing.T, buildFn func(s *Ssg) ([]OutputFile, error)) {
 	}
 
 	s := New(src, dst, title, url)
-	outputs, err := buildFn(&s)
+	_, outputs, err := buildFn(&s)
 	if err != nil {
 		t.Errorf("unexpected error from scan: %v", err)
 	}
@@ -397,7 +397,7 @@ func TestBuildAndWriteOut(t *testing.T) {
 		panic(err)
 	}
 
-	dist, err := Build(src, dstBuild, title, url)
+	files, dist, err := Build(src, dstBuild, title, url)
 	if err != nil {
 		panic(err)
 	}
@@ -409,7 +409,7 @@ func TestBuildAndWriteOut(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	err = GenerateMetadata(src, dstBuild, url, dist, stat.ModTime())
+	err = GenerateMetadata(src, dstBuild, url, files, dist, stat.ModTime())
 	if err != nil {
 		panic(err)
 	}

@@ -20,10 +20,13 @@ func generate(s *Ssg) error {
 	s.stream = stream
 
 	var errBuild error
+	var files []string
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		_, err := s.buildV2()
+
+		var err error
+		files, _, err = s.buildV2()
 		if err != nil {
 			errBuild = err
 		}
@@ -56,7 +59,7 @@ func generate(s *Ssg) error {
 		return fmt.Errorf("streaming_write_error: %w", errWrites)
 	}
 
-	err = GenerateMetadata(s.Src, s.Dst, s.Url, written, stat.ModTime())
+	err = GenerateMetadata(s.Src, s.Dst, s.Url, files, written, stat.ModTime())
 	if err != nil {
 		return err
 	}

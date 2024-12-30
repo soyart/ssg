@@ -15,7 +15,7 @@ func generateCaching(s *Ssg) error {
 	if err != nil {
 		return err
 	}
-	dist, err := s.buildV2()
+	files, dist, err := s.buildV2()
 	if err != nil {
 		return err
 	}
@@ -23,7 +23,7 @@ func generateCaching(s *Ssg) error {
 	if err != nil {
 		return err
 	}
-	err = GenerateMetadata(s.Src, s.Dst, s.Url, dist, stat.ModTime())
+	err = GenerateMetadata(s.Src, s.Dst, s.Url, files, dist, stat.ModTime())
 	if err != nil {
 		return err
 	}

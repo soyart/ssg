@@ -55,12 +55,13 @@ type Ssg struct {
 	ssgignores ignorer
 	headers    headers
 	footers    footers
-	preferred  Set // Used to prefer html and ignore md files with identical names, as with the original ssg
+	preferred  Set      // Used to prefer html and ignore md files with identical names, as with the original ssg
+	files      []string // Input files read (not ignored)
 	cache      []OutputFile
 }
 
 // Build returns the ssg outputs built from src
-func Build(src, dst, title, url string, opts ...Option) ([]OutputFile, error) {
+func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile, error) {
 	s := New(src, dst, title, url)
 	return s.
 		With(opts...).
@@ -186,6 +187,7 @@ func Metadata(
 	src string,
 	dst string,
 	url string,
+	files []string,
 	dist []OutputFile,
 	srcModTime time.Time,
 ) (
@@ -196,7 +198,7 @@ func Metadata(
 		return dist[i].target < dist[j].target
 	})
 
-	dotFiles, err := DotFiles(src, dist)
+	dotFiles, err := DotFiles(src, files)
 	if err != nil {
 		return nil, err
 	}
@@ -211,23 +213,21 @@ func Metadata(
 	}, nil
 }
 
-func GenerateMetadata(src, dst, url string, dist []OutputFile, srcModTime time.Time) error {
-	metadata, err := Metadata(src, dst, url, dist, srcModTime)
+func GenerateMetadata(src, dst, url string, files []string, dist []OutputFile, srcModTime time.Time) error {
+	metadata, err := Metadata(src, dst, url, files, dist, srcModTime)
 	if err != nil {
 		return err
 	}
 	return WriteOut(metadata, 2)
 }
 
-func DotFiles(src string, dist []OutputFile) (string, error) {
+func DotFiles(src string, files []string) (string, error) {
 	list := bytes.NewBuffer(nil)
-	for i := range dist {
-		f := &dist[i]
-		if f.originator == "" {
-			continue
+	for _, f := range files {
+		if f == "" {
+			panic("found empty file for .files")
 		}
-
-		rel, err := filepath.Rel(src, f.originator)
+		rel, err := filepath.Rel(src, f)
 		if err != nil {
 			return "", err
 		}
@@ -238,12 +238,13 @@ func DotFiles(src string, dist []OutputFile) (string, error) {
 	return list.String(), nil
 }
 
-func (s *Ssg) buildV2() ([]OutputFile, error) {
+func (s *Ssg) buildV2() ([]string, []OutputFile, error) {
 	err := filepath.WalkDir(s.Src, s.walkBuildV2)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return s.cache, nil
+
+	return s.files, s.cache, nil
 }
 
 func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
@@ -267,6 +268,9 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 	case MarkerHeader, MarkerFooter:
 		return nil
 	}
+
+	// Remember input files for .files
+	s.files = append(s.files, path)
 
 	data, err := os.ReadFile(path)
 	if err != nil {
