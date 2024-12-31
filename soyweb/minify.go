@@ -126,7 +126,7 @@ func minifyFormat(original []byte, format string) ([]byte, error) {
 	return min.Bytes(), nil
 }
 
-func pipelineMinify(m map[string]MinifyFn) ssg.HookAll {
+func pipelineMinify(m map[string]MinifyFn) ssg.Hook {
 	if len(m) == 0 {
 		return nil
 	}

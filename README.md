@@ -248,34 +248,25 @@ Go programmers can extend ssg-go via its [`Option` type](./options.go).
 [soyweb](./soyweb/) also extends ssg via `Option`,
 and provides extra functionality such as index generator and minifiers.
 
-## `HookAll` option
+## `Hook` option
 
-`HookAll` is a Go function called on every unignored input file.
+`Hook` is a Go function called on every unignored input file.
 soyweb uses this option to implement global minifiers.
 
-## `HookGenerate`
+It is enabled with `WithHook(hook)`.
+
+## `HookGenerate` option
 
 `HookGenerate` is a Go function called on every generated HTML.
 soyweb uses this option to implement output minifier.
 
-## `Pipeline`
+It is enabled with `WithHookGenerate(hook)`
+
+## `Pipeline` option
 
 `Pipeline` is a Go function called on a file during directory walk.
 To reduce complexity, ignored files and ssg headers/footers are not sent
 to `Pipeline`. This preserves the core functionality of the original ssg.
 
-> When using `Pipeline` option, options `HookAll` or `HookGenerate`
-> are not used unless explicitly implemented in the `Pipeline` option
-> to do so. This helps reduce complexity.
->
-> Type `Ssg` provides a method `PipelineDefault() Pipeline`,
-> and the return value can be used to perform vanilla ssg-go behavior.
-> This allows HTTP-middleware-style composing as shown in the [soyweb index generator](./soyweb/index.go).
->
-> Here, the generator `Pipeline` sees if it needs to create an index for a directory,
-> and, if not, simply passes the data back to ssg-go default implementation.
->
-> If it needs to generate an index, then it creates a new output file,
-> and passes that to the standard ssg-go implementation, allowing all
-> the features such as header/footer combination and hooks to continue to work.
+Pipelines can be chained together with `WithPipelines(p1, p2, p3)`
 

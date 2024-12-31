@@ -60,7 +60,7 @@ type Ssg struct {
 	cache      []OutputFile
 }
 
-// Build returns the ssg outputs built from src
+// Build returns the ssg outputs built from src without writing the outputs.
 func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile, error) {
 	s := New(src, dst, title, url)
 	return s.
@@ -69,13 +69,14 @@ func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile,
 		buildV2()
 }
 
-// Generate creates a one-off [Ssg] that's used to generate a site right away.
+// Generate builds and writes to outputs.
+// It creates a one-off [Ssg] that's used to generate a site right away.
 func Generate(src, dst, title, url string, opts ...Option) error {
 	s := New(src, dst, title, url)
 	return s.With(opts...).Generate()
 }
 
-// New returns a default, vanilla [Ssg].
+// New returns a default [Ssg] with no options.
 func New(src, dst, title, url string) Ssg {
 	src = filepath.Clean(src)
 	dst = filepath.Clean(dst)
@@ -243,7 +244,6 @@ func (s *Ssg) buildV2() ([]string, []OutputFile, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-
 	return s.files, s.cache, nil
 }
 

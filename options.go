@@ -11,9 +11,9 @@ import (
 type (
 	Option func(*Ssg)
 
-	// HookAll takes in a path and reads file data,
+	// Hook takes in a path and reads file data,
 	// returning modified output to be written at destination
-	HookAll func(path string, data []byte) (output []byte, err error)
+	Hook func(path string, data []byte) (output []byte, err error)
 
 	// HookGenerate takes in converted HTML bytes
 	// and returns modified HTML output (e.g. minified) to be written at destination
@@ -25,7 +25,7 @@ type (
 	Pipeline func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error)
 
 	options struct {
-		hookAll      HookAll
+		hookAll      Hook
 		hookGenerate HookGenerate
 		pipeline     Pipeline
 		caching      bool
@@ -54,21 +54,24 @@ func GetEnvWriters() int {
 	return WritersDefault
 }
 
+// Caching allows outputs to be built and retained for later use.
+// This is enabled in [Build].
 func Caching() Option {
 	return func(s *Ssg) {
 		s.options.caching = true
 	}
 }
 
+// Writers set the number of concurrent output writers.
 func Writers(u uint) Option {
 	return func(s *Ssg) {
 		s.options.writers = int(u)
 	}
 }
 
-// WithHookAll will make [Ssg] call hook(path, fileContent)
+// WithHook will make [Ssg] call hook(path, fileContent)
 // on every unignored files.
-func WithHookAll(hook HookAll) Option {
+func WithHook(hook Hook) Option {
 	return func(s *Ssg) {
 		s.options.hookAll = hook
 	}
@@ -96,20 +99,21 @@ func WithPipelines(pipelines ...interface{}) Option {
 			case func(*Ssg) Pipeline:
 				pipes[i] = actual(s)
 			default:
-				panic(fmt.Errorf("[pipeline %d] unexpected pipeline type '%s'", i+1, reflect.TypeOf(f).String()))
+				panic(fmt.Errorf("unexpected pipelines[%d] type '%s'", i, reflect.TypeOf(f).String()))
 			}
 		}
 		s.options.pipeline = Chain(pipes...)
 	}
 }
 
+// Chain returns a new Pipeline that interates the input through pipelines sequentially.
 func Chain(pipes ...Pipeline) Pipeline {
 	return func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error) {
 		var err error
 		for i := range pipes {
 			path, data, d, err = pipes[i](path, data, d)
 			if err != nil {
-				return "", nil, nil, fmt.Errorf("[middleware %d] error: %w", i+1, err)
+				return "", nil, nil, fmt.Errorf("[pipeline %d] error: %w", i, err)
 			}
 		}
 		return path, data, d, nil
