@@ -49,7 +49,7 @@ type Ssg struct {
 	Title string
 	Url   string
 
-	options
+	options options
 
 	stream     chan<- OutputFile
 	ssgignores ignorer
@@ -280,8 +280,8 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 		return err
 	}
 
-	if s.pipeline != nil {
-		return s.pipeline(path, data, d)
+	if s.options.pipeline != nil {
+		return s.options.pipeline(path, data, d)
 	}
 
 	return s.pipelineDefault(path, data, d)
@@ -344,8 +344,8 @@ func (s *Ssg) pipelineDefault(path string, data []byte, d fs.DirEntry) error {
 		return err
 	}
 
-	if s.hookAll != nil {
-		data, err = s.hookAll(path, data)
+	if s.options.hookAll != nil {
+		data, err = s.options.hookAll(path, data)
 		if err != nil {
 			return fmt.Errorf("hook error when building %s: %w", path, err)
 		}
@@ -396,8 +396,8 @@ func (s *Ssg) pipelineDefault(path string, data []byte, d fs.DirEntry) error {
 	out.Write(ToHtml(data))
 	out.Write(footer.Bytes())
 
-	if s.hookGenerate != nil {
-		b, err := s.hookGenerate(out.Bytes())
+	if s.options.hookGenerate != nil {
+		b, err := s.options.hookGenerate(out.Bytes())
 		if err != nil {
 			return fmt.Errorf("hook error when building %s: %w", path, err)
 		}

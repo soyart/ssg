@@ -36,7 +36,7 @@ type (
 func WritersFromEnv() Option {
 	return func(s *Ssg) {
 		writes := GetEnvWriters()
-		s.writers = int(writes)
+		s.options.writers = int(writes)
 	}
 }
 
@@ -85,6 +85,6 @@ func WithHookGenerate(hook HookGenerate) Option {
 // are skipped by ssg-go.
 func WithPipeline(f Pipeline) Option {
 	return func(s *Ssg) {
-		s.pipeline = f
+		s.options.pipeline = f
 	}
 }
