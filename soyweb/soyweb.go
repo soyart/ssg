@@ -37,14 +37,16 @@ type (
 )
 
 func SsgOptions(f Flags) []ssg.Option {
-	f.MinifyFlags = negate(f.MinifyFlags, f.NoMinifyFlags)
 	opts := []ssg.Option{}
 
+	pipes := []interface{}{}
 	if f.GenerateIndex {
-		opts = append(opts, ssg.WithPipelines(IndexGenerator))
+		pipes = append(pipes, IndexGenerator)
 	}
 
 	minifiers := make(map[string]MinifyFn)
+	f.MinifyFlags = negate(f.MinifyFlags, f.NoMinifyFlags)
+
 	if f.MinifyHtmlCopy {
 		minifiers[".html"] = MinifyHtml
 	}
@@ -66,7 +68,7 @@ func SsgOptions(f Flags) []ssg.Option {
 		opts = append(opts, ssg.WithHookGenerate(MinifyHtml))
 	}
 
-	return opts
+	return append(opts, ssg.WithPipelines(pipes...))
 }
 
 func (m MinifyFlags) Skip(ext string) bool {

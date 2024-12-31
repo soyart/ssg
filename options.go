@@ -86,7 +86,7 @@ func WithHookGenerate(hook HookGenerate) Option {
 // pipelines chained together.
 //
 // pipelines can be of type Pipeline or func(*Ssg) Pipeline
-func WithPipelines(pipelines ...any) Option {
+func WithPipelines(pipelines ...interface{}) Option {
 	return func(s *Ssg) {
 		pipes := make([]Pipeline, len(pipelines))
 		for i, f := range pipelines {
