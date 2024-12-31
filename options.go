@@ -93,15 +93,12 @@ func WithPipelines(pipelines ...interface{}) Option {
 			switch actual := f.(type) {
 			case Pipeline:
 				pipes[i] = actual
-
 			case func(*Ssg) Pipeline:
 				pipes[i] = actual(s)
-
 			default:
 				panic(fmt.Errorf("[pipeline %d] unexpected pipeline type '%s'", i+1, reflect.TypeOf(f).String()))
 			}
 		}
-
 		s.options.pipeline = Chain(pipes...)
 	}
 }

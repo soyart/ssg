@@ -17,9 +17,6 @@ import (
 // and generate a Markdown list with name index.md,
 // which is later sent to supplied impl.
 func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
-	src := s.Src
-	ignore := s.Ignore
-
 	return func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error) {
 		switch {
 		case
@@ -27,7 +24,7 @@ func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
 			filepath.Base(path) != MarkerIndex:
 			return path, data, d, nil
 
-		case ignore(path):
+		case s.Ignore(path):
 			panic("unexpected ignored file for index-generator: " + path)
 		}
 
@@ -42,8 +39,7 @@ func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
 		if err != nil {
 			return "", nil, nil, fmt.Errorf("failed to read marker '%s': %w", path, err)
 		}
-
-		index, err := genIndex(src, ignore, parent, entries, template)
+		index, err := genIndex(s.Src, s.Ignore, parent, entries, template)
 		if err != nil {
 			return "", nil, nil, fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
 		}
@@ -149,7 +145,7 @@ func genIndex(
 			}
 
 		default:
-			panic("unhandled case for child: " + filepath.Join(parent, sibName))
+			panic("unhandled case for sibling: " + filepath.Join(parent, sibName))
 		}
 
 		rel, err := filepath.Rel(src, parent)
@@ -164,7 +160,7 @@ func genIndex(
 		ssg.Fprintf(content, "- [%s](/%s)\n\n", linkTitle, link)
 	}
 
-	ssg.Fprintln(os.Stdout, "Generated Markdown index for directory", parent)
+	ssg.Fprintln(os.Stdout, "Generated index for", parent)
 	ssg.Fprint(os.Stdout, "======= START =======\n")
 	ssg.Fprintln(os.Stdout, content.String())
 	ssg.Fprint(os.Stdout, "======== END ========\n")
