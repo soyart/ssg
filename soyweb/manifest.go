@@ -132,7 +132,7 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 
 		s := &site.ssg
 		if site.GenerateBlog {
-			opts = append(opts, IndexGenerator())
+			opts = append(opts, ssg.WithPipelines())
 		}
 
 		s.With(opts...)

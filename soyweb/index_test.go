@@ -78,7 +78,7 @@ func TestGenerateIndex(t *testing.T) {
 		}
 	}
 
-	err = ssg.Generate(src, dst, title, url, IndexGenerator())
+	err = ssg.Generate(src, dst, title, url, ssg.WithPipelines(IndexGenerator))
 	if err != nil {
 		t.Fatalf("error during ssg generation: %v", err)
 	}

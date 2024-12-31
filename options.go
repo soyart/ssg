@@ -1,8 +1,10 @@
 package ssg
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
+	"reflect"
 	"strconv"
 )
 
@@ -80,11 +82,39 @@ func WithHookGenerate(hook HookGenerate) Option {
 	}
 }
 
-// WithPipeline takes f, which will called during build process.
-// Ignored files, _header.html and _footer.html
-// are skipped by ssg-go.
-func WithPipeline(f Pipeline) Option {
+// WithPipelines returns an option that set option.pipeline to
+// pipelines chained together.
+//
+// pipelines can be of type Pipeline or func(*Ssg) Pipeline
+func WithPipelines(pipelines ...any) Option {
 	return func(s *Ssg) {
-		s.options.pipeline = f
+		pipes := make([]Pipeline, len(pipelines))
+		for i, f := range pipelines {
+			switch actual := f.(type) {
+			case Pipeline:
+				pipes[i] = actual
+
+			case func(*Ssg) Pipeline:
+				pipes[i] = actual(s)
+
+			default:
+				panic(fmt.Errorf("[pipeline %d] unexpected pipeline type '%s'", i+1, reflect.TypeOf(f).String()))
+			}
+		}
+
+		s.options.pipeline = Chain(pipes...)
+	}
+}
+
+func Chain(pipes ...Pipeline) Pipeline {
+	return func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error) {
+		var err error
+		for i := range pipes {
+			path, data, d, err = pipes[i](path, data, d)
+			if err != nil {
+				return "", nil, nil, fmt.Errorf("[middleware %d] error: %w", i+1, err)
+			}
+		}
+		return path, data, d, nil
 	}
 }

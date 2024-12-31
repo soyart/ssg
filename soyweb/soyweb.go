@@ -36,21 +36,12 @@ type (
 	}
 )
 
-// IndexGenerator returns an option that will make ssg generates
-// index.md/index.html for all unignored _index.soyweb marker files.
-func IndexGenerator() ssg.Option {
-	return func(s *ssg.Ssg) {
-		generator := indexGenerator(s)
-		ssg.WithPipeline(generator)(s)
-	}
-}
-
 func SsgOptions(f Flags) []ssg.Option {
 	f.MinifyFlags = negate(f.MinifyFlags, f.NoMinifyFlags)
 	opts := []ssg.Option{}
 
 	if f.GenerateIndex {
-		opts = append(opts, IndexGenerator())
+		opts = append(opts, ssg.WithPipelines(IndexGenerator))
 	}
 
 	minifiers := make(map[string]MinifyFn)

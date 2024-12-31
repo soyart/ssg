@@ -28,7 +28,9 @@ func main() {
 
 	err := ssg.Generate(
 		src, dst, title, url,
-		soyweb.IndexGenerator(),
+		ssg.WithPipelines(
+			soyweb.IndexGenerator,
+		),
 	)
 	if err != nil {
 		panic(err)
