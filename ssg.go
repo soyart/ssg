@@ -27,9 +27,7 @@ const (
 	SsgExtensions      = parser.CommonExtensions |
 		parser.Mmark |
 		parser.AutoHeadingIDs
-)
 
-const (
 	HeaderDefault = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -41,6 +39,15 @@ const (
 	FooterDefault = `</body>
 </html>
 `
+)
+
+var (
+	// ErrBreakPipelines causes Ssg to break from pipeline iteration
+	// and use the pipeline's output
+	ErrBreakPipelines = errors.New("break_pipeline")
+	// ErrSkipCore causes Ssg to break from pipeline iteration
+	// and skip core processor, continuing to the new input file.
+	ErrSkipCore = errors.New("skip_core")
 )
 
 type Ssg struct {
@@ -280,14 +287,26 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 		return err
 	}
 
-	if s.options.pipeline != nil {
-		path, data, d, err = s.options.pipeline(path, data, d)
+	skipCore := false
+	for i, p := range s.options.pipelines {
+		path, data, d, err = p(path, data, d)
 		if err != nil {
-			return fmt.Errorf("pipeline error: %w", err)
+			if errors.Is(err, ErrSkipCore) {
+				skipCore = true
+				break
+			}
+			if errors.Is(err, ErrBreakPipelines) {
+				break
+			}
+			return fmt.Errorf("[pipeline %d] error: %w", i, err)
 		}
 	}
 
-	return s.pipelineDefault(path, data, d)
+	if skipCore {
+		return nil
+	}
+
+	return s.core(path, data, d)
 }
 
 func (s *Ssg) collect(path string) error {
@@ -341,7 +360,12 @@ func (s *Ssg) collect(path string) error {
 	return nil
 }
 
-func (s *Ssg) pipelineDefault(path string, data []byte, d fs.DirEntry) error {
+// core does 2 things:
+// - If path extension is not .md, then the current file will
+// simply be copied to outputs.
+// - If path has .md extension, it converts Markdown to HTML
+// and adds a new output with .html extension
+func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 	info, err := d.Info()
 	if err != nil {
 		return err
@@ -569,14 +593,14 @@ func (o *OutputFile) Perm() fs.FileMode {
 	return o.perm
 }
 
-type writeError struct {
+type errorWrite struct {
 	err        error
 	target     string
 	originator string
 }
 
-func (w writeError) Error() string {
-	return fmt.Errorf("WriteError(target='%s',originator='%s'): %w", w.target, w.originator, w.err).Error()
+func (e errorWrite) Error() string {
+	return fmt.Errorf("WriteError(target='%s',originator='%s'): %w", e.target, e.originator, e.err).Error()
 }
 
 // WriteOut blocks and writes concurrently to output locations.
@@ -586,7 +610,7 @@ func WriteOut(writes []OutputFile, concurrent int) error {
 	}
 
 	wg := new(sync.WaitGroup)
-	errs := make(chan writeError)
+	errs := make(chan errorWrite)
 	guard := make(chan struct{}, concurrent)
 
 	for i := range writes {
@@ -601,7 +625,7 @@ func WriteOut(writes []OutputFile, concurrent int) error {
 
 			err := os.MkdirAll(filepath.Dir(w.target), os.ModePerm)
 			if err != nil {
-				errs <- writeError{
+				errs <- errorWrite{
 					err:        err,
 					target:     w.target,
 					originator: w.originator,
@@ -610,7 +634,7 @@ func WriteOut(writes []OutputFile, concurrent int) error {
 			}
 			err = os.WriteFile(w.target, w.data, w.Perm())
 			if err != nil {
-				errs <- writeError{
+				errs <- errorWrite{
 					err:        err,
 					target:     w.target,
 					originator: w.originator,

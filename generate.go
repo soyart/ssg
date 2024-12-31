@@ -77,7 +77,7 @@ func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]OutputFile, error
 
 	written := make([]OutputFile, 0) // No data, only metadata
 	wg := new(sync.WaitGroup)
-	errs := make(chan writeError)
+	errs := make(chan errorWrite)
 	guard := make(chan struct{}, concurrent)
 	mut := new(sync.Mutex)
 
@@ -93,7 +93,7 @@ func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]OutputFile, error
 
 			err := os.MkdirAll(filepath.Dir(w.target), os.ModePerm)
 			if err != nil {
-				errs <- writeError{
+				errs <- errorWrite{
 					err:        err,
 					target:     w.target,
 					originator: w.originator,
@@ -102,7 +102,7 @@ func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]OutputFile, error
 			}
 			err = os.WriteFile(w.target, w.data, w.Perm())
 			if err != nil {
-				errs <- writeError{
+				errs <- errorWrite{
 					err:        err,
 					target:     w.target,
 					originator: w.originator,

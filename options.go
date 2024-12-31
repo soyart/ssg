@@ -21,13 +21,13 @@ type (
 
 	// Pipeline is called during directory tree walks.
 	// ssg-go provides path and data from the file,
-	// and Pipeline is free to do whatever it wants
+	// and Pipeline is free to do whatever it wants.
 	Pipeline func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error)
 
 	options struct {
 		hookAll      Hook
 		hookGenerate HookGenerate
-		pipeline     Pipeline
+		pipelines    []Pipeline
 		caching      bool
 		writers      int
 	}
@@ -102,7 +102,7 @@ func WithPipelines(pipelines ...interface{}) Option {
 				panic(fmt.Errorf("unexpected pipelines[%d] type '%s'", i, reflect.TypeOf(f).String()))
 			}
 		}
-		s.options.pipeline = Chain(pipes...)
+		s.options.pipelines = pipes
 	}
 }
 
