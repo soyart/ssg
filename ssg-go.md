@@ -1,0 +1,131 @@
+# ssg-go
+
+ssg-go is a drop-in replacement and library for implementing ssg.
+
+## Concurrent writers
+
+ssg-go has built-in concurrent output writers.
+
+The number of writers can be set at runtime by environment variable `SSG_WRITERS`.
+At any point in time, at most `SSG_WRITERS` number of threads are writing output files.
+
+The default value for concurrent writer is 20. If the supplied value is illegal,
+ssg-go falls back to 20 concurrent writers.
+
+> To write outputs sequentially, set the write concurrency value to 1:
+> 
+> ```shell
+> SSG_WRITERS=1 ssg mySrc myDst myTitle myUrl
+> ```
+
+## Extending ssg-go
+
+Go programmers can extend ssg-go via its [`Option` type](./options.go).
+
+[soyweb](./soyweb/) also extends ssg via `Option`,
+and provides extra functionality such as index generator and minifiers.
+
+### `Hook` option
+
+`Hook` is a Go function called on every unignored input file.
+soyweb uses this option to implement global minifiers.
+
+It is enabled with `WithHook(hook)`.
+
+### `HookGenerate` option
+
+`HookGenerate` is a Go function called on every generated HTML.
+soyweb uses this option to implement output minifier.
+
+It is enabled with `WithHookGenerate(hook)`
+
+### `Pipeline` option
+
+`Pipeline` is a Go function called on a file during directory walk.
+To reduce complexity, ignored files and ssg headers/footers are not sent
+to `Pipeline`. This preserves the core functionality of the original ssg.
+
+Pipelines can be chained together with `WithPipelines(p1, p2, p3)`
+
+### Streaming and caching builds
+
+To minimize runtime memory usage, ssg-go builds and writes concurrently.
+There're 2 main ssg threads: one is for building the outputs,
+and the other is the write thread.
+
+The build thread *sequentially* reads, builds and sends outputs
+to the write thread via a buffered Go channel.
+
+Bufffering allows the builder thread to continue to build and send outputs
+to the writer until the buffer is full.
+
+This helps reduce back pressure, and keeps memory usage low.
+The buffer size is, by default, 2x of the number of writers.
+
+This means that, at any point in time during a generation of any number of files
+with 20 writers, ssg-go will at most only hold 40 output files
+in memory (in the buffered channel).
+
+If you are importing ssg-go to your code and you don't want this
+streaming behavior, you can use the exposed function `Build`, `WriteOut`,
+and `GenerateMetadata`:
+
+```go
+files, dist, err := ssg.Build(src, dst, title, url)
+if err != nil {
+  panic(err)
+}
+
+err = ssg.WriteOut(dist)
+if err != nil {
+  panic(err)
+}
+
+err = GenerateMetadata(src, dst, urk, files, dist, time.Time{})
+if err != nil {
+  panic(err)
+}
+```
+
+### Core of ssg-go
+
+The core of ssg-go is to perform these actions:
+
+- If path is a file
+
+  ssg-go calls `Hook` on the file to modify the data.
+  We can use minifiers here.
+
+- If path has `.md` extension
+
+  ssg-go assembles and adds the HTML output to the outputs.
+  After the assembly, `HookGenerate` is called on the data.
+
+### The walk
+
+Given `src` and `dst` paths, ssg-go walks `src` and performs the
+following operations for each source file:
+
+- If path is ignored
+
+  ssg-go continues to the next input.
+
+- If path is unignored directory
+
+  ssg-go collects templates from `_header.html` and `_footer.html`
+
+- If path is a file
+
+  ssg-go reads the data and send it to all of the `Pipeline`s.
+  The output from the last `Pipeline` is used as input to core.
+
+  A well known error can be used to control this behavior:
+
+  - `ErrBreakPipelines`
+  
+    ssg-go stops going through pipelines and immedietly advances to core
+
+  - `ErrSkipCore`
+
+    Like with `ErrBreakPipelines`, but ssg-go also skips core.
+
