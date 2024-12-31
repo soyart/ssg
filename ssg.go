@@ -281,7 +281,10 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 	}
 
 	if s.options.pipeline != nil {
-		return s.options.pipeline(path, data, d)
+		path, data, d, err = s.options.pipeline(path, data, d)
+		if err != nil {
+			return fmt.Errorf("pipeline error: %w", err)
+		}
 	}
 
 	return s.pipelineDefault(path, data, d)
@@ -413,10 +416,6 @@ func (s *Ssg) pipelineDefault(path string, data []byte, d fs.DirEntry) error {
 	))
 
 	return nil
-}
-
-func (s *Ssg) PipelineDefault() Pipeline {
-	return s.pipelineDefault
 }
 
 func (s *Ssg) Ignore(path string) bool {

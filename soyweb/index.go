@@ -18,15 +18,14 @@ import (
 // which is later sent to supplied impl.
 func indexGenerator(s *ssg.Ssg) ssg.Pipeline {
 	src := s.Src
-	next := s.PipelineDefault() // next as in HTTP middleware-style
 	ignore := s.Ignore
 
-	return func(path string, data []byte, d fs.DirEntry) error {
+	return func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error) {
 		switch {
 		case
 			d.IsDir(),
 			filepath.Base(path) != MarkerIndex:
-			return next(path, data, d)
+			return path, data, d, nil
 
 		case ignore(path):
 			panic("unexpected ignored file for index-generator: " + path)
@@ -37,19 +36,19 @@ func indexGenerator(s *ssg.Ssg) ssg.Pipeline {
 
 		entries, err := os.ReadDir(parent)
 		if err != nil {
-			return fmt.Errorf("failed to read marker dir '%s': %w", path, err)
+			return "", nil, nil, fmt.Errorf("failed to read marker dir '%s': %w", path, err)
 		}
 		template, err := os.ReadFile(path)
 		if err != nil {
-			return fmt.Errorf("failed to read marker '%s': %w", path, err)
+			return "", nil, nil, fmt.Errorf("failed to read marker '%s': %w", path, err)
 		}
 
 		index, err := genIndex(src, ignore, parent, entries, template)
 		if err != nil {
-			return fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
+			return "", nil, nil, fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
 		}
 
-		return next(filepath.Join(parent, "index.md"), []byte(index), d)
+		return filepath.Join(parent, "index.md"), []byte(index), d, nil
 	}
 }
 

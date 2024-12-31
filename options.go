@@ -20,7 +20,7 @@ type (
 	// Pipeline is called during directory tree walks.
 	// ssg-go provides path and data from the file,
 	// and Pipeline is free to do whatever it wants
-	Pipeline func(path string, data []byte, d fs.DirEntry) error
+	Pipeline func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error)
 
 	options struct {
 		hookAll      HookAll
