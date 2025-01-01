@@ -45,6 +45,7 @@ var (
 	// ErrBreakPipelines causes Ssg to break from pipeline iteration
 	// and use the pipeline's output
 	ErrBreakPipelines = errors.New("break_pipeline")
+
 	// ErrSkipCore causes Ssg to break from pipeline iteration
 	// and skip core processor, continuing to the new input file.
 	ErrSkipCore = errors.New("skip_core")
@@ -290,16 +291,18 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 	skipCore := false
 	for i, p := range s.options.pipelines {
 		path, data, d, err = p(path, data, d)
-		if err != nil {
-			if errors.Is(err, ErrSkipCore) {
-				skipCore = true
-				break
-			}
-			if errors.Is(err, ErrBreakPipelines) {
-				break
-			}
-			return fmt.Errorf("[pipeline %d] error: %w", i, err)
+		if err == nil {
+			continue
 		}
+		if errors.Is(err, ErrSkipCore) {
+			skipCore = true
+			break
+		}
+		if errors.Is(err, ErrBreakPipelines) {
+			break
+		}
+
+		return fmt.Errorf("[pipeline %d] error: %w", i, err)
 	}
 
 	if skipCore {
