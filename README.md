@@ -1,6 +1,8 @@
 # ssg (static site generator)
 
-> This repository also hosts [soyweb](./soyweb/),
+> See also: [ssg-go](./ssg-go.md)
+>
+> Note: This repository also hosts [soyweb](./soyweb/),
 > an ssg wrapper and replacement for [webtools](https://github.com/soyart/webtools)
 
 This Nix Flake provides 2 implementations of ssg.
@@ -65,6 +67,22 @@ or a default value provided at the command-line (the 3rd argument).
 > with `:ssg-title` tag. This line will be removed from the output.
 
 ## Differences between ssg and ssg-go
+
+### Concurrent writers
+
+ssg-go has built-in concurrent output writers.
+
+The number of writers can be set at runtime by environment variable `SSG_WRITERS`.
+At any point in time, at most `SSG_WRITERS` number of threads are writing output files.
+
+The default value for concurrent writer is 20. If the supplied value is illegal,
+ssg-go falls back to 20 concurrent writers.
+
+> To write outputs sequentially, set the write concurrency value to 1:
+>
+> ```shell
+> SSG_WRITERS=1 ssg mySrc myDst myTitle myUrl
+> ```
 
 ### Custom title tag for `_header.html`
 
@@ -151,7 +169,6 @@ as the document head title.
 
 On the other hand, the `{{from-h1}}` will cause ssg-go to use `Some Header 2`
 as the document head title.
-
 
 ### Cascading header and footer templates
 

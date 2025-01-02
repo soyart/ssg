@@ -125,19 +125,3 @@ if err != nil {
 }
 ```
 
-## Concurrent writers
-
-ssg-go has built-in concurrent output writers.
-
-The number of writers can be set at runtime by environment variable `SSG_WRITERS`.
-At any point in time, at most `SSG_WRITERS` number of threads are writing output files.
-
-The default value for concurrent writer is 20. If the supplied value is illegal,
-ssg-go falls back to 20 concurrent writers.
-
-> To write outputs sequentially, set the write concurrency value to 1:
->
-> ```shell
-> SSG_WRITERS=1 ssg mySrc myDst myTitle myUrl
-> ```
-
