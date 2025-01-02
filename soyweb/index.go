@@ -115,13 +115,13 @@ func genIndex(
 			if recurse {
 				break // switch
 			}
-			// No index in child, won't build index line
-			if index == "" {
-				continue
-			}
 			// No need to extract and change title
 			if index == "index.html" {
 				break // switch
+			}
+			// No index in child, won't build index line
+			if index == "" {
+				continue
 			}
 			// Try to extract and change link title
 			title, err := extractTitle(filepath.Join(sibPath, index))
