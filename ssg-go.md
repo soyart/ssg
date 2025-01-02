@@ -46,14 +46,22 @@ For an input file, ssg-go performs these actions:
   ssg-go calls `Hook` on the file to modify the data.
   We can use minifiers here.
 
+- If path has non-`.md` extension
+
+  ssg-go will simply mirrors the file to `$dst`:
+
+  ```
+  raw data (post-pipeline) -> hook -> output
+  ```
+
 - If path has `.md` extension
 
   ssg-go assembles and adds the HTML output to the outputs.
   After the assembly, `HookGenerate` is called on the data.
 
-```
-raw data (post-pipeline) -> hook -> generate/assemble HTML -> hookGenerate -> output
-```
+  ```
+  raw data (post-pipeline) -> hook -> generate/assemble HTML -> hookGenerate -> output
+  ```
 
 ### Options
 
