@@ -92,15 +92,19 @@ func genIndex(
 			// Find 1st-level subdir with index.html or index.md
 			// e.g. /parent/article/index.html
 			// or   /parent/article/index.md
-			children, err := os.ReadDir(sibPath)
+			nephews, err := os.ReadDir(sibPath)
 			if err != nil {
 				return "", fmt.Errorf("failed to read child dir %s: %w", sibName, err)
 			}
 
 			index := ""
 			recurse := false
-			for j := range children {
-				name := children[j].Name()
+			for j := range nephews {
+				nephew := nephews[j]
+				if nephew.IsDir() {
+					continue
+				}
+				name := nephew.Name()
 				if name == "index.md" || name == "index.html" {
 					index = name
 					break
@@ -119,7 +123,7 @@ func genIndex(
 			if index == "index.html" {
 				break // switch
 			}
-			// No index in child, won't build index line
+			// No index in child, won't build index for the sibling
 			if index == "" {
 				continue
 			}
