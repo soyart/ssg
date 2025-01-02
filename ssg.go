@@ -19,12 +19,15 @@ import (
 )
 
 const (
-	MarkerHeader       = "_header.html"
-	MarkerFooter       = "_footer.html"
-	HtmlFlags          = html.CommonFlags
+	MarkerHeader = "_header.html"
+	MarkerFooter = "_footer.html"
+	SsgIgnore    = ".ssgignore"
+
 	WritersEnvKey      = "SSG_WRITERS"
 	WritersDefault int = 20
-	SsgExtensions      = parser.CommonExtensions |
+
+	HtmlFlags     = html.CommonFlags
+	SsgExtensions = parser.CommonExtensions |
 		parser.Mmark |
 		parser.AutoHeadingIDs
 
@@ -60,7 +63,7 @@ type Ssg struct {
 	options options
 
 	stream     chan<- OutputFile
-	ssgignores ignorer
+	ssgignores Ignorer
 	headers    headers
 	footers    footers
 	preferred  Set      // Used to prefer html and ignore md files with identical names, as with the original ssg
@@ -273,7 +276,11 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 	}
 
 	switch base {
-	case MarkerHeader, MarkerFooter:
+	case
+		MarkerHeader,
+		MarkerFooter,
+		SsgIgnore:
+
 		return nil
 	}
 
@@ -373,9 +380,8 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 	if err != nil {
 		return err
 	}
-
-	if s.options.hookAll != nil {
-		data, err = s.options.hookAll(path, data)
+	if s.options.hook != nil {
+		data, err = s.options.hook(path, data)
 		if err != nil {
 			return fmt.Errorf("hook error when building %s: %w", path, err)
 		}
@@ -383,7 +389,7 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 
 	ext := filepath.Ext(path)
 	if ext != ".md" {
-		target, err := MirrorPath(s.Src, s.Dst, path, ext)
+		target, err := mirrorPath(s.Src, s.Dst, path, ext)
 		if err != nil {
 			return err
 		}
@@ -402,7 +408,7 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 		return nil // Make way for existing (preferred) html file with matching base name
 	}
 
-	target, err := MirrorPath(s.Src, s.Dst, path, ".html")
+	target, err := mirrorPath(s.Src, s.Dst, path, ".html")
 	if err != nil {
 		return err
 	}
@@ -422,23 +428,23 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 		headerText, data = AddTitleFromTag([]byte(s.Title), headerText, data)
 	}
 
-	out := bytes.NewBuffer(headerText)
-	out.Write(ToHtml(data))
-	out.Write(footer.Bytes())
+	// HTML output buffer
+	buf := bytes.NewBuffer(headerText)
+	buf.Write(ToHtml(data))
+	buf.Write(footer.Bytes())
 
 	if s.options.hookGenerate != nil {
-		b, err := s.options.hookGenerate(out.Bytes())
+		b, err := s.options.hookGenerate(buf.Bytes())
 		if err != nil {
 			return fmt.Errorf("hook error when building %s: %w", path, err)
 		}
-
-		out = bytes.NewBuffer(b)
+		buf = bytes.NewBuffer(b)
 	}
 
 	s.AddOutputs(Output(
 		target,
 		path,
-		out.Bytes(),
+		buf.Bytes(),
 		info.Mode().Perm(),
 	))
 
@@ -446,33 +452,18 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 }
 
 func (s *Ssg) Ignore(path string) bool {
-	return s.ssgignores.ignore(path)
+	return s.ssgignores.Ignore(path)
 }
 
 func (s *Ssg) pront(l int) {
 	Fprintf(os.Stdout, "[ssg-go] wrote %d file(s) to %s\n", l, s.Dst)
 }
 
-type ignorer interface {
-	ignore(path string) bool
+type Ignorer interface {
+	Ignore(path string) bool
 }
 
-type ignorerGitignore struct {
-	*ignore.GitIgnore
-}
-
-func (i *ignorerGitignore) ignore(path string) bool {
-	if i == nil {
-		return false
-	}
-	if i.GitIgnore == nil {
-		return false
-	}
-
-	return i.MatchesPath(path)
-}
-
-func prepare(src, dst string) (*ignorerGitignore, error) {
+func prepare(src, dst string) (Ignorer, error) {
 	if src == "" {
 		return nil, fmt.Errorf("empty src")
 	}
@@ -483,26 +474,42 @@ func prepare(src, dst string) (*ignorerGitignore, error) {
 		return nil, fmt.Errorf("src is identical to dst: '%s'", src)
 	}
 
-	ssgignore := filepath.Join(src, ".ssgignore")
-	ignores, err := ignore.CompileIgnoreFile(ssgignore)
+	ssgignore := filepath.Join(src, SsgIgnore)
+	return ParseSsgIgnore(ssgignore)
+}
+
+func ParseSsgIgnore(path string) (Ignorer, error) {
+	ignores, err := ignore.CompileIgnoreFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to parse ssgignore at %s: %w", ssgignore, err)
+		return nil, fmt.Errorf("failed to parse ssgignore at %s: %w", path, err)
 	}
 
 	return &ignorerGitignore{GitIgnore: ignores}, nil
 }
 
-func shouldIgnore(ignores ignorer, path, base string, d fs.DirEntry) (bool, error) {
+type ignorerGitignore struct {
+	*ignore.GitIgnore
+}
+
+func (i *ignorerGitignore) Ignore(path string) bool {
+	if i == nil {
+		return false
+	}
+	if i.GitIgnore == nil {
+		return false
+	}
+	return i.MatchesPath(path)
+}
+
+// TODO: refactor
+func shouldIgnore(ignores Ignorer, path, base string, d fs.DirEntry) (bool, error) {
 	isDot := strings.HasPrefix(base, ".")
 	isDir := d.IsDir()
 
 	switch {
-	case base == ".ssgignore":
-		return true, nil
-
 	case isDot && isDir:
 		return true, fs.SkipDir
 
@@ -510,7 +517,7 @@ func shouldIgnore(ignores ignorer, path, base string, d fs.DirEntry) (bool, erro
 	case isDot, isDir:
 		return true, nil
 
-	case ignores.ignore(path):
+	case ignores.Ignore(path):
 		return true, nil
 	}
 
@@ -530,12 +537,12 @@ func shouldIgnore(ignores ignorer, path, base string, d fs.DirEntry) (bool, erro
 	return false, nil
 }
 
-// MirrorPath mirrors the target HTML file path under src to under dist
+// mirrorPath mirrors the target HTML file path under src to under dist
 //
 // i.e. if src="foo/src" and dst="foo/dist",
 // and path="foo/src/bar/baz.md"  newExt=".html",
 // then the return value will be foo/dist/bar/baz.html
-func MirrorPath(
+func mirrorPath(
 	src string,
 	dst string,
 	path string,

@@ -25,7 +25,7 @@ type (
 	Pipeline func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error)
 
 	options struct {
-		hookAll      Hook
+		hook         Hook
 		hookGenerate HookGenerate
 		pipelines    []Pipeline
 		caching      bool
@@ -73,7 +73,7 @@ func Writers(u uint) Option {
 // on every unignored files.
 func WithHook(hook Hook) Option {
 	return func(s *Ssg) {
-		s.options.hookAll = hook
+		s.options.hook = hook
 	}
 }
 
@@ -89,20 +89,26 @@ func WithHookGenerate(hook HookGenerate) Option {
 // pipelines chained together.
 //
 // pipelines can be of type Pipeline or func(*Ssg) Pipeline
-func WithPipelines(pipelines ...interface{}) Option {
+func WithPipelines(pipes ...interface{}) Option {
 	return func(s *Ssg) {
-		pipes := make([]Pipeline, len(pipelines))
-		for i, f := range pipelines {
-			switch actual := f.(type) {
+		pipelines := make([]Pipeline, len(pipes))
+		for i, p := range pipes {
+			switch pipe := p.(type) {
 			case Pipeline:
-				pipes[i] = actual
+				pipelines[i] = pipe
+
+			case func(string, []byte, fs.DirEntry) (string, []byte, fs.DirEntry, error):
+				pipelines[i] = pipe
+
 			case func(*Ssg) Pipeline:
-				pipes[i] = actual(s)
+				pipelines[i] = pipe(s)
+
 			default:
-				panic(fmt.Errorf("unexpected pipelines[%d] type '%s'", i, reflect.TypeOf(f).String()))
+				panic(fmt.Errorf("unexpected pipelines[%d] type '%s'", i, reflect.TypeOf(p).String()))
 			}
 		}
-		s.options.pipelines = pipes
+
+		s.options.pipelines = pipelines
 	}
 }
 

@@ -2,44 +2,82 @@
 
 ssg-go is a drop-in replacement and library for implementing ssg.
 
-## Concurrent writers
+## Extending and consuming ssg-go
 
-ssg-go has built-in concurrent output writers.
+### ssg-go walk
 
-The number of writers can be set at runtime by environment variable `SSG_WRITERS`.
-At any point in time, at most `SSG_WRITERS` number of threads are writing output files.
+Given `src` and `dst` paths, ssg-go walks `src` and performs the
+following operations for each source file:
 
-The default value for concurrent writer is 20. If the supplied value is illegal,
-ssg-go falls back to 20 concurrent writers.
+- If path is ignored
 
-> To write outputs sequentially, set the write concurrency value to 1:
-> 
-> ```shell
-> SSG_WRITERS=1 ssg mySrc myDst myTitle myUrl
-> ```
+  ssg-go continues to the next input.
 
-## Extending ssg-go
+- If path is unignored directory
+
+  ssg-go collects templates from `_header.html` and `_footer.html`
+
+- If path is a file
+
+  ssg-go reads the data and send it to all of the `Pipeline`s.
+
+  The output from the last `Pipeline` is used as input to core:
+
+  ```
+  raw_data -> pipelines -> core
+  ```
+
+  A well known error can be used to control this behavior:
+
+  - `ErrBreakPipelines`
+
+    ssg-go stops going through pipelines and immedietly advances to core
+
+  - `ErrSkipCore`
+
+    Like with `ErrBreakPipelines`, but ssg-go also skips core.
+
+### ssg-go core
+
+For an input file, ssg-go performs these actions:
+
+- If path is a file
+
+  ssg-go calls `Hook` on the file to modify the data.
+  We can use minifiers here.
+
+- If path has `.md` extension
+
+  ssg-go assembles and adds the HTML output to the outputs.
+  After the assembly, `HookGenerate` is called on the data.
+
+```
+raw data (post-pipeline) -> hook -> generate/assemble HTML -> hookGenerate -> output
+```
+
+### Options
 
 Go programmers can extend ssg-go via its [`Option` type](./options.go).
 
 [soyweb](./soyweb/) also extends ssg via `Option`,
 and provides extra functionality such as index generator and minifiers.
 
-### `Hook` option
+#### `Hook` option
 
-`Hook` is a Go function called on every unignored input file.
-soyweb uses this option to implement global minifiers.
+`Hook` is a Go function used to modify data after it is read,
+preserving the filename. `Hook` is only called on the raw inputs
+but not on the generated HTMLs.
 
-It is enabled with `WithHook(hook)`.
+It is enabled with `WithHook(hook)`
 
-### `HookGenerate` option
+#### `HookGenerate` option
 
 `HookGenerate` is a Go function called on every generated HTML.
-soyweb uses this option to implement output minifier.
+For example, soyweb uses this option to implement output minifier.
 
 It is enabled with `WithHookGenerate(hook)`
 
-### `Pipeline` option
+#### `Pipeline` option
 
 `Pipeline` is a Go function called on a file during directory walk.
 To reduce complexity, ignored files and ssg headers/footers are not sent
@@ -87,45 +125,19 @@ if err != nil {
 }
 ```
 
-### Core of ssg-go
+## Concurrent writers
 
-The core of ssg-go is to perform these actions:
+ssg-go has built-in concurrent output writers.
 
-- If path is a file
+The number of writers can be set at runtime by environment variable `SSG_WRITERS`.
+At any point in time, at most `SSG_WRITERS` number of threads are writing output files.
 
-  ssg-go calls `Hook` on the file to modify the data.
-  We can use minifiers here.
+The default value for concurrent writer is 20. If the supplied value is illegal,
+ssg-go falls back to 20 concurrent writers.
 
-- If path has `.md` extension
-
-  ssg-go assembles and adds the HTML output to the outputs.
-  After the assembly, `HookGenerate` is called on the data.
-
-### The walk
-
-Given `src` and `dst` paths, ssg-go walks `src` and performs the
-following operations for each source file:
-
-- If path is ignored
-
-  ssg-go continues to the next input.
-
-- If path is unignored directory
-
-  ssg-go collects templates from `_header.html` and `_footer.html`
-
-- If path is a file
-
-  ssg-go reads the data and send it to all of the `Pipeline`s.
-  The output from the last `Pipeline` is used as input to core.
-
-  A well known error can be used to control this behavior:
-
-  - `ErrBreakPipelines`
-  
-    ssg-go stops going through pipelines and immedietly advances to core
-
-  - `ErrSkipCore`
-
-    Like with `ErrBreakPipelines`, but ssg-go also skips core.
+> To write outputs sequentially, set the write concurrency value to 1:
+>
+> ```shell
+> SSG_WRITERS=1 ssg mySrc myDst myTitle myUrl
+> ```
 
