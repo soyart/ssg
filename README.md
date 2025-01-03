@@ -1,9 +1,6 @@
 # ssg (static site generator)
 
 > See also: [ssg-go](./ssg-go.md)
->
-> Note: This repository also hosts [soyweb](./soyweb/),
-> an ssg wrapper and replacement for [webtools](https://github.com/soyart/webtools)
 
 This Nix Flake provides 2 implementations of ssg.
 
@@ -24,7 +21,7 @@ This Nix Flake provides 2 implementations of ssg.
   In addition to the executables, ssg-go also provides
   extensible ssg implementations with Go API.
 
-  A Go wrapper for ssg-go is also available in [`soyweb`](./soyweb/).
+  A Go wrapper for ssg-go is also available in [`soyweb`](./soyweb/) repository.
 
   > Note: both ssg-go and soyweb will probably not work on Windows due to
   > Windows path delimiter being different than POSIX's

@@ -24,10 +24,10 @@ following operations for each source file:
   The output from the last `Pipeline` is used as input to core:
 
   ```
-  raw_data -> pipelines -> core
+  raw_data -> [pipelines] -> core
   ```
 
-  A well known error can be used to control this behavior:
+  Pipelines can use these 2 well known errors control ssg-go walk control flow:
 
   - `ErrBreakPipelines`
 
@@ -51,7 +51,7 @@ For an input file, ssg-go performs these actions:
   ssg-go will simply mirrors the file to `$dst`:
 
   ```
-  raw data (post-pipeline) -> hook -> output
+  raw data post-pipeline -> hook -> output
   ```
 
 - If path has `.md` extension
@@ -60,7 +60,7 @@ For an input file, ssg-go performs these actions:
   After the assembly, `HookGenerate` is called on the data.
 
   ```
-  raw data (post-pipeline) -> hook -> generate/assemble HTML -> hookGenerate -> output
+  raw data post-pipeline -> hook -> generate/assemble HTML -> hookGenerate -> output
   ```
 
 ### Options
@@ -69,6 +69,22 @@ Go programmers can extend ssg-go via its [`Option` type](./options.go).
 
 [soyweb](./soyweb/) also extends ssg via `Option`,
 and provides extra functionality such as index generator and minifiers.
+
+Extending via options can be done in 2 rough categories:
+
+- Hooks
+
+  Hooks modify file content in-place in memory (without renaming input files).
+  In short, it maps the input bytes 1-1 to new input bytes.
+
+  A good usecase for hooks would be minifiers or content filter.
+
+- Pipelines
+
+  Pipelines have full control of the walk, and can arbitarily generate new
+  ssg-go outputs and change input properties such as filenames and modes.
+
+  In soyweb, pipelines are used to implement the [index generator](./index.go).
 
 #### `Hook` option
 
@@ -92,6 +108,45 @@ To reduce complexity, ignored files and ssg headers/footers are not sent
 to `Pipeline`. This preserves the core functionality of the original ssg.
 
 Pipelines can be chained together with `WithPipelines(p1, p2, p3)`
+
+`WithPipelines` accepts 2 types of spread parameters:
+
+- `Pipeline`
+
+  An alias to `func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error)`
+  We can call these pipelines *pure* pipelines.
+
+  An example would be this `Pipeline`, that reads atime from filesystems
+  and prepends the date string to Markdowns:
+
+  ```go
+  func pipelineUpdatedAt(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error) {
+  	if d.IsDir() {
+  		return path, data, d, nil
+  	}
+  	if filepath.Ext(path) != ".md" {
+  		return path, data, d, nil
+  	}
+  	info, err := d.Info()
+  	if err != nil {
+  		return "", nil, nil, err
+  	}
+  	buf := bytes.NewBufferString(
+  		fmt.Sprintf("%s", info.ModTime().Format(time.DateOnly)),
+  	)
+
+  	buf.ReadFrom(bytes.NewBuffer(data))
+  	return path, buf.Bytes(), d, nil
+  }
+  ```
+
+- `func(s *Ssg) Pipeline`
+
+  Some pipelines are not pure and might need something from `Ssg`, so
+  we allow these pipeline constructors as arguments to `WithPipelines`.
+
+  An example for this type of pipelines would be the [index generator](./index.go),
+  which needs to know which files are ignored in addition to `$src` and `$dst`.
 
 ### Streaming and caching builds
 
