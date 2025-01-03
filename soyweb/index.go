@@ -39,7 +39,7 @@ func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
 		if err != nil {
 			return "", nil, nil, fmt.Errorf("failed to read marker '%s': %w", path, err)
 		}
-		index, err := genIndex(s.Src, s.Ignore, parent, entries, template)
+		index, err := generateIndex(s.Src, s.Ignore, parent, entries, template)
 		if err != nil {
 			return "", nil, nil, fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
 		}
@@ -48,7 +48,7 @@ func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
 	}
 }
 
-func genIndex(
+func generateIndex(
 	src string,
 	ignore func(path string) bool,
 	parent string,
@@ -66,35 +66,43 @@ func genIndex(
 	for i := range siblings {
 		sib := siblings[i]
 		sibName := sib.Name()
-		linkTitle := sibName
+		sibIsDir := sib.IsDir()
 
 		switch sibName {
 		case
-			ssg.MarkerHeader,
-			ssg.MarkerFooter,
-			MarkerIndex:
+			"index.html",
+			"index.md":
+			if !sibIsDir {
+				return "", fmt.Errorf("parent %s already had index %s", parent, sibName)
+			}
+
+		case
+			MarkerIndex,      // Marker itself
+			ssg.MarkerHeader, // Ignore
+			ssg.MarkerFooter: // Ignore
 			continue
 		}
 
-		isDir := sib.IsDir()
 		sibExt := filepath.Ext(sibName)
-		if !isDir && (sibExt != ".md" && sibExt != ".html") {
+		if !sibIsDir && sibExt != ".md" && sibExt != ".html" {
 			continue
 		}
-
 		sibPath := filepath.Join(parent, sibName)
 		if ignore(sibPath) {
 			continue
 		}
 
+		// Default is to use dir/filename as link title
+		linkTitle := sibName
+
 		switch {
-		case isDir:
+		case sibIsDir:
 			// Find 1st-level subdir with index.html or index.md
 			// e.g. /parent/article/index.html
 			// or   /parent/article/index.md
 			nephews, err := os.ReadDir(sibPath)
 			if err != nil {
-				return "", fmt.Errorf("failed to read child dir %s: %w", sibName, err)
+				return "", fmt.Errorf("failed to read nephew dir '%s': %w", sibName, err)
 			}
 
 			index := ""
@@ -105,7 +113,7 @@ func genIndex(
 					continue
 				}
 				name := nephew.Name()
-				if name == "index.md" || name == "index.html" {
+				if name == "index.html" || name == "index.md" {
 					index = name
 					break
 				}
@@ -119,7 +127,8 @@ func genIndex(
 			if recurse {
 				break // switch
 			}
-			// No need to extract and change title
+			// Use dir as childTitle
+			// No need to extract and change title from Markdown
 			if index == "index.html" {
 				break // switch
 			}
@@ -127,7 +136,8 @@ func genIndex(
 			if index == "" {
 				continue
 			}
-			// Try to extract and change link title
+
+			// Get linkTitle from nephew's content
 			title, err := extractTitle(filepath.Join(sibPath, index))
 			if err != nil {
 				return "", err
@@ -136,7 +146,7 @@ func genIndex(
 				linkTitle = string(title)
 			}
 
-		case sibExt == ".md" || sibExt == ".html":
+		case sibExt == ".md":
 			title, err := extractTitle(sibPath)
 			if err != nil {
 				return "", err
@@ -144,12 +154,7 @@ func genIndex(
 			if len(title) != 0 {
 				linkTitle = string(title)
 			}
-			if sibExt == ".md" {
-				sibName = ssg.ChangeExt(sibName, ".md", ".html")
-			}
-
-		default:
-			panic("unhandled case for sibling: " + filepath.Join(parent, sibName))
+			sibName = ssg.ChangeExt(sibName, ".md", ".html")
 		}
 
 		rel, err := filepath.Rel(src, parent)
@@ -157,7 +162,7 @@ func genIndex(
 			return "", err
 		}
 		link := filepath.Join(rel, sibName)
-		if isDir {
+		if sibIsDir {
 			link += "/"
 		}
 
