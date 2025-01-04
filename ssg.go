@@ -130,6 +130,7 @@ func (s *Ssg) Generate() error {
 
 // AddOutputs adds outputs to cache (if enabled)
 // and sends the outputs to output stream to concurrent writers.
+// **It does not write the outputs**.
 func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	if s.options.caching {
 		s.cache = append(s.cache, outputs...)
