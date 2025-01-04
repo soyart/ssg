@@ -107,21 +107,6 @@ func WithPipelines(pipes ...interface{}) Option {
 				panic(fmt.Errorf("unexpected pipelines[%d] type '%s'", i, reflect.TypeOf(p).String()))
 			}
 		}
-
 		s.options.pipelines = pipelines
-	}
-}
-
-// Chain returns a new Pipeline that interates the input through pipelines sequentially.
-func Chain(pipes ...Pipeline) Pipeline {
-	return func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error) {
-		var err error
-		for i := range pipes {
-			path, data, d, err = pipes[i](path, data, d)
-			if err != nil {
-				return "", nil, nil, fmt.Errorf("[pipeline %d] error: %w", i, err)
-			}
-		}
-		return path, data, d, nil
 	}
 }

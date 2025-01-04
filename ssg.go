@@ -7,10 +7,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
@@ -47,11 +45,11 @@ const (
 var (
 	// ErrBreakPipelines causes Ssg to break from pipeline iteration
 	// and use the pipeline's output
-	ErrBreakPipelines = errors.New("break_pipeline")
+	ErrBreakPipelines = errors.New("ssg_break_pipeline")
 
 	// ErrSkipCore causes Ssg to break from pipeline iteration
 	// and skip core processor, continuing to the new input file.
-	ErrSkipCore = errors.New("skip_core")
+	ErrSkipCore = errors.New("ssg_skip_core")
 )
 
 type Ssg struct {
@@ -117,59 +115,6 @@ func ToHtml(md []byte) []byte {
 	return markdown.Render(root, renderer)
 }
 
-func Sitemap(
-	dst string,
-	url string,
-	modTime time.Time,
-	outputs []OutputFile,
-) (
-	string,
-	error,
-) {
-	dateStr := modTime.Format(time.DateOnly)
-	sm := bytes.NewBufferString(`<?xml version="1.0" encoding="UTF-8"?>
-<urlset
-xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance"
-xsi:schemaLocation="https://www.sitemaps.org/schemas/sitemap/0.9
-https://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
-xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
-`)
-	for i := range outputs {
-		o := &outputs[i]
-		target, err := filepath.Rel(dst, o.target)
-		if err != nil {
-			return sm.String(), err
-		}
-
-		Fprintf(sm, "<url><loc>%s/", url)
-
-		/* There're 2 possibilities for this
-		1. First is when the HTML is some/path/index.html
-		<url><loc>https://example.com/some/path/</loc><lastmod>2024-10-04</lastmod><priority>1.0</priority></url>
-
-		2. Then there is when the HTML is some/path/page.html
-		<url><loc>https://example.com/some/path/page.html</loc><lastmod>2024-10-04</lastmod><priority>1.0</priority></url>
-		*/
-
-		base := filepath.Base(target)
-		switch base {
-		case "index.html":
-			d := filepath.Dir(target)
-			if d != "." {
-				Fprintf(sm, "%s/", d)
-			}
-
-		default:
-			sm.WriteString(target)
-		}
-
-		Fprintf(sm, "><lastmod>%s</lastmod><priority>1.0</priority></url>\n", dateStr)
-	}
-
-	sm.WriteString("</urlset>\n")
-	return sm.String(), nil
-}
-
 // With applies opts to s sequentially
 func (s *Ssg) With(opts ...Option) *Ssg {
 	for i := range opts {
@@ -183,6 +128,8 @@ func (s *Ssg) Generate() error {
 	return generate(s)
 }
 
+// AddOutputs adds outputs to cache (if enabled)
+// and sends the outputs to output stream to concurrent writers.
 func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	if s.options.caching {
 		s.cache = append(s.cache, outputs...)
@@ -193,61 +140,6 @@ func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	for i := range outputs {
 		s.stream <- outputs[i]
 	}
-}
-
-func Metadata(
-	src string,
-	dst string,
-	url string,
-	files []string,
-	dist []OutputFile,
-	srcModTime time.Time,
-) (
-	[]OutputFile,
-	error,
-) {
-	sort.Slice(dist, func(i, j int) bool {
-		return dist[i].target < dist[j].target
-	})
-
-	dotFiles, err := DotFiles(src, files)
-	if err != nil {
-		return nil, err
-	}
-	sitemap, err := Sitemap(dst, url, srcModTime, dist)
-	if err != nil {
-		return nil, err
-	}
-
-	return []OutputFile{
-		Output(filepath.Join(dst, "sitemap.xml"), "", []byte(sitemap), 0644),
-		Output(filepath.Join(dst, ".files"), "", []byte(dotFiles), 0644),
-	}, nil
-}
-
-func GenerateMetadata(src, dst, url string, files []string, dist []OutputFile, srcModTime time.Time) error {
-	metadata, err := Metadata(src, dst, url, files, dist, srcModTime)
-	if err != nil {
-		return err
-	}
-	return WriteOut(metadata, 2)
-}
-
-func DotFiles(src string, files []string) (string, error) {
-	list := bytes.NewBuffer(nil)
-	for _, f := range files {
-		if f == "" {
-			panic("found empty file for .files")
-		}
-		rel, err := filepath.Rel(src, f)
-		if err != nil {
-			return "", err
-		}
-
-		Fprintf(list, "./%s\n", rel)
-	}
-
-	return list.String(), nil
 }
 
 func (s *Ssg) buildV2() ([]string, []OutputFile, error) {
@@ -284,16 +176,16 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 		return nil
 	}
 
+	data, err := ReadFile(path)
+	if err != nil {
+		return err
+	}
+
 	// Remember input files for .files
 	//
 	// Original ssg does not include _header.html
 	// and _footer.html in .files
 	s.files = append(s.files, path)
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
 
 	skipCore := false
 	for i, p := range s.options.pipelines {
@@ -308,7 +200,6 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 		if errors.Is(err, ErrBreakPipelines) {
 			break
 		}
-
 		return fmt.Errorf("[pipeline %d] error: %w", i, err)
 	}
 
@@ -332,7 +223,7 @@ func (s *Ssg) collect(path string) error {
 
 		switch base {
 		case MarkerHeader:
-			data, err := os.ReadFile(pathChild)
+			data, err := ReadFile(pathChild)
 			if err != nil {
 				return err
 			}
@@ -343,10 +234,11 @@ func (s *Ssg) collect(path string) error {
 			if err != nil {
 				return err
 			}
+
 			continue
 
 		case MarkerFooter:
-			data, err := os.ReadFile(pathChild)
+			data, err := ReadFile(pathChild)
 			if err != nil {
 				return err
 			}
@@ -354,6 +246,7 @@ func (s *Ssg) collect(path string) error {
 			if err != nil {
 				return err
 			}
+
 			continue
 		}
 
@@ -361,7 +254,6 @@ func (s *Ssg) collect(path string) error {
 		if ext != ".html" {
 			continue
 		}
-
 		if s.preferred.Insert(pathChild) {
 			return fmt.Errorf("duplicate html file %s", path)
 		}
@@ -389,7 +281,7 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 
 	ext := filepath.Ext(path)
 	if ext != ".md" {
-		target, err := mirrorPath(s.Src, s.Dst, path, ext)
+		target, err := mirrorPath(s.Src, s.Dst, path)
 		if err != nil {
 			return err
 		}
@@ -399,26 +291,28 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 			data,
 			info.Mode().Perm(),
 		))
-
 		return nil
 	}
 
-	html := ChangeExt(path, ".md", ".html")
-	if s.preferred.ContainsAll(html) {
-		return nil // Make way for existing (preferred) html file with matching base name
+	// Make way for existing (preferred) html file with matching base name
+	if s.preferred.ContainsAll(
+		ChangeExt(path, ".md", ".html"),
+	) {
+		return nil
 	}
 
-	target, err := mirrorPath(s.Src, s.Dst, path, ".html")
+	target, err := mirrorPath(s.Src, s.Dst, path)
 	if err != nil {
 		return err
 	}
 
+	target = ChangeExt(target, ".md", ".html")
 	header := s.headers.choose(path)
 	footer := s.footers.choose(path)
 
 	// Copy, leave the underlying data in header unchanged
 	headerText := make([]byte, header.Len())
-	copy(headerText, header.Bytes())
+	_ = copy(headerText, header.Bytes())
 
 	switch header.titleFrom {
 	case TitleFromH1:
@@ -546,15 +440,10 @@ func mirrorPath(
 	src string,
 	dst string,
 	path string,
-	newExt string, // File's new extension after mirrored
 ) (
 	string,
 	error,
 ) {
-	ext := filepath.Ext(path)
-	if ext != newExt {
-		path = ChangeExt(path, ext, newExt)
-	}
 	path, err := filepath.Rel(src, path)
 	if err != nil {
 		return "", err

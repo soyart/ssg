@@ -35,7 +35,7 @@ func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
 		if err != nil {
 			return "", nil, nil, fmt.Errorf("failed to read marker dir '%s': %w", path, err)
 		}
-		template, err := os.ReadFile(path)
+		template, err := ssg.ReadFile(path)
 		if err != nil {
 			return "", nil, nil, fmt.Errorf("failed to read marker '%s': %w", path, err)
 		}
@@ -169,16 +169,16 @@ func generateIndex(
 		ssg.Fprintf(content, "- [%s](/%s)\n\n", linkTitle, link)
 	}
 
-	ssg.Fprintln(os.Stdout, "Generated index for", parent)
-	ssg.Fprint(os.Stdout, "======= START =======\n")
-	ssg.Fprintln(os.Stdout, content.String())
-	ssg.Fprint(os.Stdout, "======== END ========\n")
+	// ssg.Fprintln(os.Stdout, "Generated index for", parent)
+	// ssg.Fprint(os.Stdout, "======= START =======\n")
+	// ssg.Fprintln(os.Stdout, content.String())
+	// ssg.Fprint(os.Stdout, "======== END ========\n")
 
 	return content.String(), nil
 }
 
 func extractTitle(path string) ([]byte, error) {
-	data, err := os.ReadFile(path)
+	data, err := ssg.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read article file %s for title extraction: %w", path, err)
 	}

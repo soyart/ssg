@@ -31,10 +31,11 @@ const (
 type Manifest map[string]Site
 
 type Site struct {
-	ssg          ssg.Ssg                `json:"-"`
-	Copies       map[string]WriteTarget `json:"-"`
-	CleanUp      bool                   `json:"-"`
-	GenerateBlog bool                   `json:"-"`
+	ssg ssg.Ssg `json:"-"`
+
+	Copies        map[string]WriteTarget `json:"-"`
+	CleanUp       bool                   `json:"-"`
+	GenerateIndex bool                   `json:"-"`
 }
 
 type WriteTarget struct {
@@ -97,12 +98,10 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 			old.Info("skipping stage copy")
 			break
 		}
-
 		slog.SetDefault(old.
 			WithGroup("copy").
 			With("key", key, "url", site.ssg.Url),
 		)
-
 		if err := site.Copy(); err != nil {
 			return manifestError{
 				err:   err,
@@ -131,7 +130,7 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 			Info("building site")
 
 		s := &site.ssg
-		if site.GenerateBlog {
+		if site.GenerateIndex {
 			opts = append(opts, ssg.WithPipelines())
 		}
 
@@ -169,7 +168,6 @@ func NewManifest(filename string) (Manifest, error) {
 		slog.Error("failed to read manifest file")
 		return Manifest{}, fmt.Errorf("failed to read manifest from file '%s': %w", filename, err)
 	}
-
 	m := Manifest{}
 	err = json.Unmarshal(b, &m)
 	if err != nil {
@@ -183,7 +181,6 @@ func (s manifestError) Error() string {
 	if s.err == nil {
 		return fmt.Sprintf("[%s %s] %s", s.stage, s.key, s.msg)
 	}
-
 	return fmt.Errorf("[%s %s] %s: %w", s.stage, s.key, s.msg, s.err).Error()
 }
 
@@ -195,19 +192,17 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 	var site struct {
 		Copies map[string]interface{} `json:"copies"`
 
-		Src          string `json:"src"`
-		Dst          string `json:"dst"`
-		Title        string `json:"title"`
-		Url          string `json:"url"`
-		CleanUp      bool   `json:"cleanup"`
-		GenerateBlog bool   `json:"generate_blog"`
+		Src           string `json:"src"`
+		Dst           string `json:"dst"`
+		Title         string `json:"title"`
+		Url           string `json:"url"`
+		CleanUp       bool   `json:"cleanup"`
+		GenerateIndex bool   `json:"generate-index"`
 	}
-
 	err := json.Unmarshal(b, &site)
 	if err != nil {
 		return err
 	}
-
 	copies := make(map[string]WriteTarget)
 	err = decodeTargetsForce(site.Copies, copies)
 	if err != nil {
@@ -215,9 +210,9 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 	}
 
 	*s = Site{
-		Copies:       copies,
-		CleanUp:      site.CleanUp,
-		GenerateBlog: site.GenerateBlog,
+		Copies:        copies,
+		CleanUp:       site.CleanUp,
+		GenerateIndex: site.GenerateIndex,
 		ssg: ssg.New(
 			site.Src,
 			site.Dst,
@@ -248,20 +243,18 @@ func (s Stage) String() string {
 	case StageBuild:
 		return "build"
 	}
-
 	return "BAD_STAGE"
 }
 
 func newLogger() *slog.Logger {
 	loglevel.Set(slog.LevelDebug)
-	logger := slog.New(slog.NewJSONHandler(
+	return slog.New(slog.NewJSONHandler(
 		os.Stdout,
 		&slog.HandlerOptions{
 			AddSource: true,
 			Level:     loglevel,
-		}))
-
-	return logger
+		}),
+	)
 }
 
 func collect(m Manifest) (map[string]ssg.Set, error) {
@@ -272,7 +265,6 @@ func collect(m Manifest) (map[string]ssg.Set, error) {
 		if targets[key] == nil {
 			targets[key] = make(ssg.Set)
 		}
-
 		logger := slog.Default().WithGroup("collect").With("key", key, "url", site.ssg.Url)
 		for src, dst := range site.Copies {
 			if !dups.Insert(dst.Target) {
@@ -282,7 +274,6 @@ func collect(m Manifest) (map[string]ssg.Set, error) {
 
 				continue
 			}
-
 			logger.Error("duplicate write target", "src", src, "target", dst.Target)
 			return nil, manifestError{
 				err:   fmt.Errorf("duplicate target '%s'", dst.Target),
@@ -292,18 +283,18 @@ func collect(m Manifest) (map[string]ssg.Set, error) {
 			}
 		}
 	}
-
 	return targets, nil
 }
 
 func cleanup(m Manifest, targets map[string]ssg.Set) error {
-	// Cleanup
 	for key, site := range m {
 		if !site.CleanUp {
 			continue
 		}
+		logger := slog.Default().
+			WithGroup("cleanup").
+			With("key", key, "url", site.ssg.Url)
 
-		logger := slog.Default().WithGroup("cleanup").With("key", key, "url", site.ssg.Url)
 		siteTargets := targets[key]
 		for target := range siteTargets {
 			logger.Info("cleaning up", "target", target)
@@ -314,7 +305,6 @@ func cleanup(m Manifest, targets map[string]ssg.Set) error {
 			if err == nil {
 				continue
 			}
-
 			return manifestError{
 				err:   err,
 				key:   key,
@@ -323,7 +313,6 @@ func cleanup(m Manifest, targets map[string]ssg.Set) error {
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -333,10 +322,8 @@ func decodeTargetsForce(m map[string]interface{}, target map[string]WriteTarget)
 		if err != nil {
 			return err
 		}
-
 		target[k] = link
 	}
-
 	return nil
 }
 
@@ -375,11 +362,12 @@ func decodeTargetForce(entry interface{}) (WriteTarget, error) {
 
 func (s *Site) Copy() error {
 	logger := slog.Default()
-
 	dirs := make(ssg.Set)
 	perms := make(map[string]fs.FileMode)
+
 	for cpSrc, cpDst := range s.Copies {
-		logger := logger.With("phase", "scan", "cpSrc", cpSrc, "cpDst", cpDst)
+		logger := logger.
+			With("phase", "scan", "cpSrc", cpSrc, "cpDst", cpDst)
 
 		if len(cpSrc) == 0 {
 			return fmt.Errorf("found empty copy src")
@@ -404,7 +392,6 @@ func (s *Site) Copy() error {
 				logger.Error("failed to stat copy dst", "error", err)
 				return fmt.Errorf("failed to stat copy dst '%s': %w", cpDst, err)
 			}
-
 			err = os.MkdirAll(filepath.Dir(cpDst.Target), os.ModePerm)
 			if err != nil {
 				return fmt.Errorf("fail to prepare copy dst '%s': %w", cpDst, err)
@@ -423,7 +410,6 @@ func (s *Site) Copy() error {
 
 	for cpSrc, cpDst := range s.Copies {
 		logger := logger.With("phase", "copy", "cpSrc", cpSrc, "cpDst", cpDst)
-
 		err := copyFiles(dirs, cpSrc, cpDst, perms)
 		if err != nil {
 			logger.Error("failed to copy file")
@@ -441,7 +427,6 @@ func cp(src string, dst WriteTarget, perm fs.FileMode) error {
 			return err
 		}
 	}
-
 	b, err := os.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("error reading src: %w", err)
@@ -484,14 +469,14 @@ func cpRecurse(src string, dst WriteTarget) error {
 		if err != nil {
 			return err
 		}
-
 		rel, err := filepath.Rel(src, path)
 		if err != nil {
 			return err
 		}
 
 		target := filepath.Join(dstRoot, rel)
-		slog.Debug("cpRecurse", "src", src, "base", filepath.Base(path), "dst", dst, "target", target)
+		// slog.Debug("cpRecurse", "src", src, "base", filepath.Base(path), "dst", dst, "target", target)
+
 		out := WriteTarget{
 			Target: target,
 			Force:  dst.Force,

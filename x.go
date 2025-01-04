@@ -78,6 +78,12 @@ func Fprintln(w io.Writer, data ...interface{}) {
 	}
 }
 
+// For debugging
+func ReadFile(path string) ([]byte, error) {
+	// fmt.Println(">>> reading file", path)
+	return os.ReadFile(path)
+}
+
 func newHeaders(defaultHeader string) headers {
 	return headers{
 		perDir: newPerDir(header{
