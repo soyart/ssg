@@ -23,15 +23,16 @@ func generate(s *Ssg) error {
 	var files []string
 	wg.Add(1)
 	go func() {
-		defer wg.Done()
+		defer func() {
+			close(s.stream)
+			wg.Done()
+		}()
 
 		var err error
 		files, _, err = s.buildV2()
 		if err != nil {
 			errBuild = err
 		}
-
-		close(s.stream)
 	}()
 
 	var written []OutputFile
