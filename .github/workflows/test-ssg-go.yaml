@@ -38,7 +38,7 @@ jobs:
 
       - name: Test ssg-go
         run: |
-          echo Testing soyweb and writing JSON report to $ARTIFACT_SSG_GO
+          echo Testing ssg-go and writing JSON report to $ARTIFACT_SSG_GO
           go test -race -count=1 -json ./... > $ARTIFACT_SSG_GO
 
       - name: Test soyweb
