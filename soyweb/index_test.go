@@ -36,7 +36,8 @@ func TestGenerateIndex(t *testing.T) {
 		},
 		"2023/_index.soyweb": {
 			defaultTitleHtml,
-			`Index of 2023`, // because _index.soyweb was empty
+			// Because _index.soyweb was empty, so default index header is used.
+			`Index of 2023`,
 			`<li><p><a href="/2023/baz.html">Bazketball</a></p></li>`,
 			`<li><p><a href="/2023/recurse/">recurse</a></p></li>`,
 			`<li><p><a href="/2023/lol/">LOLOLOL</a></p></li>`,
@@ -53,6 +54,12 @@ func TestGenerateIndex(t *testing.T) {
 			`<li><p><a href="/testdir/dir2/">Dir-2</a></p></li>`,
 			`<li><p><a href="/testdir/testprefer/">testprefer</a></p></li>`,
 		},
+		"testdir/testprefer/_index.soyweb": {
+			defaultTitleHtml,
+			// Use dirname because existing index.html is preferred
+			`<li><p><a href="/testdir/testprefer/dir3/">dir3</a></p></li>`,
+			`<li><p><a href="/testdir/testprefer/dir4/">Dir-4</a></p></li>`,
+		},
 	}
 
 	notContains := map[string][]string{
@@ -63,6 +70,10 @@ func TestGenerateIndex(t *testing.T) {
 		"testdir/_index.soyweb": {
 			"ignore3",
 			"ignore4",
+		},
+		"testdir/testprefer/_index.soyweb": {
+			"Dir-3",
+			"This should not be copied to target",
 		},
 	}
 
@@ -78,7 +89,7 @@ func TestGenerateIndex(t *testing.T) {
 		}
 	}
 
-	err = ssg.Generate(src, dst, title, url, IndexGenerator())
+	err = ssg.Generate(src, dst, title, url, ssg.WithPipelines(IndexGenerator))
 	if err != nil {
 		t.Fatalf("error during ssg generation: %v", err)
 	}

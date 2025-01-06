@@ -2,6 +2,8 @@ package ssg
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -364,7 +366,7 @@ func TestSsgignore(t *testing.T) {
 		}
 
 		ignorer := &ignorerGitignore{GitIgnore: ignores}
-		ignored := ignorer.ignore(tc.path)
+		ignored := ignorer.Ignore(tc.path)
 		if tc.expected == ignored {
 			continue
 		}
@@ -415,4 +417,42 @@ func TestBuildAndWriteOut(t *testing.T) {
 	}
 
 	testDeepEqual(t, dstGenerate, dstBuild)
+}
+
+func TestErrors(t *testing.T) {
+	retBreakPipe := func() error {
+		return ErrBreakPipelines
+	}
+	wrapBreakPipe := func(err error) error {
+		return fmt.Errorf("foo bar %w: %w", err, ErrBreakPipelines)
+	}
+	retSkipCore := func() error {
+		return ErrSkipCore
+	}
+	wrapSkipCore := func(err error) error {
+		return fmt.Errorf("foo bar %w: %w", err, ErrSkipCore)
+	}
+
+	tests := map[error][]error{
+		ErrBreakPipelines: {
+			retBreakPipe(),
+			wrapBreakPipe(errors.New("some error")),
+			fmt.Errorf("%w-%w", ErrBreakPipelines, ErrSkipCore),
+			fmt.Errorf("%w%w", ErrBreakPipelines, ErrSkipCore),
+			fmt.Errorf("%w%w", ErrSkipCore, ErrBreakPipelines),
+		},
+		ErrSkipCore: {
+			retSkipCore(),
+			wrapSkipCore(errors.New("some other error")),
+		},
+	}
+
+	for target, errs := range tests {
+		for i := range errs {
+			if errors.Is(errs[i], target) {
+				continue
+			}
+			t.Fatalf("unexpected unwrapping error %v for case %d", target, i+1)
+		}
+	}
 }

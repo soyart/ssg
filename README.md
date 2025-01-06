@@ -1,20 +1,17 @@
 # ssg (static site generator)
 
-> This repository also hosts [soyweb](./soyweb/),
-> an ssg wrapper and replacement for [webtools](https://github.com/soyart/webtools)
+> See also: [ssg-go](./ssg-go.md)
 
 This Nix Flake provides 2 implementations of ssg.
 
-- POSIX shell ssg
-
-  > See also: [romanzolotarev.com](https://romanzolotarev.com/ssg.html)
+- [Original POSIX shell ssg romanzolotarev.com](https://romanzolotarev.com/ssg.html)
 
   The original script is copied from [rgz.ee](https://romanzolotarev.com/bin/ssg).
 
   Through [`flake.nix`](./flake.nix), ssg's runtime dependencies will be included
   in the derivation.
 
-- Go implementation of ssg (ssg-go)
+- [ssg-go](./ssg-go.md)
 
   My own implementation, using [github.com/gomarkdown/markdown](https://github.com/gomarkdown/markdown).
 
@@ -24,7 +21,7 @@ This Nix Flake provides 2 implementations of ssg.
   In addition to the executables, ssg-go also provides
   extensible ssg implementations with Go API.
 
-  A Go wrapper for ssg-go is also available in [`soyweb`](./soyweb/).
+  A Go wrapper for ssg-go is also available in [`soyweb`](./soyweb/) repository.
 
   > Note: both ssg-go and soyweb will probably not work on Windows due to
   > Windows path delimiter being different than POSIX's
@@ -67,6 +64,22 @@ or a default value provided at the command-line (the 3rd argument).
 > with `:ssg-title` tag. This line will be removed from the output.
 
 ## Differences between ssg and ssg-go
+
+### Concurrent writers
+
+ssg-go has built-in concurrent output writers.
+
+The number of writers can be set at runtime by environment variable `SSG_WRITERS`.
+At any point in time, at most `SSG_WRITERS` number of threads are writing output files.
+
+The default value for concurrent writer is 20. If the supplied value is illegal,
+ssg-go falls back to 20 concurrent writers.
+
+> To write outputs sequentially, set the write concurrency value to 1:
+>
+> ```shell
+> SSG_WRITERS=1 ssg mySrc myDst myTitle myUrl
+> ```
 
 ### Custom title tag for `_header.html`
 
@@ -154,7 +167,6 @@ as the document head title.
 On the other hand, the `{{from-h1}}` will cause ssg-go to use `Some Header 2`
 as the document head title.
 
-
 ### Cascading header and footer templates
 
 ssg-go cascades `_header.html` and `_footer.html` down the directory tree
@@ -182,100 +194,4 @@ Then:
 - `/blog/index.md` will use `/blog/_header.html`
 
 - `/blog/2023/baz/index.md` will use `/blog/2023/_header.html`
-
-## ssg-go quirks
-
-### Concurrent writers
-
-ssg-go has built-in concurrent output writers.
-
-The number of writers can be set at runtime by environment variable `SSG_WRITERS`.
-At any point in time, at most `SSG_WRITERS` number of threads are writing output files.
-
-The default value for concurrent writer is 20. If the supplied value is illegal,
-ssg-go falls back to 20 concurrent writers.
-
-> To write outputs sequentially, set the write concurrency value to 1:
-> 
-> ```shell
-> SSG_WRITERS=1 ssg mySrc myDst myTitle myUrl
-> ```
-
-### Streaming and caching builds
-
-To minimize runtime memory usage, ssg-go builds and writes concurrently.
-There're 2 main ssg threads: one is for building the outputs,
-and the other is the write thread.
-
-The build thread *sequentially* reads, builds and sends outputs
-to the write thread via a buffered Go channel.
-
-Bufffering allows the builder thread to continue to build and send outputs
-to the writer until the buffer is full.
-
-This helps reduce back pressure, and keeps memory usage low.
-The buffer size is, by default, 2x of the number of writers.
-
-This means that, at any point in time during a generation of any number of files
-with 20 writers, ssg-go will at most only hold 40 output files
-in memory (in the buffered channel).
-
-If you are importing ssg-go to your code and you don't want this
-streaming behavior, you can use the exposed function `Build`, `WriteOut`,
-and `GenerateMetadata`:
-
-```go
-dist, err := ssg.Build(src, dst, title, url)
-if err != nil {
-  panic(err)
-}
-
-err = ssg.WriteOut(dist)
-if err != nil {
-  panic(err)
-}
-
-err = GenerateMetadata(url, dst, dist, time.Time{})
-if err != nil {
-  panic(err)
-}
-```
-
-# Extending ssg-go
-
-Go programmers can extend ssg-go via its [`Option` type](./options.go).
-
-[soyweb](./soyweb/) also extends ssg via `Option`,
-and provides extra functionality such as index generator and minifiers.
-
-## `HookAll` option
-
-`HookAll` is a Go function called on every unignored input file.
-soyweb uses this option to implement global minifiers.
-
-## `HookGenerate`
-
-`HookGenerate` is a Go function called on every generated HTML.
-soyweb uses this option to implement output minifier.
-
-## `Pipeline`
-
-`Pipeline` is a Go function called on a file during directory walk.
-To reduce complexity, ignored files and ssg headers/footers are not sent
-to `Pipeline`. This preserves the core functionality of the original ssg.
-
-> When using `Pipeline` option, options `HookAll` or `HookGenerate`
-> are not used unless explicitly implemented in the `Pipeline` option
-> to do so. This helps reduce complexity.
->
-> Type `Ssg` provides a method `PipelineDefault() Pipeline`,
-> and the return value can be used to perform vanilla ssg-go behavior.
-> This allows HTTP-middleware-style composing as shown in the [soyweb index generator](./soyweb/index.go).
->
-> Here, the generator `Pipeline` sees if it needs to create an index for a directory,
-> and, if not, simply passes the data back to ssg-go default implementation.
->
-> If it needs to generate an index, then it creates a new output file,
-> and passes that to the standard ssg-go implementation, allowing all
-> the features such as header/footer combination and hooks to continue to work.
 

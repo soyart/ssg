@@ -7,10 +7,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
@@ -19,17 +17,18 @@ import (
 )
 
 const (
-	MarkerHeader       = "_header.html"
-	MarkerFooter       = "_footer.html"
-	HtmlFlags          = html.CommonFlags
+	MarkerHeader = "_header.html"
+	MarkerFooter = "_footer.html"
+	SsgIgnore    = ".ssgignore"
+
 	WritersEnvKey      = "SSG_WRITERS"
 	WritersDefault int = 20
-	SsgExtensions      = parser.CommonExtensions |
+
+	HtmlFlags     = html.CommonFlags
+	SsgExtensions = parser.CommonExtensions |
 		parser.Mmark |
 		parser.AutoHeadingIDs
-)
 
-const (
 	HeaderDefault = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -43,16 +42,26 @@ const (
 `
 )
 
+var (
+	// ErrBreakPipelines causes Ssg to break from pipeline iteration
+	// and use the pipeline's output
+	ErrBreakPipelines = errors.New("ssg_break_pipeline")
+
+	// ErrSkipCore causes Ssg to break from pipeline iteration
+	// and skip core processor, continuing to the new input file.
+	ErrSkipCore = errors.New("ssg_skip_core")
+)
+
 type Ssg struct {
 	Src   string
 	Dst   string
 	Title string
 	Url   string
 
-	options
+	options options
 
 	stream     chan<- OutputFile
-	ssgignores ignorer
+	ssgignores Ignorer
 	headers    headers
 	footers    footers
 	preferred  Set      // Used to prefer html and ignore md files with identical names, as with the original ssg
@@ -60,7 +69,7 @@ type Ssg struct {
 	cache      []OutputFile
 }
 
-// Build returns the ssg outputs built from src
+// Build returns the ssg outputs built from src without writing the outputs.
 func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile, error) {
 	s := New(src, dst, title, url)
 	return s.
@@ -69,13 +78,14 @@ func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile,
 		buildV2()
 }
 
-// Generate creates a one-off [Ssg] that's used to generate a site right away.
+// Generate builds and writes to outputs.
+// It creates a one-off [Ssg] that's used to generate a site right away.
 func Generate(src, dst, title, url string, opts ...Option) error {
 	s := New(src, dst, title, url)
 	return s.With(opts...).Generate()
 }
 
-// New returns a default, vanilla [Ssg].
+// New returns a default [Ssg] with no options.
 func New(src, dst, title, url string) Ssg {
 	src = filepath.Clean(src)
 	dst = filepath.Clean(dst)
@@ -105,59 +115,6 @@ func ToHtml(md []byte) []byte {
 	return markdown.Render(root, renderer)
 }
 
-func Sitemap(
-	dst string,
-	url string,
-	modTime time.Time,
-	outputs []OutputFile,
-) (
-	string,
-	error,
-) {
-	dateStr := modTime.Format(time.DateOnly)
-	sm := bytes.NewBufferString(`<?xml version="1.0" encoding="UTF-8"?>
-<urlset
-xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance"
-xsi:schemaLocation="https://www.sitemaps.org/schemas/sitemap/0.9
-https://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
-xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
-`)
-	for i := range outputs {
-		o := &outputs[i]
-		target, err := filepath.Rel(dst, o.target)
-		if err != nil {
-			return sm.String(), err
-		}
-
-		Fprintf(sm, "<url><loc>%s/", url)
-
-		/* There're 2 possibilities for this
-		1. First is when the HTML is some/path/index.html
-		<url><loc>https://example.com/some/path/</loc><lastmod>2024-10-04</lastmod><priority>1.0</priority></url>
-
-		2. Then there is when the HTML is some/path/page.html
-		<url><loc>https://example.com/some/path/page.html</loc><lastmod>2024-10-04</lastmod><priority>1.0</priority></url>
-		*/
-
-		base := filepath.Base(target)
-		switch base {
-		case "index.html":
-			d := filepath.Dir(target)
-			if d != "." {
-				Fprintf(sm, "%s/", d)
-			}
-
-		default:
-			sm.WriteString(target)
-		}
-
-		Fprintf(sm, "><lastmod>%s</lastmod><priority>1.0</priority></url>\n", dateStr)
-	}
-
-	sm.WriteString("</urlset>\n")
-	return sm.String(), nil
-}
-
 // With applies opts to s sequentially
 func (s *Ssg) With(opts ...Option) *Ssg {
 	for i := range opts {
@@ -171,6 +128,9 @@ func (s *Ssg) Generate() error {
 	return generate(s)
 }
 
+// AddOutputs adds outputs to cache (if enabled)
+// and sends the outputs to output stream to concurrent writers.
+// **It does not write the outputs**.
 func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	if s.options.caching {
 		s.cache = append(s.cache, outputs...)
@@ -183,67 +143,11 @@ func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	}
 }
 
-func Metadata(
-	src string,
-	dst string,
-	url string,
-	files []string,
-	dist []OutputFile,
-	srcModTime time.Time,
-) (
-	[]OutputFile,
-	error,
-) {
-	sort.Slice(dist, func(i, j int) bool {
-		return dist[i].target < dist[j].target
-	})
-
-	dotFiles, err := DotFiles(src, files)
-	if err != nil {
-		return nil, err
-	}
-	sitemap, err := Sitemap(dst, url, srcModTime, dist)
-	if err != nil {
-		return nil, err
-	}
-
-	return []OutputFile{
-		Output(filepath.Join(dst, "sitemap.xml"), "", []byte(sitemap), 0644),
-		Output(filepath.Join(dst, ".files"), "", []byte(dotFiles), 0644),
-	}, nil
-}
-
-func GenerateMetadata(src, dst, url string, files []string, dist []OutputFile, srcModTime time.Time) error {
-	metadata, err := Metadata(src, dst, url, files, dist, srcModTime)
-	if err != nil {
-		return err
-	}
-	return WriteOut(metadata, 2)
-}
-
-func DotFiles(src string, files []string) (string, error) {
-	list := bytes.NewBuffer(nil)
-	for _, f := range files {
-		if f == "" {
-			panic("found empty file for .files")
-		}
-		rel, err := filepath.Rel(src, f)
-		if err != nil {
-			return "", err
-		}
-
-		Fprintf(list, "./%s\n", rel)
-	}
-
-	return list.String(), nil
-}
-
 func (s *Ssg) buildV2() ([]string, []OutputFile, error) {
 	err := filepath.WalkDir(s.Src, s.walkBuildV2)
 	if err != nil {
 		return nil, nil, err
 	}
-
 	return s.files, s.cache, nil
 }
 
@@ -265,8 +169,17 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 	}
 
 	switch base {
-	case MarkerHeader, MarkerFooter:
+	case
+		MarkerHeader,
+		MarkerFooter,
+		SsgIgnore:
+
 		return nil
+	}
+
+	data, err := ReadFile(path)
+	if err != nil {
+		return err
 	}
 
 	// Remember input files for .files
@@ -275,16 +188,27 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 	// and _footer.html in .files
 	s.files = append(s.files, path)
 
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
+	skipCore := false
+	for i, p := range s.options.pipelines {
+		path, data, d, err = p(path, data, d)
+		if err == nil {
+			continue
+		}
+		if errors.Is(err, ErrSkipCore) {
+			skipCore = true
+			break
+		}
+		if errors.Is(err, ErrBreakPipelines) {
+			break
+		}
+		return fmt.Errorf("[pipeline %d] error: %w", i, err)
 	}
 
-	if s.pipeline != nil {
-		return s.pipeline(path, data, d)
+	if skipCore {
+		return nil
 	}
 
-	return s.pipelineDefault(path, data, d)
+	return s.core(path, data, d)
 }
 
 func (s *Ssg) collect(path string) error {
@@ -300,7 +224,7 @@ func (s *Ssg) collect(path string) error {
 
 		switch base {
 		case MarkerHeader:
-			data, err := os.ReadFile(pathChild)
+			data, err := ReadFile(pathChild)
 			if err != nil {
 				return err
 			}
@@ -311,10 +235,11 @@ func (s *Ssg) collect(path string) error {
 			if err != nil {
 				return err
 			}
+
 			continue
 
 		case MarkerFooter:
-			data, err := os.ReadFile(pathChild)
+			data, err := ReadFile(pathChild)
 			if err != nil {
 				return err
 			}
@@ -322,6 +247,7 @@ func (s *Ssg) collect(path string) error {
 			if err != nil {
 				return err
 			}
+
 			continue
 		}
 
@@ -329,7 +255,6 @@ func (s *Ssg) collect(path string) error {
 		if ext != ".html" {
 			continue
 		}
-
 		if s.preferred.Insert(pathChild) {
 			return fmt.Errorf("duplicate html file %s", path)
 		}
@@ -338,14 +263,18 @@ func (s *Ssg) collect(path string) error {
 	return nil
 }
 
-func (s *Ssg) pipelineDefault(path string, data []byte, d fs.DirEntry) error {
+// core does 2 things:
+// - If path extension is not .md, then the current file will
+// simply be copied to outputs.
+// - If path has .md extension, it converts Markdown to HTML
+// and adds a new output with .html extension
+func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 	info, err := d.Info()
 	if err != nil {
 		return err
 	}
-
-	if s.hookAll != nil {
-		data, err = s.hookAll(path, data)
+	if s.options.hook != nil {
+		data, err = s.options.hook(path, data)
 		if err != nil {
 			return fmt.Errorf("hook error when building %s: %w", path, err)
 		}
@@ -353,7 +282,7 @@ func (s *Ssg) pipelineDefault(path string, data []byte, d fs.DirEntry) error {
 
 	ext := filepath.Ext(path)
 	if ext != ".md" {
-		target, err := MirrorPath(s.Src, s.Dst, path, ext)
+		target, err := mirrorPath(s.Src, s.Dst, path)
 		if err != nil {
 			return err
 		}
@@ -363,26 +292,28 @@ func (s *Ssg) pipelineDefault(path string, data []byte, d fs.DirEntry) error {
 			data,
 			info.Mode().Perm(),
 		))
-
 		return nil
 	}
 
-	html := ChangeExt(path, ".md", ".html")
-	if s.preferred.ContainsAll(html) {
-		return nil // Make way for existing (preferred) html file with matching base name
+	// Make way for existing (preferred) html file with matching base name
+	if s.preferred.ContainsAll(
+		ChangeExt(path, ".md", ".html"),
+	) {
+		return nil
 	}
 
-	target, err := MirrorPath(s.Src, s.Dst, path, ".html")
+	target, err := mirrorPath(s.Src, s.Dst, path)
 	if err != nil {
 		return err
 	}
 
+	target = ChangeExt(target, ".md", ".html")
 	header := s.headers.choose(path)
 	footer := s.footers.choose(path)
 
 	// Copy, leave the underlying data in header unchanged
 	headerText := make([]byte, header.Len())
-	copy(headerText, header.Bytes())
+	_ = copy(headerText, header.Bytes())
 
 	switch header.titleFrom {
 	case TitleFromH1:
@@ -392,61 +323,42 @@ func (s *Ssg) pipelineDefault(path string, data []byte, d fs.DirEntry) error {
 		headerText, data = AddTitleFromTag([]byte(s.Title), headerText, data)
 	}
 
-	out := bytes.NewBuffer(headerText)
-	out.Write(ToHtml(data))
-	out.Write(footer.Bytes())
+	// HTML output buffer
+	buf := bytes.NewBuffer(headerText)
+	buf.Write(ToHtml(data))
+	buf.Write(footer.Bytes())
 
-	if s.hookGenerate != nil {
-		b, err := s.hookGenerate(out.Bytes())
+	if s.options.hookGenerate != nil {
+		b, err := s.options.hookGenerate(buf.Bytes())
 		if err != nil {
 			return fmt.Errorf("hook error when building %s: %w", path, err)
 		}
-
-		out = bytes.NewBuffer(b)
+		buf = bytes.NewBuffer(b)
 	}
 
 	s.AddOutputs(Output(
 		target,
 		path,
-		out.Bytes(),
+		buf.Bytes(),
 		info.Mode().Perm(),
 	))
 
 	return nil
 }
 
-func (s *Ssg) PipelineDefault() Pipeline {
-	return s.pipelineDefault
-}
-
 func (s *Ssg) Ignore(path string) bool {
-	return s.ssgignores.ignore(path)
+	return s.ssgignores.Ignore(path)
 }
 
 func (s *Ssg) pront(l int) {
 	Fprintf(os.Stdout, "[ssg-go] wrote %d file(s) to %s\n", l, s.Dst)
 }
 
-type ignorer interface {
-	ignore(path string) bool
+type Ignorer interface {
+	Ignore(path string) bool
 }
 
-type ignorerGitignore struct {
-	*ignore.GitIgnore
-}
-
-func (i *ignorerGitignore) ignore(path string) bool {
-	if i == nil {
-		return false
-	}
-	if i.GitIgnore == nil {
-		return false
-	}
-
-	return i.MatchesPath(path)
-}
-
-func prepare(src, dst string) (*ignorerGitignore, error) {
+func prepare(src, dst string) (Ignorer, error) {
 	if src == "" {
 		return nil, fmt.Errorf("empty src")
 	}
@@ -457,26 +369,42 @@ func prepare(src, dst string) (*ignorerGitignore, error) {
 		return nil, fmt.Errorf("src is identical to dst: '%s'", src)
 	}
 
-	ssgignore := filepath.Join(src, ".ssgignore")
-	ignores, err := ignore.CompileIgnoreFile(ssgignore)
+	ssgignore := filepath.Join(src, SsgIgnore)
+	return ParseSsgIgnore(ssgignore)
+}
+
+func ParseSsgIgnore(path string) (Ignorer, error) {
+	ignores, err := ignore.CompileIgnoreFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to parse ssgignore at %s: %w", ssgignore, err)
+		return nil, fmt.Errorf("failed to parse ssgignore at %s: %w", path, err)
 	}
 
 	return &ignorerGitignore{GitIgnore: ignores}, nil
 }
 
-func shouldIgnore(ignores ignorer, path, base string, d fs.DirEntry) (bool, error) {
+type ignorerGitignore struct {
+	*ignore.GitIgnore
+}
+
+func (i *ignorerGitignore) Ignore(path string) bool {
+	if i == nil {
+		return false
+	}
+	if i.GitIgnore == nil {
+		return false
+	}
+	return i.MatchesPath(path)
+}
+
+// TODO: refactor
+func shouldIgnore(ignores Ignorer, path, base string, d fs.DirEntry) (bool, error) {
 	isDot := strings.HasPrefix(base, ".")
 	isDir := d.IsDir()
 
 	switch {
-	case base == ".ssgignore":
-		return true, nil
-
 	case isDot && isDir:
 		return true, fs.SkipDir
 
@@ -484,7 +412,7 @@ func shouldIgnore(ignores ignorer, path, base string, d fs.DirEntry) (bool, erro
 	case isDot, isDir:
 		return true, nil
 
-	case ignores.ignore(path):
+	case ignores.Ignore(path):
 		return true, nil
 	}
 
@@ -504,24 +432,19 @@ func shouldIgnore(ignores ignorer, path, base string, d fs.DirEntry) (bool, erro
 	return false, nil
 }
 
-// MirrorPath mirrors the target HTML file path under src to under dist
+// mirrorPath mirrors the target HTML file path under src to under dist
 //
 // i.e. if src="foo/src" and dst="foo/dist",
 // and path="foo/src/bar/baz.md"  newExt=".html",
 // then the return value will be foo/dist/bar/baz.html
-func MirrorPath(
+func mirrorPath(
 	src string,
 	dst string,
 	path string,
-	newExt string, // File's new extension after mirrored
 ) (
 	string,
 	error,
 ) {
-	ext := filepath.Ext(path)
-	if ext != newExt {
-		path = ChangeExt(path, ext, newExt)
-	}
 	path, err := filepath.Rel(src, path)
 	if err != nil {
 		return "", err
@@ -570,14 +493,14 @@ func (o *OutputFile) Perm() fs.FileMode {
 	return o.perm
 }
 
-type writeError struct {
+type errorWrite struct {
 	err        error
 	target     string
 	originator string
 }
 
-func (w writeError) Error() string {
-	return fmt.Errorf("WriteError(target='%s',originator='%s'): %w", w.target, w.originator, w.err).Error()
+func (e errorWrite) Error() string {
+	return fmt.Errorf("WriteError(target='%s',originator='%s'): %w", e.target, e.originator, e.err).Error()
 }
 
 // WriteOut blocks and writes concurrently to output locations.
@@ -587,7 +510,7 @@ func WriteOut(writes []OutputFile, concurrent int) error {
 	}
 
 	wg := new(sync.WaitGroup)
-	errs := make(chan writeError)
+	errs := make(chan errorWrite)
 	guard := make(chan struct{}, concurrent)
 
 	for i := range writes {
@@ -602,7 +525,7 @@ func WriteOut(writes []OutputFile, concurrent int) error {
 
 			err := os.MkdirAll(filepath.Dir(w.target), os.ModePerm)
 			if err != nil {
-				errs <- writeError{
+				errs <- errorWrite{
 					err:        err,
 					target:     w.target,
 					originator: w.originator,
@@ -611,7 +534,7 @@ func WriteOut(writes []OutputFile, concurrent int) error {
 			}
 			err = os.WriteFile(w.target, w.data, w.Perm())
 			if err != nil {
-				errs <- writeError{
+				errs <- errorWrite{
 					err:        err,
 					target:     w.target,
 					originator: w.originator,

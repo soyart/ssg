@@ -16,22 +16,23 @@ func generate(s *Ssg) error {
 	}
 
 	var wg sync.WaitGroup
-	stream := make(chan OutputFile, s.writers*bufferMultiplier)
+	stream := make(chan OutputFile, s.options.writers*bufferMultiplier)
 	s.stream = stream
 
 	var errBuild error
 	var files []string
 	wg.Add(1)
 	go func() {
-		defer wg.Done()
+		defer func() {
+			close(s.stream)
+			wg.Done()
+		}()
 
 		var err error
 		files, _, err = s.buildV2()
 		if err != nil {
 			errBuild = err
 		}
-
-		close(s.stream)
 	}()
 
 	var written []OutputFile
@@ -41,7 +42,7 @@ func generate(s *Ssg) error {
 		defer wg.Done()
 		var err error
 
-		written, err = WriteOutStreaming(stream, s.writers)
+		written, err = WriteOutStreaming(stream, s.options.writers)
 		if err != nil {
 			errWrites = err
 		}
@@ -77,7 +78,7 @@ func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]OutputFile, error
 
 	written := make([]OutputFile, 0) // No data, only metadata
 	wg := new(sync.WaitGroup)
-	errs := make(chan writeError)
+	errs := make(chan errorWrite)
 	guard := make(chan struct{}, concurrent)
 	mut := new(sync.Mutex)
 
@@ -93,7 +94,7 @@ func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]OutputFile, error
 
 			err := os.MkdirAll(filepath.Dir(w.target), os.ModePerm)
 			if err != nil {
-				errs <- writeError{
+				errs <- errorWrite{
 					err:        err,
 					target:     w.target,
 					originator: w.originator,
@@ -102,7 +103,7 @@ func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]OutputFile, error
 			}
 			err = os.WriteFile(w.target, w.data, w.Perm())
 			if err != nil {
-				errs <- writeError{
+				errs <- errorWrite{
 					err:        err,
 					target:     w.target,
 					originator: w.originator,

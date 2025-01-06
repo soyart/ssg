@@ -1,17 +1,19 @@
 package ssg
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
+	"reflect"
 	"strconv"
 )
 
 type (
 	Option func(*Ssg)
 
-	// HookAll takes in a path and reads file data,
+	// Hook takes in a path and reads file data,
 	// returning modified output to be written at destination
-	HookAll func(path string, data []byte) (output []byte, err error)
+	Hook func(path string, data []byte) (output []byte, err error)
 
 	// HookGenerate takes in converted HTML bytes
 	// and returns modified HTML output (e.g. minified) to be written at destination
@@ -19,13 +21,13 @@ type (
 
 	// Pipeline is called during directory tree walks.
 	// ssg-go provides path and data from the file,
-	// and Pipeline is free to do whatever it wants
-	Pipeline func(path string, data []byte, d fs.DirEntry) error
+	// and Pipeline is free to do whatever it wants.
+	Pipeline func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error)
 
 	options struct {
-		hookAll      HookAll
+		hook         Hook
 		hookGenerate HookGenerate
-		pipeline     Pipeline
+		pipelines    []Pipeline
 		caching      bool
 		writers      int
 	}
@@ -36,7 +38,7 @@ type (
 func WritersFromEnv() Option {
 	return func(s *Ssg) {
 		writes := GetEnvWriters()
-		s.writers = int(writes)
+		s.options.writers = int(writes)
 	}
 }
 
@@ -52,23 +54,26 @@ func GetEnvWriters() int {
 	return WritersDefault
 }
 
+// Caching allows outputs to be built and retained for later use.
+// This is enabled in [Build].
 func Caching() Option {
 	return func(s *Ssg) {
 		s.options.caching = true
 	}
 }
 
+// Writers set the number of concurrent output writers.
 func Writers(u uint) Option {
 	return func(s *Ssg) {
 		s.options.writers = int(u)
 	}
 }
 
-// WithHookAll will make [Ssg] call hook(path, fileContent)
+// WithHook will make [Ssg] call hook(path, fileContent)
 // on every unignored files.
-func WithHookAll(hook HookAll) Option {
+func WithHook(hook Hook) Option {
 	return func(s *Ssg) {
-		s.options.hookAll = hook
+		s.options.hook = hook
 	}
 }
 
@@ -80,11 +85,28 @@ func WithHookGenerate(hook HookGenerate) Option {
 	}
 }
 
-// WithPipeline takes f, which will called during build process.
-// Ignored files, _header.html and _footer.html
-// are skipped by ssg-go.
-func WithPipeline(f Pipeline) Option {
+// WithPipelines returns an option that set option.pipeline to
+// pipelines chained together.
+//
+// pipelines can be of type Pipeline or func(*Ssg) Pipeline
+func WithPipelines(pipes ...interface{}) Option {
 	return func(s *Ssg) {
-		s.pipeline = f
+		pipelines := make([]Pipeline, len(pipes))
+		for i, p := range pipes {
+			switch pipe := p.(type) {
+			case Pipeline:
+				pipelines[i] = pipe
+
+			case func(string, []byte, fs.DirEntry) (string, []byte, fs.DirEntry, error):
+				pipelines[i] = pipe
+
+			case func(*Ssg) Pipeline:
+				pipelines[i] = pipe(s)
+
+			default:
+				panic(fmt.Errorf("unexpected pipelines[%d] type '%s'", i, reflect.TypeOf(p).String()))
+			}
+		}
+		s.options.pipelines = pipelines
 	}
 }
