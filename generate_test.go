@@ -44,7 +44,7 @@ func writeOutFromCache(s *Ssg) error {
 	if err != nil {
 		return err
 	}
-	err = WriteOut(s.cache, s.options.writers)
+	err = WriteOutSlice(s.cache, s.options.writers)
 	if err != nil {
 		return err
 	}

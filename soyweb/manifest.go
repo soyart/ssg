@@ -494,7 +494,7 @@ func cpRecurse(src string, dst WriteTarget) error {
 func copyFiles(dirs ssg.Set, src string, dst WriteTarget, permsCache map[string]fs.FileMode) error {
 	switch {
 	// Copy dir to dir, with target not yet existing
-	case dirs.ContainsAll(src) && !dirs.ContainsAll(dst.Target):
+	case dirs.Contains(src) && !dirs.Contains(dst.Target):
 		err := os.MkdirAll(dst.Target, os.ModePerm)
 		if err != nil {
 			return fmt.Errorf("failed to prepare dst directory: %w", err)
@@ -503,12 +503,12 @@ func copyFiles(dirs ssg.Set, src string, dst WriteTarget, permsCache map[string]
 		fallthrough
 
 	// Copy dir to dir, with target dir existing
-	case dirs.ContainsAll(src, dst.Target):
+	case dirs.Contains(src, dst.Target):
 		return cpRecurse(src, dst)
 
 	// Copy file to dir, i.e. cp foo.json ./some-dir/
 	// which will just writes out to ./some-dir/foo.json
-	case dirs.ContainsAll(dst.Target):
+	case dirs.Contains(dst.Target):
 		base := filepath.Base(src)
 		dst.Target = filepath.Join(dst.Target, base)
 	}

@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
@@ -60,7 +59,7 @@ type Ssg struct {
 
 	options options
 
-	stream     chan<- OutputFile
+	stream     chan<- OutputFile // TODO: refactor out of struct
 	ssgignores Ignorer
 	headers    headers
 	footers    footers
@@ -296,7 +295,7 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 	}
 
 	// Make way for existing (preferred) html file with matching base name
-	if s.preferred.ContainsAll(
+	if s.preferred.Contains(
 		ChangeExt(path, ".md", ".html"),
 	) {
 		return nil
@@ -451,113 +450,4 @@ func mirrorPath(
 	}
 
 	return filepath.Join(dst, path), nil
-}
-
-// OutputFile is the main output struct for ssg-go.
-//
-// Its values are not supposed to be changed by other packages,
-// and thus the only ways other packages can work with OutputFile
-// is via the constructor [Output] and the type's getter methods.
-type OutputFile struct {
-	target     string
-	originator string
-	data       []byte
-	perm       fs.FileMode
-}
-
-func Output(target string, originator string, data []byte, perm fs.FileMode) OutputFile {
-	return OutputFile{
-		target:     target,
-		originator: originator,
-		data:       data,
-		perm:       perm,
-	}
-}
-
-func (o *OutputFile) Target() string {
-	return o.target
-}
-
-func (o *OutputFile) Originator() string {
-	return o.originator
-}
-
-func (o *OutputFile) Data() []byte {
-	return o.data
-}
-
-func (o *OutputFile) Perm() fs.FileMode {
-	if o.perm == fs.FileMode(0) {
-		return fs.ModePerm
-	}
-	return o.perm
-}
-
-type errorWrite struct {
-	err        error
-	target     string
-	originator string
-}
-
-func (e errorWrite) Error() string {
-	return fmt.Errorf("WriteError(target='%s',originator='%s'): %w", e.target, e.originator, e.err).Error()
-}
-
-// WriteOut blocks and writes concurrently to output locations.
-func WriteOut(writes []OutputFile, concurrent int) error {
-	if concurrent == 0 {
-		concurrent = 1
-	}
-
-	wg := new(sync.WaitGroup)
-	errs := make(chan errorWrite)
-	guard := make(chan struct{}, concurrent)
-
-	for i := range writes {
-		guard <- struct{}{}
-		wg.Add(1)
-
-		go func(w *OutputFile, wg *sync.WaitGroup) {
-			defer func() {
-				<-guard
-				wg.Done()
-			}()
-
-			err := os.MkdirAll(filepath.Dir(w.target), os.ModePerm)
-			if err != nil {
-				errs <- errorWrite{
-					err:        err,
-					target:     w.target,
-					originator: w.originator,
-				}
-				return
-			}
-			err = os.WriteFile(w.target, w.data, w.Perm())
-			if err != nil {
-				errs <- errorWrite{
-					err:        err,
-					target:     w.target,
-					originator: w.originator,
-				}
-				return
-			}
-
-			Fprintln(os.Stdout, w.target)
-		}(&writes[i], wg)
-	}
-
-	go func() {
-		wg.Wait()
-		close(errs)
-	}()
-
-	var wErrs []error
-	for err := range errs { // Blocks here until errs is closed
-		wErrs = append(wErrs, err)
-	}
-	if len(wErrs) > 0 {
-		return errors.Join(wErrs...)
-	}
-
-	return nil
 }

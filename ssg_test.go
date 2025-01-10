@@ -162,7 +162,7 @@ func testGenerate(t *testing.T, buildFn func(s *Ssg) ([]string, []OutputFile, er
 	if err != nil {
 		t.Errorf("unexpected error from scan: %v", err)
 	}
-	if !s.preferred.ContainsAll(filepath.Join(src, "/blog/index.html")) {
+	if !s.preferred.Contains(filepath.Join(src, "/blog/index.html")) {
 		t.Fatalf("missing preferred html file /blog/index.html")
 	}
 
@@ -403,7 +403,7 @@ func TestBuildAndWriteOut(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	err = WriteOut(dist, 1)
+	err = WriteOutSlice(dist, 1)
 	if err != nil {
 		panic(err)
 	}

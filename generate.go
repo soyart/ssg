@@ -17,18 +17,20 @@ func generate(s *Ssg) error {
 
 	var wg sync.WaitGroup
 	stream := make(chan OutputFile, s.options.writers*bufferMultiplier)
-	s.stream = stream
 
 	var errBuild error
 	var files []string
 	wg.Add(1)
 	go func() {
 		defer func() {
-			close(s.stream)
+			s.stream = nil
+			close(stream)
 			wg.Done()
 		}()
 
+		s.stream = stream
 		var err error
+
 		files, _, err = s.buildV2()
 		if err != nil {
 			errBuild = err
@@ -42,7 +44,7 @@ func generate(s *Ssg) error {
 		defer wg.Done()
 		var err error
 
-		written, err = WriteOutStreaming(stream, s.options.writers)
+		written, err = WriteOut(stream, s.options.writers)
 		if err != nil {
 			errWrites = err
 		}
@@ -69,9 +71,9 @@ func generate(s *Ssg) error {
 	return nil
 }
 
-// WriteOutStreaming blocks and concurrently writes outputs recevied from c until c is closed.
+// WriteOut blocks and concurrently writes outputs recevied from c until c is closed.
 // It returns metadata for all outputs written without the data.
-func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]OutputFile, error) {
+func WriteOut(stream <-chan OutputFile, concurrent int) ([]OutputFile, error) {
 	if concurrent == 0 {
 		concurrent = 1
 	}
@@ -82,7 +84,7 @@ func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]OutputFile, error
 	guard := make(chan struct{}, concurrent)
 	mut := new(sync.Mutex)
 
-	for o := range c {
+	for w := range stream {
 		guard <- struct{}{}
 		wg.Add(1)
 
@@ -117,7 +119,7 @@ func WriteOutStreaming(c <-chan OutputFile, concurrent int) ([]OutputFile, error
 			written = append(written, Output(w.target, w.originator, nil, w.perm))
 			Fprintln(os.Stdout, w.target)
 
-		}(&o, wg)
+		}(&w, wg)
 	}
 
 	go func() {
