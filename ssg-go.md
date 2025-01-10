@@ -168,7 +168,7 @@ with 20 writers, ssg-go will at most only hold 40 output files
 in memory (in the buffered channel).
 
 If you are importing ssg-go to your code and you don't want this
-streaming behavior, you can use the exposed function `Build`, `WriteOut`,
+streaming behavior, you can use the exposed function `Build`, `WriteOutSlice`,
 and `GenerateMetadata`:
 
 ```go
@@ -177,12 +177,12 @@ if err != nil {
   panic(err)
 }
 
-err = ssg.WriteOut(dist)
+err = ssg.WriteOutSlice(dist)
 if err != nil {
   panic(err)
 }
 
-err = GenerateMetadata(src, dst, urk, files, dist, time.Time{})
+err = GenerateMetadata(src, dst, urk, files, dist, time.Now())
 if err != nil {
   panic(err)
 }

@@ -2,17 +2,33 @@ package ssg
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 )
 
 type (
+	// OutputFile is the main output struct for ssg-go.
+	//
+	// Its values are not supposed to be changed by other packages,
+	// and thus the only ways other packages can work with OutputFile
+	// is via the constructor [Output] and the type's getter methods.
+	OutputFile struct {
+		target     string
+		originator string
+		data       []byte
+		perm       fs.FileMode
+	}
+
 	Set map[string]struct{}
 
 	// perDir tracks files under directory in a trie-like fashion.
+	// Used to choose headers and footers.
 	perDir[T any] struct {
 		defaultValue T
 		values       map[string]T
@@ -47,7 +63,7 @@ func (s Set) Insert(v string) bool {
 	return ok
 }
 
-func (s Set) ContainsAll(items ...string) bool {
+func (s Set) Contains(items ...string) bool {
 	for _, v := range items {
 		_, ok := s[v]
 		if !ok {
@@ -82,6 +98,93 @@ func Fprintln(w io.Writer, data ...interface{}) {
 func ReadFile(path string) ([]byte, error) {
 	// fmt.Println(">>> reading file", path)
 	return os.ReadFile(path)
+}
+
+func Output(target string, originator string, data []byte, perm fs.FileMode) OutputFile {
+	return OutputFile{
+		target:     target,
+		originator: originator,
+		data:       data,
+		perm:       perm,
+	}
+}
+
+func (o *OutputFile) Target() string {
+	return o.target
+}
+
+func (o *OutputFile) Originator() string {
+	return o.originator
+}
+
+func (o *OutputFile) Data() []byte {
+	return o.data
+}
+
+func (o *OutputFile) Perm() fs.FileMode {
+	if o.perm == fs.FileMode(0) {
+		return fs.ModePerm
+	}
+	return o.perm
+}
+
+// WriteOutSlice blocks and writes concurrently from writes to their output locations.
+func WriteOutSlice(writes []OutputFile, concurrent int) error {
+	if concurrent == 0 {
+		concurrent = 1
+	}
+
+	wg := new(sync.WaitGroup)
+	errs := make(chan errorWrite)
+	guard := make(chan struct{}, concurrent)
+
+	for i := range writes {
+		guard <- struct{}{}
+		wg.Add(1)
+
+		go func(w *OutputFile, wg *sync.WaitGroup) {
+			defer func() {
+				<-guard
+				wg.Done()
+			}()
+
+			err := os.MkdirAll(filepath.Dir(w.target), os.ModePerm)
+			if err != nil {
+				errs <- errorWrite{
+					err:        err,
+					target:     w.target,
+					originator: w.originator,
+				}
+				return
+			}
+			err = os.WriteFile(w.target, w.data, w.Perm())
+			if err != nil {
+				errs <- errorWrite{
+					err:        err,
+					target:     w.target,
+					originator: w.originator,
+				}
+				return
+			}
+
+			Fprintln(os.Stdout, w.target)
+		}(&writes[i], wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(errs)
+	}()
+
+	var wErrs []error
+	for err := range errs { // Blocks here until errs is closed
+		wErrs = append(wErrs, err)
+	}
+	if len(wErrs) > 0 {
+		return errors.Join(wErrs...)
+	}
+
+	return nil
 }
 
 func newHeaders(defaultHeader string) headers {
@@ -150,4 +253,14 @@ outer:
 	}
 
 	return chosen
+}
+
+type errorWrite struct {
+	err        error
+	target     string
+	originator string
+}
+
+func (e errorWrite) Error() string {
+	return fmt.Errorf("WriteError(target='%s',originator='%s'): %w", e.target, e.originator, e.err).Error()
 }
