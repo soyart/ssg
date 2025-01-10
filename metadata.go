@@ -19,7 +19,7 @@ func GenerateMetadata(
 	if err != nil {
 		return err
 	}
-	return WriteOut(metadata, 2)
+	return WriteOutSlice(metadata, 2)
 }
 
 func Metadata(
