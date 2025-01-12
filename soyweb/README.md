@@ -32,7 +32,7 @@ to streamline the site's CI/CD pipelines.
   ssg-manifest wraps Go ssg implementation for better multi-site management,
   and is intended to be a better replacement for [webtools](https://github.com/soyart/webtools)
 
-  > See [`manifest.json`](./testdata/manifest.json) as example
+  > See [`manifest.json`](../testdata/manifest.json) as example
   >
   > To try ssg-manifest, go into `./testdata` and run ssg-manifest
 
@@ -131,7 +131,7 @@ The minifiers is available to all programs under soyweb.
 
 ### [Index generator](./index.go)
 
-soyweb provides an automatic index generator implemented as a [ssg.Pipeline](/options.go).
+soyweb provides an automatic index generator implemented as a [ssg.Pipeline](../ssg-go/options.go).
 This pipeline will automatically generate index sibling Markdowns, HTMLs, and directories.
 
 It looks for marker file `_index.soyweb` somewhere under `${src}`, and,
@@ -174,7 +174,7 @@ in the output.
 The generated indexes are treated just like any other source Markdown files.
 
 In other words, `_header.html` and `_footer.html` will surround the index generated from
-marker files. [`ssg.TitleFrom`](../title.go) tags are respected and title extraction
+marker files. [`ssg.TitleFrom`](../ssg-go/title.go) tags are respected and title extraction
 for the generated index is handled in the familiar fashion.
 
 #### Index generator: link title extraction (files)

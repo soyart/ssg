@@ -49,7 +49,7 @@ and `_footer.html` respectively. The output file tree is mirrored into `${dst}`.
 Files or directories whose names start with `.` are ignored.
 Files listed in `${src}/.ssgignore` are also ignored in a fashion similar
 to `.gitignore`. To see how `.ssgignore` works in Go implementation, see
-[the test `TestSsgignore`](./ssg_test.go).
+[the test `TestSsgignore`](./ssg-go/ssg_test.go).
 
 If we have `foo.html` and `foo.md`, the HTML file wins.
 

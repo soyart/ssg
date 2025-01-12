@@ -19,9 +19,11 @@ type (
 	// and returns modified HTML output (e.g. minified) to be written at destination
 	HookGenerate func(generatedHtml []byte) (output []byte, err error)
 
-	// Pipeline is called during directory tree walks.
-	// ssg-go provides path and data from the file,
-	// and Pipeline is free to do whatever it wants.
+	// Pipeline is called for each visit during a dir walk.
+	// ssg-go provides for pipeline the path and data the file being visited,
+	// and Pipeline is free to do whatever it wants with that information.
+	// The pipeline could use ErrSkipCore or ErrBreakPipelines as return value
+	// to control subsequent operations of the walk.
 	Pipeline func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error)
 
 	options struct {
@@ -85,8 +87,9 @@ func WithHookGenerate(hook HookGenerate) Option {
 	}
 }
 
-// WithPipelines returns an option that set option.pipeline to
-// pipelines chained together.
+// WithPipelines returns an option that allows caller
+// to set the pipeline(s) chained together for each file visit,
+// in a fashion similar to middlewares in HTTP frameworks.
 //
 // pipelines can be of type Pipeline or func(*Ssg) Pipeline
 func WithPipelines(pipes ...interface{}) Option {

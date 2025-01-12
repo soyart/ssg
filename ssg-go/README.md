@@ -86,7 +86,7 @@ Extending via options can be done in 2 rough categories:
   Pipelines have full control of the walk, and can arbitarily generate new
   ssg-go outputs and change input properties such as filenames and modes.
 
-  In soyweb, pipelines are used to implement the [index generator](./index.go).
+  In soyweb, pipelines are used to implement the [index generator](../soyweb/index.go).
 
 #### `Hook` option
 
