@@ -11,8 +11,8 @@ import (
 )
 
 func TestGenerateIndex(t *testing.T) {
-	src := "./testdata/myblog/src"
-	dst := "./testdata/myblog/dst-test-generate-index"
+	src := "../testdata/myblog/src"
+	dst := "../testdata/myblog/dst-test-generate-index"
 	title := "TestTitle"
 	url := "https://my.blog"
 

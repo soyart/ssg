@@ -3,12 +3,12 @@
 
 /cmd/debug
 
-soyweb/testdata/johndoe.com/*
-!soyweb/testdata/johndoe.com/src
-soyweb/testdata/johndoe.com/src/style.css
-soyweb/testdata/johndoe.com/src/some-txt.txt
-soyweb/testdata/johndoe.com/src/drop
-soyweb/testdata/johndoe.com/src/assets
+testdata/johndoe.com/*
+!testdata/johndoe.com/src
+testdata/johndoe.com/src/style.css
+testdata/johndoe.com/src/some-txt.txt
+testdata/johndoe.com/src/drop
+testdata/johndoe.com/src/assets
 
-soyweb/testdata/myblog/*
-!soyweb/testdata/myblog/src
+testdata/myblog/*
+!testdata/myblog/src

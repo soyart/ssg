@@ -1,6 +1,6 @@
 module github.com/soyart/ssg/soyweb
 
-replace github.com/soyart/ssg => ./..
+replace github.com/soyart/ssg => ../ssg-go
 
 go 1.22.7
 

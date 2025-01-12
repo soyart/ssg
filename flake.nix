@@ -58,7 +58,7 @@ rec {
           inherit version;
 
           pname = "ssg";
-          src = ./.;
+          src = ./ssg-go;
           vendorHash = "sha256-89MtPLdBD0lF7YOrhMgSB0q0AdKylBAiLmPQayL+M9I=";
 
           buildPhase = ''
@@ -86,7 +86,7 @@ rec {
           pname = "soyweb";
           src = ./.;
           modRoot = "./soyweb";
-          vendorHash = "sha256-h//lE0ZNYx4wTUMiVy+vUoRxpuGmc9IDCkdSBvy/mPY=";
+          vendorHash = "sha256-Rc/rZ0AAa+Fyanhn5OHa8g3N9UMK0u1xy2JxjbaQQDs=";
           meta = {
             homepage = "https://github.com/soyart/ssg";
             description = "soyweb - ssg wrapper";
