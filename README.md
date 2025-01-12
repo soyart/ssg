@@ -22,7 +22,7 @@ This Nix Flake provides 2 implementations of ssg.
   extensible ssg implementations with Go API.
 
 > In addition to the implementations, a Go wrapper for ssg-go is also provided
-> in [`soyweb`](./soyweb/) repository.
+> in [`soyweb`](../soyweb/) repository.
 >
 > Note: both ssg-go and soyweb will probably not work on Windows due to
 > Windows path delimiter being different than POSIX's

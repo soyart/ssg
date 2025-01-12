@@ -17,14 +17,15 @@ following operations for each source file:
 
   ssg-go collects templates from `_header.html` and `_footer.html`
 
-- If path is a file
+- If path is an unignored file
 
   ssg-go reads the data and send it to all of the `Pipeline`s.
 
-  The output from the last `Pipeline` is used as input to core:
+  The output from the last `Pipeline` is used as input to ssg-go *core*,
+  which handles the Markdown conversion and assembly of HTML outputs.
 
   ```
-  raw_data -> [pipelines] -> core
+  raw_data -> [pipelines] -> [core] -> output
   ```
 
   Pipelines can use these 2 well known errors control ssg-go walk control flow:
@@ -48,10 +49,11 @@ For an input file, ssg-go performs these actions:
 
 - If path has non-`.md` extension
 
-  ssg-go will simply mirrors the file to `$dst`:
+  ssg-go will not convert it to HTML,
+  and it will simply mirror the file to `$dst`:
 
   ```
-  raw data post-pipeline -> hook -> output
+  core_input -> [hook] -> output
   ```
 
 - If path has `.md` extension
@@ -60,14 +62,14 @@ For an input file, ssg-go performs these actions:
   After the assembly, `HookGenerate` is called on the data.
 
   ```
-  raw data post-pipeline -> hook -> generate/assemble HTML -> hookGenerate -> output
+  core_input -> [hook] -> [covert-to-html] -> [hookGenerate] -> output
   ```
 
 ### Options
 
-Go programmers can extend ssg-go via its [`Option` type](./options.go).
+Go programmers can extend ssg-go via the [`Option` type](./options.go).
 
-[soyweb](./soyweb/) also extends ssg via `Option`,
+[soyweb](../soyweb/) also extends ssg via `Option`,
 and provides extra functionality such as index generator and minifiers.
 
 Extending via options can be done in 2 rough categories:
