@@ -32,19 +32,22 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
-          go-version-file: "go.mod"
+          go-version-file: "./ssg-go/go.mod"
           cache: false
           check-latest: true
 
       - name: Build ssg-go
         run: |
+          cd ssg-go;
+          echo "PWD: $pwd"
           mkdir -p $ARTIFACT_SSG_GO
           echo 'Building ssg-go/ssg'
           go build -o $ARTIFACT_SSG_GO/ssg ./cmd/ssg
 
       - name: Build soyweb
         run: |
-          cd ./soyweb
+          cd soyweb;
+          echo "PWD: $pwd"
           mkdir -p $ARTIFACT_SOYWEB
           echo 'Building ssg-go/ssg'
           go build -o $ARTIFACT_SOYWEB/ssg-manifest ./cmd/ssg-manifest
@@ -56,6 +59,6 @@ jobs:
         with:
           name: build_result-go${{ matrix.go-version }}_${{ matrix.os }}
           path: |
-            ${{ env.ARTIFACT_SSG_GO }}
+            ssg-go/${{ env.ARTIFACT_SSG_GO }}
             soyweb/${{ env.ARTIFACT_SOYWEB }}
 
