@@ -37,7 +37,7 @@ func inputHasher(s *ssg.Ssg) ssg.Pipeline {
 			return path, data, d, nil
 		}
 
-		s.AddOutputs(ssg.Output(hashPath, path, []byte(hash), 0644))
+		s.AddOutputs(ssg.Output(hashPath, path, []byte(hash), 0o644))
 
 		return path, data, d, nil
 	}
@@ -83,8 +83,8 @@ func changeFilename(path string) string {
 }
 
 func TestChainPipelines(t *testing.T) {
-	src := "soyweb/testdata/myblog/src"
-	dst := "soyweb/testdata/myblog/dst-chain-pipes"
+	src := "../testdata/myblog/src"
+	dst := "../testdata/myblog/dst-chain-pipes"
 
 	err := os.RemoveAll(dst)
 	if err != nil {

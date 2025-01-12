@@ -54,7 +54,7 @@ func writeOutFromCache(s *Ssg) error {
 // TestGenerateStreaming tests that all files are properly flushed to destination when streaming,
 // and that all outputs are identical
 func TestGenerateStreaming(t *testing.T) {
-	root := "./soyweb/testdata/johndoe.com"
+	root := "../testdata/johndoe.com"
 	src := filepath.Join(root, "/src")
 	dst := filepath.Join(root, "/dst")
 	dstStreaming := filepath.Join(root, "/dstStreaming")

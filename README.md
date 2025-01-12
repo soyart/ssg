@@ -1,6 +1,6 @@
 # ssg (static site generator)
 
-> See also: [ssg-go](./ssg-go.md)
+> See also: [ssg-go](./ssg-go/)
 
 This Nix Flake provides 2 implementations of ssg.
 
@@ -11,7 +11,7 @@ This Nix Flake provides 2 implementations of ssg.
   Through [`flake.nix`](./flake.nix), ssg's runtime dependencies will be included
   in the derivation.
 
-- [ssg-go](./ssg-go.md)
+- [ssg-go](./ssg-go/)
 
   My own implementation, using [github.com/gomarkdown/markdown](https://github.com/gomarkdown/markdown).
 
@@ -21,10 +21,11 @@ This Nix Flake provides 2 implementations of ssg.
   In addition to the executables, ssg-go also provides
   extensible ssg implementations with Go API.
 
-  A Go wrapper for ssg-go is also available in [`soyweb`](./soyweb/) repository.
-
-  > Note: both ssg-go and soyweb will probably not work on Windows due to
-  > Windows path delimiter being different than POSIX's
+> In addition to the implementations, a Go wrapper for ssg-go is also provided
+> in [`soyweb`](./soyweb/) repository.
+>
+> Note: both ssg-go and soyweb will probably not work on Windows due to
+> Windows path delimiter being different than POSIX's
 
 ## Build from Nix flake
 

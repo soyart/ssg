@@ -146,7 +146,7 @@ func TestGenerate(t *testing.T) {
 }
 
 func testGenerate(t *testing.T, buildFn func(s *Ssg) ([]string, []OutputFile, error)) {
-	root := "./soyweb/testdata/johndoe.com"
+	root := "../testdata/johndoe.com"
 	src := filepath.Join(root, "/src")
 	dst := filepath.Join(root, "/dst")
 	title := "JohnDoe.com"
@@ -378,7 +378,7 @@ func TestSsgignore(t *testing.T) {
 // TestBuildAndWriteOut tests that Build+WriteOut functions
 // work as expected (identical to streaming Generate)
 func TestBuildAndWriteOut(t *testing.T) {
-	root := "./soyweb/testdata/johndoe.com"
+	root := "../testdata/johndoe.com"
 	src := filepath.Join(root, "/src")
 	dstGenerate := filepath.Join(root, "/dstGenerate")
 	dstBuild := filepath.Join(root, "/dstBuild")
