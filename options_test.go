@@ -119,6 +119,9 @@ func TestChainPipelines(t *testing.T) {
 	// ${name}_mw_change_filename.${old_ext}
 	// ${name}_mw_change_filename.${old_ext}.sha256
 	filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
 		if d.IsDir() {
 			return nil
 		}
