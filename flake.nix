@@ -58,7 +58,7 @@ rec {
           inherit version;
 
           pname = "ssg";
-          src = ./.;
+          src = ./ssg-go;
           vendorHash = "sha256-89MtPLdBD0lF7YOrhMgSB0q0AdKylBAiLmPQayL+M9I=";
 
           buildPhase = ''
