@@ -3,7 +3,7 @@ package soyweb
 import (
 	"errors"
 
-	"github.com/soyart/ssg"
+	"github.com/soyart/ssg/ssg-go"
 )
 
 const (

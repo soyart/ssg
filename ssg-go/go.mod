@@ -1,4 +1,4 @@
-module github.com/soyart/ssg
+module github.com/soyart/ssg/ssg-go
 
 go 1.22.7
 

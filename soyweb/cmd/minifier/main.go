@@ -8,8 +8,8 @@ import (
 
 	"github.com/alexflint/go-arg"
 
-	"github.com/soyart/ssg"
 	"github.com/soyart/ssg/soyweb"
+	"github.com/soyart/ssg/ssg-go"
 )
 
 type cli struct {

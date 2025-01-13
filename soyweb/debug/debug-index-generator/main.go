@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/soyart/ssg"
 	"github.com/soyart/ssg/soyweb"
+	"github.com/soyart/ssg/ssg-go"
 )
 
 func main() {

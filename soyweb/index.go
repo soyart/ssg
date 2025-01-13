@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/soyart/ssg"
+	"github.com/soyart/ssg/ssg-go"
 )
 
 // IndexGenerator returns an [ssg.Pipeline] that would look for
@@ -69,9 +69,7 @@ func generateIndex(
 		sibIsDir := sib.IsDir()
 
 		switch sibName {
-		case
-			"index.html",
-			"index.md":
+		case "index.html", "index.md":
 			if !sibIsDir {
 				return "", fmt.Errorf("parent %s already had index %s", parent, sibName)
 			}

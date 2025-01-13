@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/soyart/ssg"
+	"github.com/soyart/ssg/ssg-go"
 )
 
 // inputHasher computes and stamps hash for input files.

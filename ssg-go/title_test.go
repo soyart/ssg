@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/soyart/ssg"
+	"github.com/soyart/ssg/ssg-go"
 )
 
 func TestTitleFromH1(t *testing.T) {

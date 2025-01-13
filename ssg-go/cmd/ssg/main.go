@@ -4,7 +4,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/soyart/ssg"
+	"github.com/soyart/ssg/ssg-go"
 )
 
 func main() {

@@ -12,7 +12,7 @@ import (
 	"github.com/tdewolff/minify/v2/js"
 	"github.com/tdewolff/minify/v2/json"
 
-	"github.com/soyart/ssg"
+	"github.com/soyart/ssg/ssg-go"
 )
 
 const (
