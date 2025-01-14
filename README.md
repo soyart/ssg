@@ -1,8 +1,27 @@
 # ssg (static site generator)
 
-> See also: [ssg-go](./ssg-go/)
+ssg is a Markdown static site generator.
+
+A Markdown static site generator generates a website from directory tree,
+with Markdown files being converted and assembled into HTMLs.
 
 This Nix Flake provides 2 implementations of ssg.
+
+- [ssg-go](./ssg-go/)
+
+  Go implementation of ssg, using [github.com/gomarkdown/markdown](https://github.com/gomarkdown/markdown).
+
+  This implementation is good for deploying ssg remotely,
+  because it's just 1 Go executable with 0 runtime dependencies.
+
+  In addition to the executables, ssg-go also provides a library
+  for extending ssg as Go module `github.com/soyart/ssg/ssg-go`.
+
+  [soyweb](./soyweb/) is another ssg-go wrapper that uses the exposed ssg-go API
+  to extend ssg-go with non-core features such as minifiers and index file generator.
+
+  > Note: both ssg-go and soyweb will probably not work on Windows due to
+  > Windows path delimiter being different than POSIX's
 
 - [Original POSIX shell ssg romanzolotarev.com](https://romanzolotarev.com/ssg.html)
 
@@ -11,27 +30,14 @@ This Nix Flake provides 2 implementations of ssg.
   Through [`flake.nix`](./flake.nix), ssg's runtime dependencies will be included
   in the derivation.
 
-- [ssg-go](./ssg-go/)
-
-  My own implementation, using [github.com/gomarkdown/markdown](https://github.com/gomarkdown/markdown).
-
-  This implementation is good for deploying ssg remotely,
-  because it's just 1 Go executable.
-
-  In addition to the executables, ssg-go also provides
-  extensible ssg implementations with Go API.
-
-> In addition to the implementations, a Go wrapper for ssg-go is also provided
-> in [`soyweb`](../soyweb/) repository.
->
-> Note: both ssg-go and soyweb will probably not work on Windows due to
-> Windows path delimiter being different than POSIX's
-
-## Build from Nix flake
+## Build from Nix flake:
 
 ```sh
+# Original shell implementation
 nix build          # Build default package - pure POSIX shell ssg
 nix build .#impure # Build directly from ssg.sh
+
+# Go implementation
 nix build .#ssg-go # Build Go implementation of ssg
 nix build .#soyweb # Build soyweb programs
 ```
@@ -42,27 +48,32 @@ nix build .#soyweb # Build soyweb programs
 ssg <src> <dst> <title> <url>
 ```
 
-ssg reads Markdown files under `${src}`, converts each to HTML,
-and prepends and appends the resulting HTML with `_header.html`
-and `_footer.html` respectively. The output file tree is mirrored into `${dst}`.
+- Files or directories whose names start with `.` are ignored.
+  Files listed in `${src}/.ssgignore` are also ignored in a fashion similar
+  to `.gitignore`. To see how `.ssgignore` works in Go implementation, see
+  [the test `TestSsgignore`](./ssg-go/ssg_test.go).
 
-Files or directories whose names start with `.` are ignored.
-Files listed in `${src}/.ssgignore` are also ignored in a fashion similar
-to `.gitignore`. To see how `.ssgignore` works in Go implementation, see
-[the test `TestSsgignore`](./ssg-go/ssg_test.go).
+- Files with extensions other than `.md` and `html` will simply be copied
+  into mirrored `${dst}`.
 
-If we have `foo.html` and `foo.md`, the HTML file wins.
+  If we have `foo.html` and `foo.md`, the HTML file wins.
 
-Files with extensions other than `.md` will simply be copied
-into mirrored `${dst}`.
+- ssg reads Markdown files under `${src}`, converts each to HTML,
+  and prepends and appends the resulting HTML with `_header.html`
+  and `_footer.html` respectively.
 
-ssg also generates `${dst}/sitemap.xml` with data from the CLI parameter.
+  The assembled output file is then mirrored into `${dst}`
+  with `.html` extension.
 
-HTML tags `<head><title>` is extracted from the first Markdown h1 (default),
-or a default value provided at the command-line (the 3rd argument).
+- At the end, ssg generates metadata such as `${dst}/sitemap.xml` with data
+  from the CLI parameter and the output tree, and `${dst}/.files` to remember
+  what files it had read.
 
-> With ssg-go, the titles can also be extracted from special line starting
-> with `:ssg-title` tag. This line will be removed from the output.
+- HTML tags `<head><title>` is extracted from the first Markdown h1 (default),
+  or a default value provided at the command-line (the 3rd argument).
+
+  > With ssg-go, the titles can also be extracted from special line starting
+  > with `:ssg-title` tag. This line will be removed from the output.
 
 ## Differences between ssg and ssg-go
 
@@ -70,8 +81,9 @@ or a default value provided at the command-line (the 3rd argument).
 
 ssg-go has built-in concurrent output writers.
 
-The number of writers can be set at runtime by environment variable `SSG_WRITERS`.
-At any point in time, at most `SSG_WRITERS` number of threads are writing output files.
+Environment variable `SSG_WRITERS` sets the number of concurrent writers in ssg-go,
+i.e. at any point in time, at most `SSG_WRITERS` number of threads are writing output
+files.
 
 The default value for concurrent writer is 20. If the supplied value is illegal,
 ssg-go falls back to 20 concurrent writers.

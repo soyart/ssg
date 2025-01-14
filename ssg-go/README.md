@@ -147,7 +147,7 @@ Pipelines can be chained together with `WithPipelines(p1, p2, p3)`
   Some pipelines are not pure and might need something from `Ssg`, so
   we allow these pipeline constructors as arguments to `WithPipelines`.
 
-  An example for this type of pipelines would be the [index generator](./index.go),
+  An example for this type of pipelines would be the [index generator](../soyweb/index.go),
   which needs to know which files are ignored in addition to `$src` and `$dst`.
 
 ### Streaming and caching builds
