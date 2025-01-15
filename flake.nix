@@ -58,22 +58,9 @@ rec {
           inherit version;
 
           pname = "ssg";
-          src = ./ssg-go;
+          src = ./.;
+          modRoot = "./ssg-go";
           vendorHash = "sha256-89MtPLdBD0lF7YOrhMgSB0q0AdKylBAiLmPQayL+M9I=";
-
-          buildPhase = ''
-            echo "Note: only building ./cmd/ssg for ssg-go"
-            mkdir -p bin $out/bin
-            go build -o ./bin/ssg ./cmd/ssg
-            mv ./bin/ssg $out/bin/
-          '';
-
-          # Go unit tests are already executed by buildGoModule.
-          # preBuild would instead be more useful if we want to set Go flags.
-          # preBuild = ''
-          #   go test ./...;
-          # '';
-
           meta = {
             homepage = "https://github.com/soyart/ssg";
             description = "${description} (go implementation)";
