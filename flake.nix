@@ -84,8 +84,7 @@ rec {
           inherit version;
 
           pname = "soyweb";
-          src = ./.;
-          modRoot = "./soyweb";
+          src = ./soyweb;
           vendorHash = "sha256-Rc/rZ0AAa+Fyanhn5OHa8g3N9UMK0u1xy2JxjbaQQDs=";
           meta = {
             homepage = "https://github.com/soyart/ssg";
