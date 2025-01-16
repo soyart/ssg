@@ -143,7 +143,6 @@ func deepEqual(t *testing.T, dst1, dst2 string) fs.WalkDirFunc {
 		if !bytes.Equal(bytesExpected, bytesStreaming) {
 			t.Logf("Expected:\n%s", bytesExpected)
 			t.Logf("Streaming:\n%s", bytesStreaming)
-			return nil
 			t.Fatalf("unexpected bytes from '%s'", path2)
 		}
 
