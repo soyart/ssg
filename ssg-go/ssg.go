@@ -81,7 +81,9 @@ func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile,
 // It creates a one-off [Ssg] that's used to generate a site right away.
 func Generate(src, dst, title, url string, opts ...Option) error {
 	s := New(src, dst, title, url)
-	return s.With(opts...).Generate()
+	return s.
+		With(opts...).
+		Generate()
 }
 
 // New returns a default [Ssg] with no options.

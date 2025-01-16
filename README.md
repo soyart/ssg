@@ -2,10 +2,25 @@
 
 ssg is a Markdown static site generator.
 
-A Markdown static site generator generates a website from directory tree,
+ssg generates a website from directory tree,
 with Markdown files being converted and assembled into HTMLs.
 
+## ssg implementations
+
 This Nix Flake provides 2 implementations of ssg.
+
+- [Original ssg](https://romanzolotarev.com/ssg.html)
+
+  The original POSIX shell script is [copied from rgz.ee](https://romanzolotarev.com/bin/ssg).
+
+  Through [`flake.nix`](./flake.nix), ssg's runtime dependencies will be included
+  in the derivation.
+
+  ```shell
+  # Original shell implementation
+  nix build          # Build default package - pure POSIX shell ssg
+  nix build .#impure # Build directly from ssg.sh
+  ```
 
 - [ssg-go](./ssg-go/)
 
@@ -19,28 +34,16 @@ This Nix Flake provides 2 implementations of ssg.
 
   [soyweb](./soyweb/) is another ssg-go wrapper that uses the exposed ssg-go API
   to extend ssg-go with non-core features such as minifiers and index file generator.
+  Like with ssg-go, soyweb provides its library as a Go module `github.com/soyart/ssg/soyweb`.
 
   > Note: both ssg-go and soyweb will probably not work on Windows due to
   > Windows path delimiter being different than POSIX's
 
-- [Original POSIX shell ssg romanzolotarev.com](https://romanzolotarev.com/ssg.html)
-
-  The original script is copied from [rgz.ee](https://romanzolotarev.com/bin/ssg).
-
-  Through [`flake.nix`](./flake.nix), ssg's runtime dependencies will be included
-  in the derivation.
-
-## Build from Nix flake:
-
-```sh
-# Original shell implementation
-nix build          # Build default package - pure POSIX shell ssg
-nix build .#impure # Build directly from ssg.sh
-
-# Go implementation
-nix build .#ssg-go # Build Go implementation of ssg
-nix build .#soyweb # Build soyweb programs
-```
+  ```shell
+  # Go implementation
+  nix build .#ssg-go # Build executables from Go implementation of ssg
+  nix build .#soyweb # Build soyweb programs
+  ```
 
 ## Usage for both implementations
 
@@ -49,8 +52,9 @@ ssg <src> <dst> <title> <url>
 ```
 
 - Files or directories whose names start with `.` are ignored.
+
   Files listed in `${src}/.ssgignore` are also ignored in a fashion similar
-  to `.gitignore`. To see how `.ssgignore` works in Go implementation, see
+  to `.gitignore`. To see how `.ssgignore` works in ssg-go, see
   [the test `TestSsgignore`](./ssg-go/ssg_test.go).
 
 - Files with extensions other than `.md` and `html` will simply be copied
@@ -65,9 +69,9 @@ ssg <src> <dst> <title> <url>
   The assembled output file is then mirrored into `${dst}`
   with `.html` extension.
 
-- At the end, ssg generates metadata such as `${dst}/sitemap.xml` with data
+- In the end, ssg generates metadata such as `${dst}/sitemap.xml` with data
   from the CLI parameter and the output tree, and `${dst}/.files` to remember
-  what files it had read.
+  what files it had processed.
 
 - HTML tags `<head><title>` is extracted from the first Markdown h1 (default),
   or a default value provided at the command-line (the 3rd argument).
@@ -77,7 +81,20 @@ ssg <src> <dst> <title> <url>
 
 ## Differences between ssg and ssg-go
 
-### Concurrent writers
+### ssg-go ignores `.files`
+
+In the original ssg, filenames listed in `.files` are
+ignored and not re-generated. Unlike the original ssg, ssg-go ignores `${dst}/.files`
+simply because it adds needless complexity.
+
+By ignoring `.files`, we can be sure that the output directory is generated in a
+functional fashion, i.e. we'll always get the same output with the same source material.
+
+To do caching from previous run, an option to store file hashes in `${dst}/.files.sha256`
+seems attractive. But upon closer inspection, it seems problems will arise when people
+use ssg-go with other wrappers that read other files or do substitutions.
+
+### ssg-go concurrent writers
 
 ssg-go has built-in concurrent output writers.
 
@@ -94,7 +111,7 @@ ssg-go falls back to 20 concurrent writers.
 > SSG_WRITERS=1 ssg mySrc myDst myTitle myUrl
 > ```
 
-### Custom title tag for `_header.html`
+### ssg-go custom title tag for `_header.html`
 
 ssg-go also parses `_header.go` for title replacement placeholder.
 Currently, ssg-go recognizes 2 placeholders:
