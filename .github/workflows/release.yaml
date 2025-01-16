@@ -8,6 +8,7 @@ on:
 
     tags:
       - 'v*'
+      - 'rc-*'
       - 'dev-*'
       - 'test-*'
 
