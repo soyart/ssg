@@ -407,7 +407,7 @@ func TestBuildAndWriteOut(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	stat, err := os.Stat(dstBuild)
+	stat, err := os.Stat(src)
 	if err != nil {
 		panic(err)
 	}

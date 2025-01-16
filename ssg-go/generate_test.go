@@ -8,55 +8,12 @@ import (
 	"testing"
 )
 
-func generateCaching(s *Ssg) error {
-	// Reset
-	s.cache = nil
-	stat, err := os.Stat(s.Src)
-	if err != nil {
-		return err
-	}
-	files, dist, err := s.buildV2()
-	if err != nil {
-		return err
-	}
-	err = writeOutFromCache(s)
-	if err != nil {
-		return err
-	}
-	err = GenerateMetadata(s.Src, s.Dst, s.Url, files, dist, stat.ModTime())
-	if err != nil {
-		return err
-	}
-
-	s.pront(len(dist) + 2)
-	return nil
-}
-
-// writeOutFromCache blocks and concurrently writes out s.writes
-// to their target locations.
-//
-// If targets is empty, writeOutFromCache writes to s.dst
-func writeOutFromCache(s *Ssg) error {
-	_, err := os.Stat(s.Dst)
-	if os.IsNotExist(err) {
-		err = os.MkdirAll(s.Dst, os.ModePerm)
-	}
-	if err != nil {
-		return err
-	}
-	err = WriteOutSlice(s.cache, s.options.writers)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // TestGenerateStreaming tests that all files are properly flushed to destination when streaming,
 // and that all outputs are identical
 func TestGenerateStreaming(t *testing.T) {
 	root := "../testdata/johndoe.com"
 	src := filepath.Join(root, "/src")
-	dst := filepath.Join(root, "/dst")
+	dst := filepath.Join(root, "/dstBuild")
 	dstStreaming := filepath.Join(root, "/dstStreaming")
 	title := "JohnDoe.com"
 	url := "https://johndoe.com"
@@ -184,6 +141,9 @@ func deepEqual(t *testing.T, dst1, dst2 string) fs.WalkDirFunc {
 			t.Fatalf("unexpected error from reading '%s'", path2)
 		}
 		if !bytes.Equal(bytesExpected, bytesStreaming) {
+			t.Logf("Expected:\n%s", bytesExpected)
+			t.Logf("Streaming:\n%s", bytesStreaming)
+			return nil
 			t.Fatalf("unexpected bytes from '%s'", path2)
 		}
 
