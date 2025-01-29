@@ -1,2 +1,14 @@
 # Nix build result
 /result
+
+/cmd/debug
+
+testdata/johndoe.com/*
+!testdata/johndoe.com/src
+testdata/johndoe.com/src/style.css
+testdata/johndoe.com/src/some-txt.txt
+testdata/johndoe.com/src/drop
+testdata/johndoe.com/src/assets
+
+testdata/myblog/*
+!testdata/myblog/src

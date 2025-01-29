@@ -1,0 +1,21 @@
+{
+	"johndoe.com": {
+		"name": "JohnDoe.com",
+		"url": "https://johndoe.com",
+		"src": "johndoe.com/src",
+		"dst": "johndoe.com/dst",
+		"cleanup": true,
+		"generate_blog": true,
+		"copies": {
+			"./assets/style.css": {
+				"target": "johndoe.com/src/style.css",
+				"force": true
+			},
+			"./assets/some.txt": "johndoe.com/src/some-txt.txt",
+			"./assets/some": {
+				"force": true,
+				"target": "johndoe.com/src/drop"
+			}
+		}
+	}
+}

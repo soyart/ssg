@@ -31,9 +31,7 @@ rec {
             lowdown
           ];
 
-          text = ''
-            ${builtins.readFile ./ssg.sh}
-          '';
+          text = builtins.readFile ./ssg.sh;
 
           meta = {
             inherit description homepage;
@@ -52,8 +50,53 @@ rec {
 
           meta = {
             inherit homepage;
-            description = "${description} + (impure version)";
+            description = "${description} (impure version)";
           };
+        };
+
+        ssg-go = pkgs.buildGoModule {
+          inherit version;
+          pname = "ssg";
+          src = ./.;
+          modRoot = "./ssg-go";
+          vendorHash = "sha256-Mc4+0bb2Uz6O0v8FBMg5Ul7LNFMwBc3BdaSUmlsaT40=";
+          meta = {
+            homepage = "https://github.com/soyart/ssg";
+            description = "${description} (go implementation)";
+          };
+        };
+
+        soyweb = pkgs.buildGoModule {
+          inherit version;
+          pname = "soyweb";
+          src = ./.;
+          modRoot = "./soyweb";
+          vendorHash = "sha256-XWVuZTnYZwOc/9j7f0oCld40E7/3VILWihW8+lmep9E=";
+          meta = {
+            homepage = "https://github.com/soyart/ssg";
+            description = "soyweb - ssg wrapper";
+          };
+        };
+      });
+
+      devShells = forAllSystems ({ pkgs }: {
+        default = pkgs.mkShell {
+          packages = with pkgs; [
+            nixd
+            nixpkgs-fmt
+
+            bash-language-server
+            shellcheck
+            shfmt
+
+            coreutils
+            lowdown
+
+            go
+            gopls
+            gotools
+            go-tools
+          ];
         };
       });
     };

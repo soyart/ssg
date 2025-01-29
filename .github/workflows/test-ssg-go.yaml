@@ -1,0 +1,60 @@
+name: test
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+
+jobs:
+  test:
+    name: Test code
+    strategy:
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
+
+        go-version:
+          - stable
+          - "" # empty string = read version from go.mod
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      ARTIFACT_SSG_GO: "ssg-go-test_result-go${{ matrix.go-version }}_${{ matrix.os }}.json"
+      ARTIFACT_SOYWEB: "soyweb-test_result-go${{ matrix.go-version }}_${{ matrix.os }}.json"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@master
+        with:
+          fetch-depth: "0"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          go-version-file: "./ssg-go/go.mod"
+          cache: false
+          check-latest: true
+
+      - name: Test ssg-go
+        run: |
+          cd ssg-go;
+          echo "PWD: $pwd"
+          echo "Testing ssg-go and writing JSON report to $ARTIFACT_SSG_GO"
+          go test -race -count=1 -json ./... > $ARTIFACT_SSG_GO
+
+      - name: Test soyweb
+        run: |
+          cd soyweb;
+          echo "PWD: $pwd"
+          echo Testing soyweb and writing JSON report to $ARTIFACT_SOYWEB
+          go test -race -count=1 -json ./... > $ARTIFACT_SOYWEB
+
+      - name: Upload Go test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test_result-go${{ matrix.go-version }}_${{ matrix.os }}
+          path: |
+            ssg-go/${{ env.ARTIFACT_SSG_GO }}
+            soyweb/${{ env.ARTIFACT_SOYWEB }}
+
