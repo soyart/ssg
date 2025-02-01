@@ -60,7 +60,7 @@ type Ssg struct {
 	options options
 
 	stream     chan<- OutputFile // TODO: refactor out of struct
-	ssgignores Ignorer
+	ssgignores func(path string) (ignore bool)
 	headers    headers
 	footers    footers
 	preferred  Set      // Used to prefer html and ignore md files with identical names, as with the original ssg
@@ -100,7 +100,7 @@ func New(src, dst, title, url string) Ssg {
 		Dst:        dst,
 		Title:      title,
 		Url:        url,
-		ssgignores: ignores,
+		ssgignores: ignores.Ignore,
 		preferred:  make(Set),
 		headers:    newHeaders(HeaderDefault),
 		footers:    newFooters(FooterDefault),
@@ -348,18 +348,14 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 }
 
 func (s *Ssg) Ignore(path string) bool {
-	return s.ssgignores.Ignore(path)
+	return s.ssgignores(path)
 }
 
 func (s *Ssg) pront(l int) {
 	Fprintf(os.Stdout, "[ssg-go] wrote %d file(s) to %s\n", l, s.Dst)
 }
 
-type Ignorer interface {
-	Ignore(path string) bool
-}
-
-func prepare(src, dst string) (Ignorer, error) {
+func prepare(src, dst string) (*gitIgnorer, error) {
 	if src == "" {
 		return nil, fmt.Errorf("empty src")
 	}
@@ -374,7 +370,7 @@ func prepare(src, dst string) (Ignorer, error) {
 	return ParseSsgIgnore(ssgignore)
 }
 
-func ParseSsgIgnore(path string) (Ignorer, error) {
+func ParseSsgIgnore(path string) (*gitIgnorer, error) {
 	ignores, err := ignore.CompileIgnoreFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -383,14 +379,14 @@ func ParseSsgIgnore(path string) (Ignorer, error) {
 		return nil, fmt.Errorf("failed to parse ssgignore at %s: %w", path, err)
 	}
 
-	return &ignorerGitignore{GitIgnore: ignores}, nil
+	return &gitIgnorer{GitIgnore: ignores}, nil
 }
 
-type ignorerGitignore struct {
+type gitIgnorer struct {
 	*ignore.GitIgnore
 }
 
-func (i *ignorerGitignore) Ignore(path string) bool {
+func (i *gitIgnorer) Ignore(path string) bool {
 	if i == nil {
 		return false
 	}
@@ -401,7 +397,7 @@ func (i *ignorerGitignore) Ignore(path string) bool {
 }
 
 // TODO: refactor
-func shouldIgnore(ignores Ignorer, path, base string, d fs.DirEntry) (bool, error) {
+func shouldIgnore(ignoreFn func(path string) (ignored bool), path, base string, d fs.DirEntry) (bool, error) {
 	isDot := strings.HasPrefix(base, ".")
 	isDir := d.IsDir()
 
@@ -413,7 +409,7 @@ func shouldIgnore(ignores Ignorer, path, base string, d fs.DirEntry) (bool, erro
 	case isDot, isDir:
 		return true, nil
 
-	case ignores.Ignore(path):
+	case ignoreFn(path):
 		return true, nil
 	}
 
