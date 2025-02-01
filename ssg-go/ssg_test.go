@@ -365,7 +365,7 @@ func TestSsgignore(t *testing.T) {
 			panic("bad ignore lines")
 		}
 
-		ignorer := &ignorerGitignore{GitIgnore: ignores}
+		ignorer := &gitIgnorer{GitIgnore: ignores}
 		ignored := ignorer.Ignore(tc.path)
 		if tc.expected == ignored {
 			continue
