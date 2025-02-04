@@ -57,6 +57,9 @@ rec {
         ssg-go = pkgs.buildGoModule {
           inherit version;
           pname = "ssg";
+          env = {
+            GOWORK = "off";
+          };
           src = ./.;
           modRoot = "./ssg-go";
           vendorHash = "sha256-Mc4+0bb2Uz6O0v8FBMg5Ul7LNFMwBc3BdaSUmlsaT40=";
@@ -69,6 +72,9 @@ rec {
         soyweb = pkgs.buildGoModule {
           inherit version;
           pname = "soyweb";
+          env = {
+            GOWORK = "off";
+          };
           src = ./.;
           modRoot = "./soyweb";
           vendorHash = "sha256-OGJ3YKuU1Ah7f6nYriBSnpjKBf+K4RN9oadGDwUBF4s=";
