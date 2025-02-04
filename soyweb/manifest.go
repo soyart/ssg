@@ -379,7 +379,7 @@ func (s *Site) Copy() error {
 		ssrc, err := os.Stat(cpSrc)
 		if err != nil {
 			logger.Error("failed to stat copy src")
-			return fmt.Errorf("failed to stat copy src: '%s'", cpSrc)
+			return fmt.Errorf("failed to stat copy src '%s': %w", cpSrc, err)
 		}
 		if ssg.FileIs(ssrc, os.ModeSymlink) {
 			logger.Error("copy src is symlink")
