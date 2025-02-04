@@ -29,7 +29,18 @@ type (
 var m = minify.New()
 
 func init() {
-	m.AddFunc(mediaTypeHtml, html.Minify)
+	m.Add(mediaTypeHtml, &html.Minifier{
+		// Default values are shown to be more conspicuous
+		KeepComments:            false,
+		KeepConditionalComments: false,
+		KeepSpecialComments:     false,
+		KeepDefaultAttrVals:     false,
+		KeepDocumentTags:        true,
+		KeepEndTags:             true,
+		KeepQuotes:              false,
+		KeepWhitespace:          false,
+		TemplateDelims:          [2]string{},
+	})
 	m.AddFunc(mediaTypeCss, css.Minify)
 	m.AddFunc(mediaTypeJs, js.Minify)
 	m.AddFunc(mediaTypeJson, json.Minify)
