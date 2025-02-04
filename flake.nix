@@ -56,8 +56,9 @@ rec {
 
         ssg-go = pkgs.buildGoModule {
           inherit version;
-          pname = "ssg-go";
-          src = ./ssg-go;
+          pname = "ssg";
+          src = ./.;
+          modRoot = "./ssg-go";
           vendorHash = "sha256-Mc4+0bb2Uz6O0v8FBMg5Ul7LNFMwBc3BdaSUmlsaT40=";
           meta = {
             homepage = "https://github.com/soyart/ssg";
@@ -68,7 +69,8 @@ rec {
         soyweb = pkgs.buildGoModule {
           inherit version;
           pname = "soyweb";
-          src = ./soyweb;
+          src = ./.;
+          modRoot = "./soyweb";
           vendorHash = "sha256-OGJ3YKuU1Ah7f6nYriBSnpjKBf+K4RN9oadGDwUBF4s=";
           meta = {
             homepage = "https://github.com/soyart/ssg";
