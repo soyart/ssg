@@ -2,12 +2,18 @@ package soyweb
 
 import (
 	"errors"
+	"io/fs"
 
 	"github.com/soyart/ssg/ssg-go"
 )
 
+type IndexGeneratorMode string
+
 const (
-	MarkerIndex = "_index.soyweb"
+	MarkerIndex string = "_index.soyweb"
+
+	IndexGeneratorModeDefault IndexGeneratorMode = ""
+	IndexGeneratorModeModTime IndexGeneratorMode = "modtime"
 )
 
 var ErrNotSupported = errors.New("unsupported web format")
@@ -32,7 +38,8 @@ type (
 	Flags struct {
 		MinifyFlags
 		NoMinifyFlags
-		GenerateIndex bool `arg:"--gen-index" default:"true" help:"Generate index on _index.soyweb"`
+		GenerateIndex     bool               `arg:"--gen-index" default:"true" help:"Generate index on _index.soyweb"`
+		GenerateIndexMode IndexGeneratorMode `arg:"--gen-index-mode" help:"Index generation mode"`
 	}
 )
 
@@ -41,7 +48,8 @@ func SsgOptions(f Flags) []ssg.Option {
 
 	pipes := []interface{}{}
 	if f.GenerateIndex {
-		pipes = append(pipes, IndexGenerator)
+		pipeGenIndex := GetIndexGenerator(f.GenerateIndexMode)
+		pipes = append(pipes, pipeGenIndex)
 	}
 
 	minifiers := make(map[string]MinifyFn)
@@ -60,7 +68,7 @@ func SsgOptions(f Flags) []ssg.Option {
 		minifiers[".json"] = MinifyJson
 	}
 
-	hook := pipelineMinify(minifiers)
+	hook := hookMinify(minifiers)
 	if hook != nil {
 		opts = append(opts, ssg.WithHook(hook))
 	}
@@ -69,6 +77,40 @@ func SsgOptions(f Flags) []ssg.Option {
 	}
 
 	return append(opts, ssg.WithPipelines(pipes...))
+}
+
+func GetIndexGenerator(m IndexGeneratorMode) func(*ssg.Ssg) ssg.Pipeline {
+	switch m {
+	case IndexGeneratorModeModTime:
+		return IndexGeneratorModTime
+	}
+
+	return IndexGenerator
+}
+
+// IndexGenerator returns an [ssg.Pipeline] that would look for
+// marker file "_index.soyweb" within a directory.
+//
+// Once it finds a marked directory, it inspects the children
+// and generate a Markdown list with name index.md,
+// which is later sent to supplied impl.
+func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
+	return IndexGeneratorTemplate(nil, generateIndex)(s)
+}
+
+func IndexGeneratorModTime(s *ssg.Ssg) ssg.Pipeline {
+	sortByModTime := func(entries []fs.FileInfo) func(i int, j int) bool {
+		return func(i, j int) bool {
+			infoI, infoJ := entries[i], entries[j]
+			cmp := infoI.ModTime().Compare(infoJ.ModTime())
+			if cmp == 0 {
+				return infoI.Name() < infoJ.Name()
+			}
+			return cmp == -1
+		}
+	}
+
+	return IndexGeneratorTemplate(sortByModTime, generateIndex)(s)
 }
 
 func (m MinifyFlags) Skip(ext string) bool {

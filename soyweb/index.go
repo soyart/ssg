@@ -11,31 +11,6 @@ import (
 	"github.com/soyart/ssg/ssg-go"
 )
 
-// IndexGenerator returns an [ssg.Pipeline] that would look for
-// marker file "_index.soyweb" within a directory.
-//
-// Once it finds a marked directory, it inspects the children
-// and generate a Markdown list with name index.md,
-// which is later sent to supplied impl.
-func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
-	return IndexGeneratorTemplate(nil, generateIndex)(s)
-}
-
-func IndexGeneratorModTime(s *ssg.Ssg) ssg.Pipeline {
-	sortByModTime := func(entries []fs.FileInfo) func(i int, j int) bool {
-		return func(i, j int) bool {
-			infoI, infoJ := entries[i], entries[j]
-			cmp := infoI.ModTime().Compare(infoJ.ModTime())
-			if cmp == 0 {
-				return infoI.Name() < infoJ.Name()
-			}
-			return cmp == -1
-		}
-	}
-
-	return IndexGeneratorTemplate(sortByModTime, generateIndex)(s)
-}
-
 func IndexGeneratorTemplate(
 	fnSortEntries func(entries []fs.FileInfo) func(i, j int) bool,
 	fnGenIndex func(
