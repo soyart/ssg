@@ -17,35 +17,7 @@ import (
 // and generate a Markdown list with name index.md,
 // which is later sent to supplied impl.
 func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
-	return func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error) {
-		switch {
-		case
-			d.IsDir(),
-			filepath.Base(path) != MarkerIndex:
-			return path, data, d, nil
-
-		case s.Ignore(path):
-			panic("unexpected ignored file for index-generator: " + path)
-		}
-
-		parent := filepath.Dir(path)
-		ssg.Fprintf(os.Stdout, "found index-generator marker: marker=\"%s\", parent=\"%s\"\n", path, parent)
-
-		entries, err := os.ReadDir(parent)
-		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to read marker dir '%s': %w", path, err)
-		}
-		template, err := ssg.ReadFile(path)
-		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to read marker '%s': %w", path, err)
-		}
-		index, err := generateIndex(s.Src, s.Ignore, parent, entries, template)
-		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
-		}
-
-		return filepath.Join(parent, "index.md"), []byte(index), d, nil
-	}
+	return IndexGeneratorV2(nil)(s)
 }
 
 func generateIndex(

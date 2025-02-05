@@ -18,7 +18,7 @@ const (
 	IndexModeModTime IndexMode = "mod-time"
 )
 
-func IndexGeneratorV2(mode IndexMode) func(*ssg.Ssg) ssg.Pipeline {
+func IndexGeneratorV2(sortFn func(i, j int) bool) func(*ssg.Ssg) ssg.Pipeline {
 	return func(s *ssg.Ssg) ssg.Pipeline {
 		return func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error) {
 			switch {
@@ -50,17 +50,8 @@ func IndexGeneratorV2(mode IndexMode) func(*ssg.Ssg) ssg.Pipeline {
 				infos[i] = info
 			}
 
-			switch mode {
-			case IndexModeModTime:
-				sort.Slice(infos, func(i, j int) bool {
-					infoI, infoJ := infos[i], infos[j]
-					cmp := infoI.ModTime().Compare(infoJ.ModTime())
-					if cmp == 0 {
-						return infoI.Name() < infoJ.Name()
-					}
-
-					return cmp == -1
-				})
+			if sortFn != nil {
+				sort.Slice(infos, sortFn)
 			}
 
 			template, err := ssg.ReadFile(path)
