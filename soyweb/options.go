@@ -9,4 +9,4 @@ func (o OptionIndexGenerator) Option() ssg.Option {
 }
 
 func (o OptionIndexGenerator) OptionName() string         { return "option-soyweb-index-generator" }
-func (o OptionIndexGenerator) OptionType() ssg.OptionType { return OptionTypeConfig }
+func (o OptionIndexGenerator) OptionType() ssg.OptionType { return ssg.OptionTypeConfig }
