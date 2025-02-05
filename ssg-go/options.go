@@ -27,6 +27,7 @@ type (
 	Pipeline func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error)
 
 	options struct {
+		options      []OptionV2 // For logging/debugging
 		hook         Hook
 		hookGenerate HookGenerate
 		pipelines    []Pipeline
