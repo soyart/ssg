@@ -10,41 +10,65 @@ import (
 	"github.com/soyart/ssg/ssg-go"
 )
 
-// IndexGenerator returns an [ssg.Pipeline] that would look for
-// marker file "_index.soyweb" within a directory.
-//
-// Once it finds a marked directory, it inspects the children
-// and generate a Markdown list with name index.md,
-// which is later sent to supplied impl.
-func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
-	return func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error) {
-		switch {
-		case
-			d.IsDir(),
-			filepath.Base(path) != MarkerIndex:
-			return path, data, d, nil
+func IndexGeneratorTemplate(
+	fnOverrideEntries func(entries []fs.FileInfo) []fs.FileInfo,
+	fnGenIndex func(
+		src string,
+		ignore func(path string) bool,
+		parent string,
+		siblings []fs.FileInfo,
+		template []byte,
+	) (
+		string,
+		error,
+	),
+) func(*ssg.Ssg) ssg.Pipeline {
+	return func(s *ssg.Ssg) ssg.Pipeline {
+		return func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error) {
+			switch {
+			case
+				d.IsDir(),
+				filepath.Base(path) != MarkerIndex:
+				return path, data, d, nil
 
-		case s.Ignore(path):
-			panic("unexpected ignored file for index-generator: " + path)
-		}
+			case s.Ignore(path):
+				panic("unexpected ignored file for index-generator: " + path)
+			}
 
-		parent := filepath.Dir(path)
-		ssg.Fprintf(os.Stdout, "found index-generator marker: marker=\"%s\", parent=\"%s\"\n", path, parent)
+			parent := filepath.Dir(path)
+			ssg.Fprintf(os.Stdout, "found index-generator marker: marker=\"%s\", parent=\"%s\"\n", path, parent)
 
-		entries, err := os.ReadDir(parent)
-		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to read marker dir '%s': %w", path, err)
-		}
-		template, err := ssg.ReadFile(path)
-		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to read marker '%s': %w", path, err)
-		}
-		index, err := generateIndex(s.Src, s.Ignore, parent, entries, template)
-		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
-		}
+			entries, err := os.ReadDir(parent)
+			if err != nil {
+				return "", nil, nil, fmt.Errorf("failed to read marker dir '%s': %w", path, err)
+			}
 
-		return filepath.Join(parent, "index.md"), []byte(index), d, nil
+			infos := make([]fs.FileInfo, len(entries))
+			for i := range entries {
+				entry := entries[i]
+				info, err := entry.Info()
+				if err != nil {
+					return "", nil, nil, fmt.Errorf("failed to stat entry '%s' in path '%s': %w", entry.Name(), path, err)
+				}
+
+				infos[i] = info
+			}
+
+			if fnOverrideEntries != nil {
+				infos = fnOverrideEntries(infos)
+			}
+
+			template, err := ssg.ReadFile(path)
+			if err != nil {
+				return "", nil, nil, fmt.Errorf("failed to read marker '%s': %w", path, err)
+			}
+			index, err := fnGenIndex(s.Src, s.Ignore, parent, infos, template)
+			if err != nil {
+				return "", nil, nil, fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
+			}
+
+			return filepath.Join(parent, "index.md"), []byte(index), d, nil
+		}
 	}
 }
 
@@ -52,7 +76,7 @@ func generateIndex(
 	src string,
 	ignore func(path string) bool,
 	parent string,
-	siblings []fs.DirEntry,
+	siblings []fs.FileInfo,
 	template []byte,
 ) (
 	string,
