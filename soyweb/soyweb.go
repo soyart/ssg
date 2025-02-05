@@ -83,6 +83,9 @@ func SsgOptions(f Flags) []ssg.Option {
 
 func GetIndexGenerator(m IndexGeneratorMode) func(*ssg.Ssg) ssg.Pipeline {
 	switch m {
+	case IndexGeneratorModeReverse:
+		return IndexGeneratorReverse
+
 	case IndexGeneratorModeModTime:
 		return IndexGeneratorModTime
 	}
