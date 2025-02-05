@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/soyart/ssg/ssg-go"
 )
@@ -17,14 +18,91 @@ import (
 // and generate a Markdown list with name index.md,
 // which is later sent to supplied impl.
 func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
-	return IndexGeneratorV2(nil)(s)
+	return IndexGeneratorTemplate(nil, generateIndex)(s)
+}
+
+func IndexGeneratorModTime(s *ssg.Ssg) ssg.Pipeline {
+	sortByModTime := func(entries []fs.FileInfo) func(i int, j int) bool {
+		return func(i, j int) bool {
+			infoI, infoJ := entries[i], entries[j]
+			cmp := infoI.ModTime().Compare(infoJ.ModTime())
+			if cmp == 0 {
+				return infoI.Name() < infoJ.Name()
+			}
+			return cmp == -1
+		}
+	}
+
+	return IndexGeneratorTemplate(sortByModTime, generateIndex)(s)
+}
+
+func IndexGeneratorTemplate(
+	fnSortEntries func(entries []fs.FileInfo) func(i, j int) bool,
+	fnGenIndex func(
+		src string,
+		ignore func(path string) bool,
+		parent string,
+		siblings []fs.FileInfo,
+		template []byte,
+	) (
+		string,
+		error,
+	),
+) func(*ssg.Ssg) ssg.Pipeline {
+	return func(s *ssg.Ssg) ssg.Pipeline {
+		return func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error) {
+			switch {
+			case
+				d.IsDir(),
+				filepath.Base(path) != MarkerIndex:
+				return path, data, d, nil
+
+			case s.Ignore(path):
+				panic("unexpected ignored file for index-generator: " + path)
+			}
+
+			parent := filepath.Dir(path)
+			ssg.Fprintf(os.Stdout, "found index-generator marker: marker=\"%s\", parent=\"%s\"\n", path, parent)
+
+			entries, err := os.ReadDir(parent)
+			if err != nil {
+				return "", nil, nil, fmt.Errorf("failed to read marker dir '%s': %w", path, err)
+			}
+
+			infos := make([]fs.FileInfo, len(entries))
+			for i := range entries {
+				entry := entries[i]
+				info, err := entry.Info()
+				if err != nil {
+					return "", nil, nil, fmt.Errorf("failed to stat entry '%s' in path '%s': %w", entry.Name(), path, err)
+				}
+
+				infos[i] = info
+			}
+
+			if fnSortEntries != nil {
+				sort.Slice(infos, fnSortEntries(infos))
+			}
+
+			template, err := ssg.ReadFile(path)
+			if err != nil {
+				return "", nil, nil, fmt.Errorf("failed to read marker '%s': %w", path, err)
+			}
+			index, err := fnGenIndex(s.Src, s.Ignore, parent, infos, template)
+			if err != nil {
+				return "", nil, nil, fmt.Errorf("failed to generate article links for marker %s: %w", path, err)
+			}
+
+			return filepath.Join(parent, "index.md"), []byte(index), d, nil
+		}
+	}
 }
 
 func generateIndex(
 	src string,
 	ignore func(path string) bool,
 	parent string,
-	siblings []fs.DirEntry,
+	siblings []fs.FileInfo,
 	template []byte,
 ) (
 	string,
