@@ -6,13 +6,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
 
 	"github.com/soyart/ssg/ssg-go"
 )
 
 func IndexGeneratorTemplate(
-	fnSortEntries func(entries []fs.FileInfo) func(i, j int) bool,
+	fnOverrideEntries func(entries []fs.FileInfo) []fs.FileInfo,
 	fnGenIndex func(
 		src string,
 		ignore func(path string) bool,
@@ -55,8 +54,8 @@ func IndexGeneratorTemplate(
 				infos[i] = info
 			}
 
-			if fnSortEntries != nil {
-				sort.Slice(infos, fnSortEntries(infos))
+			if fnOverrideEntries != nil {
+				infos = fnOverrideEntries(infos)
 			}
 
 			template, err := ssg.ReadFile(path)

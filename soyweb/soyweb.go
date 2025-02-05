@@ -3,6 +3,7 @@ package soyweb
 import (
 	"errors"
 	"io/fs"
+	"sort"
 
 	"github.com/soyart/ssg/ssg-go"
 )
@@ -13,6 +14,7 @@ const (
 	MarkerIndex string = "_index.soyweb"
 
 	IndexGeneratorModeDefault IndexGeneratorMode = ""
+	IndexGeneratorModeReverse IndexGeneratorMode = "reverse"
 	IndexGeneratorModeModTime IndexGeneratorMode = "modtime"
 )
 
@@ -84,7 +86,6 @@ func GetIndexGenerator(m IndexGeneratorMode) func(*ssg.Ssg) ssg.Pipeline {
 	case IndexGeneratorModeModTime:
 		return IndexGeneratorModTime
 	}
-
 	return IndexGenerator
 }
 
@@ -93,11 +94,28 @@ func GetIndexGenerator(m IndexGeneratorMode) func(*ssg.Ssg) ssg.Pipeline {
 //
 // Once it finds a marked directory, it inspects the children
 // and generate a Markdown list with name index.md,
-// which is later sent to supplied impl.
+// which is later sent to supplied impl
 func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
-	return IndexGeneratorTemplate(nil, generateIndex)(s)
+	return IndexGeneratorTemplate(
+		nil,
+		generateIndex,
+	)(s)
 }
 
+// IndexGeneratorReverse returns an index generator whose index list
+// is populated reversed, i.e. descending alphanumerical sort
+func IndexGeneratorReverse(s *ssg.Ssg) ssg.Pipeline {
+	return IndexGeneratorTemplate(
+		func(entries []fs.FileInfo) []fs.FileInfo {
+			reverseInPlace(entries)
+			return entries
+		},
+		generateIndex,
+	)(s)
+}
+
+// IndexGeneratorModTime returns an index generator that sort index entries
+// by ModTime returned by fs.FileInfo
 func IndexGeneratorModTime(s *ssg.Ssg) ssg.Pipeline {
 	sortByModTime := func(entries []fs.FileInfo) func(i int, j int) bool {
 		return func(i, j int) bool {
@@ -110,7 +128,19 @@ func IndexGeneratorModTime(s *ssg.Ssg) ssg.Pipeline {
 		}
 	}
 
-	return IndexGeneratorTemplate(sortByModTime, generateIndex)(s)
+	return IndexGeneratorTemplate(
+		func(entries []fs.FileInfo) []fs.FileInfo {
+			sort.Slice(entries, sortByModTime(entries))
+			return entries
+		},
+		generateIndex,
+	)(s)
+}
+
+func reverseInPlace(arr []fs.FileInfo) {
+	for i, j := 0, len(arr)-1; i < j; i, j = i+1, j-1 {
+		arr[i], arr[j] = arr[j], arr[i]
+	}
 }
 
 func (m MinifyFlags) Skip(ext string) bool {
