@@ -72,7 +72,7 @@ func SsgOptions(f Flags) []ssg.Option {
 
 	hook := hookMinify(minifiers)
 	if hook != nil {
-		opts = append(opts, ssg.WithHook(hook))
+		opts = append(opts, ssg.WithHooks(hook))
 	}
 	if f.MinifyHtmlGenerate {
 		opts = append(opts, ssg.WithHookGenerate(MinifyHtml))

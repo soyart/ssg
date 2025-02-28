@@ -27,7 +27,7 @@ type (
 	Pipeline func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error)
 
 	options struct {
-		hook         Hook
+		hooks        []Hook
 		hookGenerate HookGenerate
 		pipelines    []Pipeline
 		caching      bool
@@ -71,11 +71,11 @@ func Writers(u uint) Option {
 	}
 }
 
-// WithHook will make [Ssg] call hook(path, fileContent)
+// WithHooks will make [Ssg] iterate through hooks and call hook(path, fileContent)
 // on every unignored files.
-func WithHook(hook Hook) Option {
+func WithHooks(hooks ...Hook) Option {
 	return func(s *Ssg) {
-		s.options.hook = hook
+		s.options.hooks = hooks
 	}
 }
 
