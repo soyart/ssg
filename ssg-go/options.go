@@ -75,7 +75,7 @@ func Writers(u uint) Option {
 // on every unignored files.
 func WithHooks(hooks ...Hook) Option {
 	return func(s *Ssg) {
-		s.options.hooks = hooks
+		s.options.hooks = append(s.options.hooks, hooks...)
 	}
 }
 

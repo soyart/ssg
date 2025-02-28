@@ -291,6 +291,10 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 			opts = append(opts, ssg.WithPipelines())
 		}
 
+		if len(site.Replaces) != 0 {
+			opts = append(opts, ssg.WithHooks(Replacers(site.Replaces)))
+		}
+
 		s.With(opts...)
 		if err := s.Generate(); err != nil {
 			return manifestError{
