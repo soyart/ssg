@@ -7,6 +7,93 @@ import (
 	"testing"
 )
 
+func TestManifestUnmarshal(t *testing.T) {
+	s := `{
+	"johndoe.com": {
+		"name": "JohnDoe.com",
+		"url": "https://johndoe.com",
+		"src": "johndoe.com/src",
+		"dst": "johndoe.com/dst",
+		"cleanup": true,
+		"generate_blog": true,
+		"copies": {
+			"./assets/some.txt": "johndoe.com/src/some-txt.txt",
+			"./assets/some": {
+				"force": true,
+				"target": "johndoe.com/src/drop"
+			},
+			"./assets/style.css": [
+				"johndoe.com/src/style-copy-0.css",
+				{
+					"target": "johndoe.com/src/style-copy-1.css",
+					"force": true
+				},
+				{
+					"target": "johndoe.com/src/style-copy-2.css",
+					"force": true
+				}
+			]
+		}
+	}
+}`
+
+	var m Manifest
+	err := json.Unmarshal([]byte(s), &m)
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	manifestExpected := Manifest{
+		"johndoe.com": Site{
+			Copies: map[string][]WriteTarget{
+				"./assets/some.txt": {
+					{Target: "johndoe.com/src/some-txt.txt", Force: false},
+				},
+				"./assets/some": {
+					{Target: "johndoe.com/src/drop", Force: true},
+				},
+				"./assets/style.css": {
+					{Target: "johndoe.com/src/style-copy-0.css", Force: false},
+					{Target: "johndoe.com/src/style-copy-1.css", Force: true},
+					{Target: "johndoe.com/src/style-copy-2.css", Force: true},
+				},
+			},
+			CleanUp:       true,
+			GenerateIndex: true,
+		},
+	}
+
+	site := m["johndoe.com"]
+	expected := manifestExpected["johndoe.com"]
+
+	if site.CleanUp != expected.CleanUp {
+		t.Fatalf("unexpected cleanup %v, expecting=%v", site.CleanUp, expected.CleanUp)
+	}
+
+	for src, dstsExpected := range expected.Copies {
+		dsts, ok := site.Copies[src]
+		if !ok {
+			t.Fatalf("missing copies[%s]", src)
+		}
+		if len(dsts) != len(dstsExpected) {
+			t.Logf("dsts actual: %+v", dsts)
+			t.Logf("dsts expected: %+v", dstsExpected)
+
+			t.Fatalf("unexpected len for copies[%s] %d, expecting=%d", src, len(dsts), len(dstsExpected))
+		}
+		for i, dstExpected := range dstsExpected {
+			dst := dsts[i]
+
+			if dst != dstExpected {
+				t.Logf("dst actual %+v", dst)
+				t.Logf("dst expected %+v", dstExpected)
+
+				t.Fatalf("unexpected value at copies[%s][%d]: actual=%+v, expecting=%+v", src, i, dst, dstExpected)
+			}
+		}
+	}
+}
+
 func prefix(p1, p2 string) string {
 	return fmt.Sprintf("%s/%s", p1, p2)
 }

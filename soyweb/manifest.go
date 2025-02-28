@@ -33,9 +33,9 @@ type Manifest map[string]Site
 type Site struct {
 	ssg ssg.Ssg `json:"-"`
 
-	Copies        map[string]WriteTarget `json:"-"`
-	CleanUp       bool                   `json:"-"`
-	GenerateIndex bool                   `json:"-"`
+	Copies        map[string][]WriteTarget `json:"-"`
+	CleanUp       bool                     `json:"-"`
+	GenerateIndex bool                     `json:"-"`
 }
 
 type WriteTarget struct {
@@ -55,7 +55,6 @@ func (s *Stage) Skip(targets ...Stage) {
 	for i := range targets {
 		copied &^= targets[i]
 	}
-
 	*s = copied
 }
 
@@ -203,8 +202,8 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-	copies := make(map[string]WriteTarget)
-	err = decodeTargetsForce(site.Copies, copies)
+	copies := make(map[string][]WriteTarget)
+	err = decodeCopies(site.Copies, copies)
 	if err != nil {
 		return err
 	}
@@ -266,20 +265,24 @@ func collect(m Manifest) (map[string]ssg.Set, error) {
 			targets[key] = make(ssg.Set)
 		}
 		logger := slog.Default().WithGroup("collect").With("key", key, "url", site.ssg.Url)
-		for src, dst := range site.Copies {
-			if !dups.Insert(dst.Target) {
-				if targets[key].Insert(dst.Target) {
-					panic("unexpected duplicate")
+		for src, dests := range site.Copies {
+			for i := range dests {
+				dst := dests[i]
+				if !dups.Insert(dst.Target) {
+					if targets[key].Insert(dst.Target) {
+						panic("unexpected duplicate")
+					}
+
+					continue
 				}
 
-				continue
-			}
-			logger.Error("duplicate write target", "src", src, "target", dst.Target)
-			return nil, manifestError{
-				err:   fmt.Errorf("duplicate target '%s'", dst.Target),
-				key:   key,
-				msg:   "duplicate write target",
-				stage: StageCollect,
+				logger.Error("duplicate write target", "src", src, "target", dst.Target)
+				return nil, manifestError{
+					err:   fmt.Errorf("duplicate target '%s'", dst.Target),
+					key:   key,
+					msg:   "duplicate write target",
+					stage: StageCollect,
+				}
 			}
 		}
 	}
@@ -316,48 +319,63 @@ func cleanup(m Manifest, targets map[string]ssg.Set) error {
 	return nil
 }
 
-func decodeTargetsForce(m map[string]interface{}, target map[string]WriteTarget) error {
+func decodeCopies(m map[string]interface{}, target map[string][]WriteTarget) error {
 	for k, entry := range m {
-		link, err := decodeTargetForce(entry)
+		link, err := decodeCopy(entry)
 		if err != nil {
 			return err
 		}
-		target[k] = link
+		target[k] = append(target[k], link...)
 	}
 	return nil
 }
 
-func decodeTargetForce(entry interface{}) (WriteTarget, error) {
+func decodeCopy(entry interface{}) ([]WriteTarget, error) {
 	switch data := entry.(type) {
 	case string:
-		return WriteTarget{Target: data}, nil
+		// 1 src, 1 string target
+		return []WriteTarget{{Target: data}}, nil
 
+		// 1 src, 1 structured target
 	case map[string]interface{}:
 		targetRaw, ok := data["target"]
 		if !ok {
-			return WriteTarget{}, errors.New("missing key 'target'")
+			return nil, errors.New("missing key 'target'")
 		}
 		target, ok := targetRaw.(string)
 		if !ok {
-			return WriteTarget{}, fmt.Errorf("invalid data type for field 'target', expecting string, got '%s'", reflect.TypeOf(targetRaw).String())
+			return nil, fmt.Errorf("invalid data type for field 'target', expecting string, got '%s'", reflect.TypeOf(targetRaw).String())
 		}
 
 		w := WriteTarget{Target: target}
 
 		forceRaw, ok := data["force"]
 		if !ok {
-			return w, nil
+			return []WriteTarget{w}, nil
 		}
 		force, ok := forceRaw.(bool)
 		if !ok {
-			return WriteTarget{}, fmt.Errorf("invalid data type for field 'target', expecting bool, got '%s'", reflect.TypeOf(forceRaw).String())
+			return nil, fmt.Errorf("invalid data type for field 'target', expecting bool, got '%s'", reflect.TypeOf(forceRaw).String())
 		}
 
 		w.Force = force
-		return w, nil
+		return []WriteTarget{w}, nil
+
+		// 1 src, multiple targets
+	case []interface{}:
+		targets := make([]WriteTarget, 0, len(data))
+		for i := range data {
+			srcDsts, err := decodeCopy(data[i])
+			if err != nil {
+				return nil, err
+			}
+			targets = append(targets, srcDsts...)
+		}
+
+		return targets, nil
 	}
 
-	return WriteTarget{}, fmt.Errorf("bad entry data shape: '%v'", entry)
+	return nil, fmt.Errorf("bad entry data shape of type %s: '%v'", reflect.TypeOf(entry).String(), entry)
 }
 
 func (s *Site) Copy() error {
@@ -365,55 +383,60 @@ func (s *Site) Copy() error {
 	dirs := make(ssg.Set)
 	perms := make(map[string]fs.FileMode)
 
-	for cpSrc, cpDst := range s.Copies {
-		logger := logger.
-			With("phase", "scan", "cpSrc", cpSrc, "cpDst", cpDst)
+	for cpSrc, cpDsts := range s.Copies {
+		for i := range cpDsts {
+			cpDst := &cpDsts[i]
+			logger := logger.
+				With("phase", "scan", "cpSrc", cpSrc, "cpDst", cpDst)
 
-		if len(cpSrc) == 0 {
-			return fmt.Errorf("found empty copy src")
-		}
-		if len(cpDst.Target) == 0 {
-			return fmt.Errorf("found empty copy dst")
-		}
-
-		ssrc, err := os.Stat(cpSrc)
-		if err != nil {
-			logger.Error("failed to stat copy src")
-			return fmt.Errorf("failed to stat copy src '%s': %w", cpSrc, err)
-		}
-		if ssg.FileIs(ssrc, os.ModeSymlink) {
-			logger.Error("copy src is symlink")
-			return fmt.Errorf("copy src is symlink: '%s'", cpSrc)
-		}
-
-		sdst, err := os.Stat(cpDst.Target)
-		if err != nil {
-			if !os.IsNotExist(err) {
-				logger.Error("failed to stat copy dst", "error", err)
-				return fmt.Errorf("failed to stat copy dst '%s': %w", cpDst, err)
+			if len(cpSrc) == 0 {
+				return fmt.Errorf("found empty copy src")
 			}
-			err = os.MkdirAll(filepath.Dir(cpDst.Target), os.ModePerm)
+			if len(cpDst.Target) == 0 {
+				return fmt.Errorf("found empty copy dst")
+			}
+
+			ssrc, err := os.Stat(cpSrc)
 			if err != nil {
-				return fmt.Errorf("fail to prepare copy dst '%s': %w", cpDst, err)
+				logger.Error("failed to stat copy src")
+				return fmt.Errorf("failed to stat copy src '%s': %w", cpSrc, err)
 			}
-		}
+			if ssg.FileIs(ssrc, os.ModeSymlink) {
+				logger.Error("copy src is symlink")
+				return fmt.Errorf("copy src is symlink: '%s'", cpSrc)
+			}
 
-		if ssrc != nil && ssrc.IsDir() {
-			dirs.Insert(cpSrc)
-			perms[cpSrc] = ssrc.Mode().Perm()
-		}
-		if sdst != nil && sdst.IsDir() {
-			dirs.Insert(cpDst.Target)
-			perms[cpDst.Target] = sdst.Mode().Perm()
+			sdst, err := os.Stat(cpDst.Target)
+			if err != nil {
+				if !os.IsNotExist(err) {
+					logger.Error("failed to stat copy dst", "error", err)
+					return fmt.Errorf("failed to stat copy dst '%s': %w", cpDst, err)
+				}
+				err = os.MkdirAll(filepath.Dir(cpDst.Target), os.ModePerm)
+				if err != nil {
+					return fmt.Errorf("fail to prepare copy dst '%s': %w", cpDst, err)
+				}
+			}
+
+			if ssrc != nil && ssrc.IsDir() {
+				dirs.Insert(cpSrc)
+				perms[cpSrc] = ssrc.Mode().Perm()
+			}
+			if sdst != nil && sdst.IsDir() {
+				dirs.Insert(cpDst.Target)
+				perms[cpDst.Target] = sdst.Mode().Perm()
+			}
 		}
 	}
 
-	for cpSrc, cpDst := range s.Copies {
-		logger := logger.With("phase", "copy", "cpSrc", cpSrc, "cpDst", cpDst)
-		err := copyFiles(dirs, cpSrc, cpDst, perms)
-		if err != nil {
-			logger.Error("failed to copy file")
-			return fmt.Errorf("failed to copy directory '%s'->'%s': %w", cpSrc, cpDst.Target, err)
+	for cpSrc, cpDsts := range s.Copies {
+		for _, cpDst := range cpDsts {
+			logger := logger.With("phase", "copy", "cpSrc", cpSrc, "cpDst", cpDst)
+			err := copyFiles(dirs, cpSrc, cpDst, perms)
+			if err != nil {
+				logger.Error("failed to copy file")
+				return fmt.Errorf("failed to copy directory '%s'->'%s': %w", cpSrc, cpDst.Target, err)
+			}
 		}
 	}
 
