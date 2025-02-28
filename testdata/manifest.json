@@ -23,6 +23,13 @@
 				},
 				"johndoe.com/src/style-copy-1.css"
 			]
+		},
+		"replaces": {
+			"replace-me-0": "replaced-text-0",
+			"replace-me-1": {
+				"text": "replaced-text-1",
+				"count": 3
+			}
 		}
 	}
 }

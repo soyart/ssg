@@ -33,6 +33,13 @@ func TestManifestUnmarshal(t *testing.T) {
 					"force": true
 				}
 			]
+		},
+		"replaces": {
+			"replace-me-0": "new-text-0",
+			"replace-me-1": {
+				"text": "new-text-1",
+				"count": 3
+			}
 		}
 	}
 }`
@@ -58,6 +65,14 @@ func TestManifestUnmarshal(t *testing.T) {
 					{Target: "johndoe.com/src/style-copy-2.css", Force: true},
 				},
 			},
+			Replaces: map[string]ReplaceTarget{
+				"replace-me-0": {
+					Text: "new-text-0", Count: 1,
+				},
+				"replace-me-1": {
+					Text: "new-text-1", Count: 3,
+				},
+			},
 			CleanUp:       true,
 			GenerateIndex: true,
 		},
@@ -76,7 +91,7 @@ func TestManifestUnmarshal(t *testing.T) {
 			t.Fatalf("missing copies[%s]", src)
 		}
 		if len(dsts) != len(dstsExpected) {
-			t.Logf("dsts actual: %+v", dsts)
+			t.Logf("dsts actual:   %+v", dsts)
 			t.Logf("dsts expected: %+v", dstsExpected)
 
 			t.Fatalf("unexpected len for copies[%s] %d, expecting=%d", src, len(dsts), len(dstsExpected))
@@ -85,13 +100,142 @@ func TestManifestUnmarshal(t *testing.T) {
 			dst := dsts[i]
 
 			if dst != dstExpected {
-				t.Logf("dst actual %+v", dst)
+				t.Logf("dst actual   %+v", dst)
 				t.Logf("dst expected %+v", dstExpected)
 
 				t.Fatalf("unexpected value at copies[%s][%d]: actual=%+v, expecting=%+v", src, i, dst, dstExpected)
 			}
 		}
 	}
+
+	for keyword, replaceExpected := range expected.Replaces {
+		replace, ok := site.Replaces[keyword]
+		if !ok {
+			t.Log("actual.replaces", site.Replaces)
+			t.Fatalf("missing replaces[%s]", keyword)
+		}
+		if replace != replaceExpected {
+			t.Fatalf("unexpected value for replaces[%s]: actual=%+v, expecting=%+v", keyword, replace, replaceExpected)
+		}
+	}
+
+	t.Run("error on invalid json manifest", func(t *testing.T) {
+		tests := []string{
+			// Missing ssg-go fields
+			`{
+	"johndoe.com": {
+		"name": "JohnDoe.com",
+		"url": "https://johndoe.com",
+		"dst": "johndoe.com/dst",
+		"copies": [1]
+	}
+}`,
+			// Invalid copies
+			`{
+	"johndoe.com": {
+		"name": "JohnDoe.com",
+		"url": "https://johndoe.com",
+		"src": "johndoe.com/src",
+		"dst": "johndoe.com/dst",
+		"copies": [1]
+	}
+}`,
+			// Invalid cleanup
+			`{
+	"johndoe.com": {
+		"name": "JohnDoe.com",
+		"url": "https://johndoe.com",
+		"src": "johndoe.com/src",
+		"dst": "johndoe.com/dst",
+		"cleanup": "johndoe.com/cleanhere"
+	}
+}`,
+			// Invalid copies
+			`{
+	"johndoe.com": {
+		"name": "JohnDoe.com",
+		"url": "https://johndoe.com",
+		"src": "johndoe.com/src",
+		"dst": "johndoe.com/dst",
+		"cleanup": false,
+		"copies": [
+			{
+				"force": true,
+				"target": "johndoe.com/src/drop"
+			}
+		]
+	}
+}`,
+			// Invalid replaces.count
+			`{
+	"johndoe.com": {
+		"name": "JohnDoe.com",
+		"url": "https://johndoe.com",
+		"src": "johndoe.com/src",
+		"dst": "johndoe.com/dst",
+		"cleanup": false,
+		"replaces": {
+			"replace-me-0": "new-text-0",
+			"replace-me-1": {
+				"text": "new-text-1",
+				"count": "1"
+			}
+		}
+	}
+}`,
+
+			// Negative count -1
+			`{
+	"johndoe.com": {
+		"name": "JohnDoe.com",
+		"url": "https://johndoe.com",
+		"src": "johndoe.com/src",
+		"dst": "johndoe.com/dst",
+		"copies": {
+			"./assets/some.txt": "johndoe.com/src/some-txt.txt",
+			"./assets/some": {
+				"force": true,
+				"target": "johndoe.com/src/drop"
+			},
+			"./assets/style.css": [
+				"johndoe.com/src/style-copy-0.css",
+				{
+					"target": "johndoe.com/src/style-copy-1.css",
+					"force": true
+				},
+				{
+					"target": "johndoe.com/src/style-copy-2.css",
+					"force": true
+				}
+			]
+		},
+		"replaces": {
+			"replace-me-0": "new-text-0",
+			"replace-me-1": {
+				"text": "new-text-1",
+				"count": -1
+			}
+		}
+	}
+}`,
+		}
+
+		for i, s := range tests {
+			var dummy any
+			err := json.Unmarshal([]byte(s), &dummy)
+			if err != nil {
+				panic(err) // check that it's a valid json, except for empty string
+			}
+
+			var m Manifest
+			err = json.Unmarshal([]byte(s), &m)
+			if err != nil {
+				t.Logf("invalids[%d] got expected error: %v", i, err)
+				continue
+			}
+			t.Fatalf("invalids[%d] unexpected unmarshal error: %v", i, err)
+		}
+	})
 }
 
 func prefix(p1, p2 string) string {
