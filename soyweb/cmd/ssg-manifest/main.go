@@ -25,6 +25,7 @@ type cmdBuild struct {
 	NoCleanup bool `arg:"--no-cleanup" help:"Skip cleanup stage"`
 	NoCopy    bool `arg:"--no-copy" help:"Skip scopy stage"`
 	NoBuild   bool `arg:"--no-build" help:"Skip build stage"`
+	NoReplace bool `arg:"--no-replace" help:"Skip text replacement hook"`
 }
 
 type cmdOther struct {
