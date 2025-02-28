@@ -34,16 +34,24 @@ type Site struct {
 	ssg ssg.Ssg `json:"-"`
 
 	Copies        map[string]CopyTargets `json:"-"`
+	Replaces      Replaces               `json:"-"`
 	CleanUp       bool                   `json:"-"`
 	GenerateIndex bool                   `json:"-"`
 }
 
 type CopyTarget struct {
-	Target string `json:"target"`
-	Force  bool   `json:"force"`
+	Target string `json:"-"`
+	Force  bool   `json:"-"`
 }
 
 type CopyTargets []CopyTarget
+
+type ReplaceTarget struct {
+	Text  string `json:"-"`
+	Count uint   `json:"-"` // 0 replaces all, 1 replaces once, 2 replaces twice, and so on
+}
+
+type Replaces map[string]ReplaceTarget
 
 func (s *Site) UnmarshalJSON(b []byte) error {
 	var site struct {
@@ -53,6 +61,7 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 		Url   string `json:"url"`
 
 		Copies        map[string]CopyTargets `json:"copies"`
+		Replaces      Replaces               `json:"replaces"`
 		CleanUp       bool                   `json:"cleanup"`
 		GenerateIndex bool                   `json:"generate-index"`
 	}
@@ -63,6 +72,7 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 
 	*s = Site{
 		Copies:        site.Copies,
+		Replaces:      site.Replaces,
 		CleanUp:       site.CleanUp,
 		GenerateIndex: site.GenerateIndex,
 		ssg: ssg.New(
@@ -88,6 +98,63 @@ func (c *CopyTargets) UnmarshalJSON(b []byte) error {
 
 	*c = result
 	return nil
+}
+
+func (r *Replaces) UnmarshalJSON(b []byte) error {
+	var data map[string]any
+	err := json.Unmarshal(b, &data)
+	if err != nil {
+		return err
+	}
+
+	results := make(Replaces)
+	for k, v := range data {
+		result, err := decodeReplace(v)
+		if err != nil {
+			return err
+		}
+		results[k] = result
+	}
+
+	*r = results
+	return nil
+}
+
+func decodeReplace(data any) (ReplaceTarget, error) {
+	switch data := data.(type) {
+	case string:
+		return ReplaceTarget{
+			Text:  data,
+			Count: 1, // Replace once
+		}, nil
+
+	case map[string]any:
+		textRaw, ok := data["text"]
+		if !ok {
+			return ReplaceTarget{}, errors.New("missing field 'text'")
+		}
+		text, ok := textRaw.(string)
+		if !ok {
+			return ReplaceTarget{}, fmt.Errorf("unexpected type for field 'text': %s'", reflect.TypeOf(textRaw).String())
+		}
+		countRaw, ok := data["count"]
+		if !ok {
+			return ReplaceTarget{}, errors.New("missing field 'text'")
+		}
+		countFloat, ok := countRaw.(float64)
+		if !ok {
+			return ReplaceTarget{}, fmt.Errorf("unexpected type for field 'count': '%s'", reflect.TypeOf(countRaw).String())
+		}
+		if countFloat < 0 {
+			return ReplaceTarget{}, fmt.Errorf("bad replace count %f", countFloat)
+		}
+		return ReplaceTarget{
+			Text:  text,
+			Count: uint(countFloat),
+		}, nil
+	}
+
+	return ReplaceTarget{}, fmt.Errorf("bad entry data shape of type %s: '%+v'", reflect.TypeOf(data).String(), data)
 }
 
 func parseCopyTarget(data any) ([]CopyTarget, error) {
