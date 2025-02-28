@@ -7,15 +7,22 @@
 		"cleanup": true,
 		"generate_blog": true,
 		"copies": {
-			"./assets/style.css": {
-				"target": "johndoe.com/src/style.css",
-				"force": true
-			},
 			"./assets/some.txt": "johndoe.com/src/some-txt.txt",
 			"./assets/some": {
 				"force": true,
 				"target": "johndoe.com/src/drop"
-			}
+			},
+			"./assets/style.css": [
+				{
+					"target": "johndoe.com/src/style.css",
+					"force": true
+				},
+				{
+					"target": "johndoe.com/src/style-copy-0.css",
+					"force": true
+				},
+				"johndoe.com/src/style-copy-1.css"
+			]
 		}
 	}
 }
