@@ -274,10 +274,10 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 	if err != nil {
 		return err
 	}
-	if s.options.hook != nil {
-		data, err = s.options.hook(path, data)
+	for i, hook := range s.options.hooks {
+		data, err = hook(path, data)
 		if err != nil {
-			return fmt.Errorf("hook error when building %s: %w", path, err)
+			return fmt.Errorf("hooks[%d]: error when building %s: %w", i, path, err)
 		}
 	}
 
