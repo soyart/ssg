@@ -45,7 +45,7 @@ func TestManifestUnmarshal(t *testing.T) {
 
 	manifestExpected := Manifest{
 		"johndoe.com": Site{
-			Copies: map[string][]WriteTarget{
+			Copies: map[string]CopyTargets{
 				"./assets/some.txt": {
 					{Target: "johndoe.com/src/some-txt.txt", Force: false},
 				},

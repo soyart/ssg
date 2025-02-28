@@ -33,14 +33,105 @@ type Manifest map[string]Site
 type Site struct {
 	ssg ssg.Ssg `json:"-"`
 
-	Copies        map[string][]WriteTarget `json:"-"`
-	CleanUp       bool                     `json:"-"`
-	GenerateIndex bool                     `json:"-"`
+	Copies        map[string]CopyTargets `json:"-"`
+	CleanUp       bool                   `json:"-"`
+	GenerateIndex bool                   `json:"-"`
 }
 
-type WriteTarget struct {
+type CopyTarget struct {
 	Target string `json:"target"`
 	Force  bool   `json:"force"`
+}
+
+type CopyTargets []CopyTarget
+
+func (s *Site) UnmarshalJSON(b []byte) error {
+	var site struct {
+		Src   string `json:"src"`
+		Dst   string `json:"dst"`
+		Title string `json:"title"`
+		Url   string `json:"url"`
+
+		Copies        map[string]CopyTargets `json:"copies"`
+		CleanUp       bool                   `json:"cleanup"`
+		GenerateIndex bool                   `json:"generate-index"`
+	}
+	err := json.Unmarshal(b, &site)
+	if err != nil {
+		return err
+	}
+
+	*s = Site{
+		Copies:        site.Copies,
+		CleanUp:       site.CleanUp,
+		GenerateIndex: site.GenerateIndex,
+		ssg: ssg.New(
+			site.Src,
+			site.Dst,
+			site.Title,
+			site.Url,
+		),
+	}
+	return nil
+}
+
+func (c *CopyTargets) UnmarshalJSON(b []byte) error {
+	var data any
+	err := json.Unmarshal(b, &data)
+	if err != nil {
+		return err
+	}
+	result, err := parseCopyTarget(data)
+	if err != nil {
+		return err
+	}
+
+	*c = result
+	return nil
+}
+
+func parseCopyTarget(data any) ([]CopyTarget, error) {
+	switch data := data.(type) {
+	case string:
+		return []CopyTarget{{Target: data}}, nil
+
+	case []any:
+		results := []CopyTarget{}
+		for i := range data {
+			result, err := parseCopyTarget(data[i])
+			if err != nil {
+				return nil, err
+			}
+			results = append(results, result...)
+		}
+		return results, nil
+
+	case map[string]any:
+		targetRaw, ok := data["target"]
+		if !ok {
+			return nil, errors.New("missing key 'target'")
+		}
+		target, ok := targetRaw.(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid data type for field 'target', expecting string, got '%s'", reflect.TypeOf(targetRaw).String())
+		}
+
+		w := CopyTarget{Target: target}
+
+		forceRaw, ok := data["force"]
+		if !ok {
+			return []CopyTarget{w}, nil
+		}
+		force, ok := forceRaw.(bool)
+		if !ok {
+			return nil, fmt.Errorf("invalid data type for field 'target', expecting bool, got '%s'", reflect.TypeOf(forceRaw).String())
+		}
+
+		w.Force = force
+		return []CopyTarget{w}, nil
+	}
+
+	return nil, fmt.Errorf("bad entry data shape of type %s: '%+v'", reflect.TypeOf(data).String(), data)
 }
 
 type manifestError struct {
@@ -187,43 +278,7 @@ func (s manifestError) Unwrap() error {
 	return s.err
 }
 
-func (s *Site) UnmarshalJSON(b []byte) error {
-	var site struct {
-		Copies map[string]interface{} `json:"copies"`
-
-		Src           string `json:"src"`
-		Dst           string `json:"dst"`
-		Title         string `json:"title"`
-		Url           string `json:"url"`
-		CleanUp       bool   `json:"cleanup"`
-		GenerateIndex bool   `json:"generate-index"`
-	}
-	err := json.Unmarshal(b, &site)
-	if err != nil {
-		return err
-	}
-	copies := make(map[string][]WriteTarget)
-	err = decodeCopies(site.Copies, copies)
-	if err != nil {
-		return err
-	}
-
-	*s = Site{
-		Copies:        copies,
-		CleanUp:       site.CleanUp,
-		GenerateIndex: site.GenerateIndex,
-		ssg: ssg.New(
-			site.Src,
-			site.Dst,
-			site.Title,
-			site.Url,
-		),
-	}
-
-	return nil
-}
-
-func (t WriteTarget) String() string {
+func (t CopyTarget) String() string {
 	if t.Force {
 		return fmt.Sprintf("%s (force)", t.Target)
 	}
@@ -319,65 +374,6 @@ func cleanup(m Manifest, targets map[string]ssg.Set) error {
 	return nil
 }
 
-func decodeCopies(m map[string]interface{}, target map[string][]WriteTarget) error {
-	for k, entry := range m {
-		link, err := decodeCopy(entry)
-		if err != nil {
-			return err
-		}
-		target[k] = append(target[k], link...)
-	}
-	return nil
-}
-
-func decodeCopy(entry interface{}) ([]WriteTarget, error) {
-	switch data := entry.(type) {
-	case string:
-		// 1 src, 1 string target
-		return []WriteTarget{{Target: data}}, nil
-
-		// 1 src, 1 structured target
-	case map[string]interface{}:
-		targetRaw, ok := data["target"]
-		if !ok {
-			return nil, errors.New("missing key 'target'")
-		}
-		target, ok := targetRaw.(string)
-		if !ok {
-			return nil, fmt.Errorf("invalid data type for field 'target', expecting string, got '%s'", reflect.TypeOf(targetRaw).String())
-		}
-
-		w := WriteTarget{Target: target}
-
-		forceRaw, ok := data["force"]
-		if !ok {
-			return []WriteTarget{w}, nil
-		}
-		force, ok := forceRaw.(bool)
-		if !ok {
-			return nil, fmt.Errorf("invalid data type for field 'target', expecting bool, got '%s'", reflect.TypeOf(forceRaw).String())
-		}
-
-		w.Force = force
-		return []WriteTarget{w}, nil
-
-		// 1 src, multiple targets
-	case []interface{}:
-		targets := make([]WriteTarget, 0, len(data))
-		for i := range data {
-			srcDsts, err := decodeCopy(data[i])
-			if err != nil {
-				return nil, err
-			}
-			targets = append(targets, srcDsts...)
-		}
-
-		return targets, nil
-	}
-
-	return nil, fmt.Errorf("bad entry data shape of type %s: '%v'", reflect.TypeOf(entry).String(), entry)
-}
-
 func (s *Site) Copy() error {
 	logger := slog.Default()
 	dirs := make(ssg.Set)
@@ -443,7 +439,7 @@ func (s *Site) Copy() error {
 	return nil
 }
 
-func cp(src string, dst WriteTarget, perm fs.FileMode) error {
+func cp(src string, dst CopyTarget, perm fs.FileMode) error {
 	if dst.Force {
 		err := os.RemoveAll(dst.Target)
 		if err != nil && !os.IsNotExist(err) {
@@ -476,7 +472,7 @@ func cp(src string, dst WriteTarget, perm fs.FileMode) error {
 	return nil
 }
 
-func cpRecurse(src string, dst WriteTarget) error {
+func cpRecurse(src string, dst CopyTarget) error {
 	dstRoot := dst.Target
 	err := filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -500,7 +496,7 @@ func cpRecurse(src string, dst WriteTarget) error {
 		target := filepath.Join(dstRoot, rel)
 		// slog.Debug("cpRecurse", "src", src, "base", filepath.Base(path), "dst", dst, "target", target)
 
-		out := WriteTarget{
+		out := CopyTarget{
 			Target: target,
 			Force:  dst.Force,
 		}
@@ -514,7 +510,7 @@ func cpRecurse(src string, dst WriteTarget) error {
 	return nil
 }
 
-func copyFiles(dirs ssg.Set, src string, dst WriteTarget, permsCache map[string]fs.FileMode) error {
+func copyFiles(dirs ssg.Set, src string, dst CopyTarget, permsCache map[string]fs.FileMode) error {
 	switch {
 	// Copy dir to dir, with target not yet existing
 	case dirs.Contains(src) && !dirs.Contains(dst.Target):
