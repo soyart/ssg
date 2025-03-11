@@ -68,6 +68,10 @@ type Ssg struct {
 	cache      []OutputFile
 }
 
+func (s *Ssg) Hooks() []Hook {
+	return s.options.hooks
+}
+
 // Build returns the ssg outputs built from src without writing the outputs.
 func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile, error) {
 	s := New(src, dst, title, url)

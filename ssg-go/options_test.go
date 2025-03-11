@@ -14,6 +14,47 @@ import (
 	"github.com/soyart/ssg/ssg-go"
 )
 
+func TestPrependHooks(t *testing.T) {
+	var hook1 ssg.Hook = func(path string, data []byte) (output []byte, err error) { return []byte("hook1"), nil }
+	var hook2 ssg.Hook = func(path string, data []byte) (output []byte, err error) { return []byte("hook2"), nil }
+	var hook3 ssg.Hook = func(path string, data []byte) (output []byte, err error) { return []byte("hook3"), nil }
+
+	s := ssg.Ssg{}
+	s.With(ssg.WithHooks(ssg.Hook(hook3)))
+
+	prepend2 := ssg.PrependHooks(hook1, hook2)
+	s.With(prepend2)
+
+	hooks := s.Hooks()
+	for i := range hooks {
+		var result []byte
+		switch i {
+		case 0:
+			result, _ = hooks[i]("", nil)
+			if string(result) == "hook1" {
+				continue
+			}
+
+		case 1:
+			result, _ = hooks[i]("", nil)
+			if string(result) == "hook2" {
+				continue
+			}
+
+		case 2:
+			result, _ = hooks[i]("", nil)
+			if string(result) == "hook3" {
+				continue
+			}
+
+		default:
+			t.Errorf("unexpected index %d", i)
+		}
+
+		t.Errorf("unexpected value for hooks[%d]: %s", i, result)
+	}
+}
+
 // inputHasher computes and stamps hash for input files.
 // If the hash cannot be computed, the hasher output is ignored
 //
