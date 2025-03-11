@@ -15,35 +15,43 @@ import (
 )
 
 func TestPrependHooks(t *testing.T) {
-	var hook1 ssg.Hook = func(path string, data []byte) (output []byte, err error) { return []byte("hook1"), nil }
-	var hook2 ssg.Hook = func(path string, data []byte) (output []byte, err error) { return []byte("hook2"), nil }
-	var hook3 ssg.Hook = func(path string, data []byte) (output []byte, err error) { return []byte("hook3"), nil }
+	var hook1 ssg.Hook = func(_ string, _ []byte) (_ []byte, _ error) { return []byte("hook1"), nil }
+	var hook2 ssg.Hook = func(_ string, _ []byte) (_ []byte, _ error) { return []byte("hook2"), nil }
+	var hook3 ssg.Hook = func(_ string, _ []byte) (_ []byte, _ error) { return []byte("hook3"), nil }
+	var hook4 ssg.Hook = func(_ string, _ []byte) (_ []byte, _ error) { return []byte("hook4"), nil }
 
-	s := ssg.Ssg{}
-	s.With(ssg.WithHooks(ssg.Hook(hook3)))
+	s := new(ssg.Ssg)
+	s.With(ssg.WithHooks(
+		ssg.Hook(hook3),
+		ssg.Hook(hook4)),
+	)
 
-	prepend2 := ssg.PrependHooks(hook1, hook2)
-	s.With(prepend2)
+	prepend := ssg.PrependHooks(hook1, hook2)
+	s.With(prepend)
 
-	hooks := s.Hooks()
+	hooks := s.Options().Hooks()
 	for i := range hooks {
 		var result []byte
+
 		switch i {
 		case 0:
 			result, _ = hooks[i]("", nil)
 			if string(result) == "hook1" {
 				continue
 			}
-
 		case 1:
 			result, _ = hooks[i]("", nil)
 			if string(result) == "hook2" {
 				continue
 			}
-
 		case 2:
 			result, _ = hooks[i]("", nil)
 			if string(result) == "hook3" {
+				continue
+			}
+		case 3:
+			result, _ = hooks[i]("", nil)
+			if string(result) == "hook4" {
 				continue
 			}
 
