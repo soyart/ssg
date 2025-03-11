@@ -20,47 +20,71 @@ func TestPrependHooks(t *testing.T) {
 	var hook3 ssg.Hook = func(_ string, _ []byte) (_ []byte, _ error) { return []byte("hook3"), nil }
 	var hook4 ssg.Hook = func(_ string, _ []byte) (_ []byte, _ error) { return []byte("hook4"), nil }
 
-	s := new(ssg.Ssg)
-	s.With(ssg.WithHooks(
-		ssg.Hook(hook3),
-		ssg.Hook(hook4)),
-	)
+	assert := func(t *testing.T, s *ssg.Ssg) {
+		hooks := s.Options().Hooks()
+		for i := range hooks {
+			var result []byte
 
-	prepend := ssg.PrependHooks(hook1, hook2)
-	s.With(prepend)
+			switch i {
+			case 0:
+				result, _ = hooks[i]("", nil)
+				if string(result) == "hook1" {
+					continue
+				}
+			case 1:
+				result, _ = hooks[i]("", nil)
+				if string(result) == "hook2" {
+					continue
+				}
+			case 2:
+				result, _ = hooks[i]("", nil)
+				if string(result) == "hook3" {
+					continue
+				}
+			case 3:
+				result, _ = hooks[i]("", nil)
+				if string(result) == "hook4" {
+					continue
+				}
 
-	hooks := s.Options().Hooks()
-	for i := range hooks {
-		var result []byte
-
-		switch i {
-		case 0:
-			result, _ = hooks[i]("", nil)
-			if string(result) == "hook1" {
-				continue
-			}
-		case 1:
-			result, _ = hooks[i]("", nil)
-			if string(result) == "hook2" {
-				continue
-			}
-		case 2:
-			result, _ = hooks[i]("", nil)
-			if string(result) == "hook3" {
-				continue
-			}
-		case 3:
-			result, _ = hooks[i]("", nil)
-			if string(result) == "hook4" {
-				continue
+			default:
+				t.Errorf("unexpected index %d", i)
 			}
 
-		default:
-			t.Errorf("unexpected index %d", i)
+			t.Errorf("unexpected value for hooks[%d]: %s", i, result)
 		}
-
-		t.Errorf("unexpected value for hooks[%d]: %s", i, result)
 	}
+
+	t.Run("imperative", func(t *testing.T) {
+		s := new(ssg.Ssg)
+		s.With(ssg.WithHooks(hook3, hook4))
+		prepend := ssg.PrependHooks(hook1, hook2)
+		s.With(prepend)
+		assert(t, s)
+	})
+
+	t.Run("option slice", func(t *testing.T) {
+		var opts []ssg.Option
+		original := ssg.WithHooks(hook3, hook4)
+		prepend := ssg.PrependHooks(hook1, hook2)
+		opts = append(opts, original, prepend)
+
+		s := new(ssg.Ssg)
+		s.With(original, prepend)
+		assert(t, s)
+	})
+
+	t.Run("option slice rev", func(t *testing.T) {
+		var opts []ssg.Option
+		original := ssg.WithHooks(hook3, hook4)
+		opts = append(opts, original)
+		prepend := ssg.PrependHooks(hook1, hook2)
+		opts = append(opts, prepend, original)
+
+		s := new(ssg.Ssg)
+		s.With(original, prepend)
+		assert(t, s)
+	})
 }
 
 // inputHasher computes and stamps hash for input files.
