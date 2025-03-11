@@ -59,32 +59,32 @@ func GetEnvWriters() int {
 // Caching allows outputs to be built and retained for later use.
 // This is enabled in [Build].
 func Caching() Option {
-	return func(s *Ssg) {
-		s.options.caching = true
-	}
+	return func(s *Ssg) { s.options.caching = true }
 }
 
 // Writers set the number of concurrent output writers.
 func Writers(u uint) Option {
-	return func(s *Ssg) {
-		s.options.writers = int(u)
-	}
+	return func(s *Ssg) { s.options.writers = int(u) }
 }
 
 // WithHooks will make [Ssg] iterate through hooks and call hook(path, fileContent)
 // on every unignored files.
 func WithHooks(hooks ...Hook) Option {
+	return func(s *Ssg) { s.options.hooks = append(s.options.hooks, hooks...) }
+}
+
+// PrependHooks
+func PrependHooks(prepends ...Hook) Option {
 	return func(s *Ssg) {
-		s.options.hooks = append(s.options.hooks, hooks...)
+		prepends = append(prepends, s.options.hooks...)
+		s.options.hooks = prepends
 	}
 }
 
 // WithHookGenerate assigns hook to be called on full output of files
 // that will be converted by ssg from Markdown to HTML.
 func WithHookGenerate(hook HookGenerate) Option {
-	return func(s *Ssg) {
-		s.options.hookGenerate = hook
-	}
+	return func(s *Ssg) { s.options.hookGenerate = hook }
 }
 
 // WithPipelines returns an option that allows caller
@@ -92,7 +92,7 @@ func WithHookGenerate(hook HookGenerate) Option {
 // in a fashion similar to middlewares in HTTP frameworks.
 //
 // pipelines can be of type Pipeline or func(*Ssg) Pipeline
-func WithPipelines(pipes ...interface{}) Option {
+func WithPipelines(pipes ...any) Option {
 	return func(s *Ssg) {
 		pipelines := make([]Pipeline, len(pipes))
 		for i, p := range pipes {

@@ -46,21 +46,10 @@ func init() {
 	m.AddFunc(mediaTypeJson, json.Minify)
 }
 
-func MinifyHtml(original []byte) ([]byte, error) {
-	return minifyFormat(original, mediaTypeHtml)
-}
-
-func MinifyCss(original []byte) ([]byte, error) {
-	return minifyFormat(original, mediaTypeCss)
-}
-
-func MinifyJs(original []byte) ([]byte, error) {
-	return minifyFormat(original, mediaTypeJs)
-}
-
-func MinifyJson(original []byte) ([]byte, error) {
-	return minifyFormat(original, mediaTypeJson)
-}
+func MinifyHtml(og []byte) ([]byte, error) { return minifyFormat(og, mediaTypeHtml) }
+func MinifyCss(og []byte) ([]byte, error)  { return minifyFormat(og, mediaTypeCss) }
+func MinifyJs(og []byte) ([]byte, error)   { return minifyFormat(og, mediaTypeJs) }
+func MinifyJson(og []byte) ([]byte, error) { return minifyFormat(og, mediaTypeJson) }
 
 func MinifyAll(path string, data []byte) ([]byte, error) {
 	fn, err := ExtToFn(filepath.Ext(path))

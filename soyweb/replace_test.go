@@ -63,6 +63,66 @@ func TestReplace(t *testing.T) {
 			},
 			expected: "12 ${{ foo}} 34",
 		},
+		{
+			s:             "12 ${{ foo }} ${{ foo}} 34",
+			placeholderFn: placeholder,
+			target:        "foo",
+			replace: ReplaceTarget{
+				Text:  "new-foo",
+				Count: 1,
+			},
+			expected: "12 new-foo ${{ foo}} 34",
+		},
+		{
+			s:             "12 ${{ foo }} ${{ foo }} 34",
+			placeholderFn: placeholder,
+			target:        "foo",
+			replace: ReplaceTarget{
+				Text:  "new-foo",
+				Count: 1,
+			},
+			expected: "12 new-foo ${{ foo }} 34",
+		},
+		{
+			s:             "12 ${{ foo }} ${{ foo }} 34",
+			placeholderFn: placeholder,
+			target:        "foo",
+			replace: ReplaceTarget{
+				Text:  "new-foo",
+				Count: 2,
+			},
+			expected: "12 new-foo new-foo 34",
+		},
+		{
+			s:             "12 ${{ foo }} ${{ foo }} 34",
+			placeholderFn: placeholder,
+			target:        "foo",
+			replace: ReplaceTarget{
+				Text:  "new-foo",
+				Count: 3,
+			},
+			expected: "12 new-foo new-foo 34",
+		},
+		{
+			s:             "12 ${{ foo }} ${{ foo }} 34 ${{ foo }}",
+			placeholderFn: placeholder,
+			target:        "foo",
+			replace: ReplaceTarget{
+				Text:  "new-foo",
+				Count: 3,
+			},
+			expected: "12 new-foo new-foo 34 new-foo",
+		},
+		{
+			s:             "12 ${{ foo }} ${{ foo }} 34 ${{ foo }}",
+			placeholderFn: placeholder,
+			target:        "foo",
+			replace: ReplaceTarget{
+				Text:  "new-foo",
+				Count: 0,
+			},
+			expected: "12 new-foo new-foo 34 new-foo",
+		},
 	}
 
 	for i := range tests {

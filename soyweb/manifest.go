@@ -288,6 +288,11 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 
 		s := &site.ssg
 		s.With(opts...)
+		if len(site.Replaces) != 0 {
+			hookReplace := Replacers(site.Replaces)
+			_ = hookReplace
+		}
+
 		if err := s.Generate(); err != nil {
 			return manifestError{
 				err:   err,
