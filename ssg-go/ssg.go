@@ -68,9 +68,7 @@ type Ssg struct {
 	cache      []OutputFile
 }
 
-func (s *Ssg) Hooks() []Hook {
-	return s.options.hooks
-}
+func (s *Ssg) Options() Options { return s.options }
 
 // Build returns the ssg outputs built from src without writing the outputs.
 func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile, error) {
@@ -333,10 +331,10 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 	buf.Write(ToHtml(data))
 	buf.Write(footer.Bytes())
 
-	if s.options.hookGenerate != nil {
-		b, err := s.options.hookGenerate(buf.Bytes())
+	for i, h := range s.options.hookGenerate {
+		b, err := h(buf.Bytes())
 		if err != nil {
-			return fmt.Errorf("hook error when building %s: %w", path, err)
+			return fmt.Errorf("hooksGenerate[%d] error when building %s: %w", i, path, err)
 		}
 		buf = bytes.NewBuffer(b)
 	}

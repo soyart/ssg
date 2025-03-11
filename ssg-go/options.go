@@ -28,12 +28,26 @@ type (
 
 	options struct {
 		hooks        []Hook
-		hookGenerate HookGenerate
+		hookGenerate []HookGenerate
 		pipelines    []Pipeline
 		caching      bool
 		writers      int
 	}
+
+	Options interface {
+		Hooks() []Hook
+		HooksGenerate() []HookGenerate
+		Pipelines() []Pipeline
+		Caching() bool
+		Writers() int
+	}
 )
+
+func (o options) Hooks() []Hook                 { return o.hooks }
+func (o options) HooksGenerate() []HookGenerate { return o.hookGenerate }
+func (o options) Pipelines() []Pipeline         { return o.pipelines }
+func (o options) Caching() bool                 { return o.caching }
+func (o options) Writers() int                  { return o.writers }
 
 // WritersFromEnv returns an option that sets the parallel writes
 // to whatever [GetEnvWriters] returns
@@ -73,18 +87,20 @@ func WithHooks(hooks ...Hook) Option {
 	return func(s *Ssg) { s.options.hooks = append(s.options.hooks, hooks...) }
 }
 
-// PrependHooks
-func PrependHooks(prepends ...Hook) Option {
+// PrependHooks prepends [hooks] to Ssg's existing hook options.
+// e.g. if we have a Ssg with existing hook options = [hook1, hook2]
+// then PrependHooks(hook3, hook4) will make
+func PrependHooks(hooks ...Hook) Option {
 	return func(s *Ssg) {
-		prepends = append(prepends, s.options.hooks...)
-		s.options.hooks = prepends
+		hooks = append(hooks, s.options.hooks...)
+		s.options.hooks = hooks
 	}
 }
 
-// WithHookGenerate assigns hook to be called on full output of files
+// WithHooksGenerate assigns hook to be called on full output of files
 // that will be converted by ssg from Markdown to HTML.
-func WithHookGenerate(hook HookGenerate) Option {
-	return func(s *Ssg) { s.options.hookGenerate = hook }
+func WithHooksGenerate(hooks ...HookGenerate) Option {
+	return func(s *Ssg) { s.options.hookGenerate = append(s.options.hookGenerate, hooks...) }
 }
 
 // WithPipelines returns an option that allows caller
