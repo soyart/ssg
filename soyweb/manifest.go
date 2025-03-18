@@ -289,8 +289,8 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 		s := &site.ssg
 		s.With(opts...)
 		if len(site.Replaces) != 0 {
-			hookReplace := Replacers(site.Replaces)
-			_ = hookReplace
+			hookReplacer := Replacer(site.Replaces)
+			opts = append(opts, ssg.PrependHooks(hookReplacer))
 		}
 
 		if err := s.Generate(); err != nil {
