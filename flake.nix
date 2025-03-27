@@ -62,7 +62,7 @@ rec {
           };
           src = ./.;
           modRoot = "./ssg-go";
-          vendorHash = "sha256-gruy/RyfhjWoPJySAcoufysmpyR0sVIbWJN0erjISi8=";
+          vendorHash = "sha256-P8vB0khyNGjYNmYwn/AfzKyB+CaK/lhcMPsO9UmDNSQ=";
           meta = {
             homepage = "https://github.com/soyart/ssg";
             description = "${description} (go implementation)";
@@ -77,7 +77,7 @@ rec {
           };
           src = ./.;
           modRoot = "./soyweb";
-          vendorHash = "sha256-bMykCiKWCkOJYcS4Mw6TkiT3Qrx7TNT5E28sD/Kr/LA=";
+          vendorHash = "sha256-xq6YGouy5wsjzK6XVAVEwG6tbMGkzVX8F1NJcQjX4F8=";
           meta = {
             homepage = "https://github.com/soyart/ssg";
             description = "soyweb - ssg wrapper";
