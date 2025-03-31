@@ -1,0 +1,19 @@
+# TestReplace header
+
+The code block below this line should have its placeholder replaced,
+with all 4 lines changed:
+
+```sh
+${{ replace-me-0 }} # should change 0
+${{ replace-me-0 }} # should change 0
+${{ replace-me-0 }} # should change 0
+${{ replace-me-0 }} # should change 0
+${{ replace-me-0 }} # should change 0
+${{ replace-me-  }} # should NOT change
+${{ replace-me-1 }} # should change 1
+${{ replace-me-1 }} # should change 1
+${{ replace-me-1 }} # should change 1
+${{ replace-me-1 }} # should NOT change
+${{ replace-me-0 }} # should change 0
+```
+

@@ -123,10 +123,7 @@ func (r *Replaces) UnmarshalJSON(b []byte) error {
 func decodeReplace(data any) (ReplaceTarget, error) {
 	switch data := data.(type) {
 	case string:
-		return ReplaceTarget{
-			Text:  data,
-			Count: 1, // Replace once
-		}, nil
+		return ReplaceTarget{Text: data}, nil
 
 	case map[string]any:
 		textRaw, ok := data["text"]
@@ -287,12 +284,12 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 			Info("building site")
 
 		s := &site.ssg
-		s.With(opts...)
 		if len(site.Replaces) != 0 {
 			hookReplacer := Replacer(site.Replaces)
 			opts = append(opts, ssg.PrependHooks(hookReplacer))
 		}
 
+		s.With(opts...)
 		if err := s.Generate(); err != nil {
 			return manifestError{
 				err:   err,

@@ -26,6 +26,24 @@ func TestReplace(t *testing.T) {
 			expected: "12new-foo34",
 		},
 		{
+			s:      "${{ foo }} \n ${{ foo }}",
+			target: "${{ foo }}",
+			replace: ReplaceTarget{
+				Text:  "new-foo",
+				Count: 2,
+			},
+			expected: "new-foo \n new-foo",
+		},
+		{
+			s:      "${{ foo }} \n ${{ foo }} \n {{ foo }}",
+			target: "${{ foo }}",
+			replace: ReplaceTarget{
+				Text:  "new-foo",
+				Count: 2,
+			},
+			expected: "new-foo \n new-foo \n {{ foo }}",
+		},
+		{
 			s:      "12 ${{ foo }} 34",
 			target: "${{ foo }}",
 			replace: ReplaceTarget{

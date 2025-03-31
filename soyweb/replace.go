@@ -8,15 +8,11 @@ import (
 )
 
 func Replacer(r Replaces) ssg.Hook {
-	holders := make(map[string]string, len(r))
+	holders := make(map[string]string)
 	for k := range r {
 		holders[k] = placeholder(k)
 	}
-	replacer := hookReplace{
-		replaces:     r,
-		placeholders: holders,
-	}
-	return replacer.hook
+	return hookReplace{replaces: r, placeholders: holders}.hook
 }
 
 func placeholder(s string) string {
@@ -29,9 +25,15 @@ type hookReplace struct {
 }
 
 func (r hookReplace) hook(path string, data []byte) ([]byte, error) {
+	fmt.Println("hook-replace!", path)
 	for k, rp := range r.replaces {
 		var err error
-		data, err = replace(data, []byte(k), rp)
+		holder, ok := r.placeholders[k]
+		fmt.Println("replacing", rp, "holder", holder, "key", k)
+		if !ok {
+			panic(fmt.Errorf("missing placeholder for key %s", k))
+		}
+		data, err = replace(data, []byte(holder), rp)
 		if err != nil {
 			return nil, err
 		}
@@ -39,12 +41,9 @@ func (r hookReplace) hook(path string, data []byte) ([]byte, error) {
 	return data, nil
 }
 
-func replace(data, holder []byte, replace ReplaceTarget) ([]byte, error) {
-	switch replace.Count {
-	case 0:
-		data = bytes.ReplaceAll(data, []byte(holder), []byte(replace.Text))
-	default:
-		data = bytes.Replace(data, []byte(holder), []byte(replace.Text), int(replace.Count))
+func replace(data, holder []byte, r ReplaceTarget) ([]byte, error) {
+	if r.Count == 0 {
+		return bytes.ReplaceAll(data, []byte(holder), []byte(r.Text)), nil
 	}
-	return data, nil
+	return bytes.Replace(data, []byte(holder), []byte(r.Text), int(r.Count)), nil
 }
