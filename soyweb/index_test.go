@@ -1,4 +1,4 @@
-package soyweb
+package soyweb_test
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	. "github.com/soyart/ssg/soyweb"
 	"github.com/soyart/ssg/ssg-go"
 )
 

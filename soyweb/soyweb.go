@@ -47,13 +47,6 @@ type (
 
 func SsgOptions(f Flags) []ssg.Option {
 	opts := []ssg.Option{}
-
-	pipes := []interface{}{}
-	if f.GenerateIndex {
-		pipeGenIndex := GetIndexGenerator(f.GenerateIndexMode)
-		pipes = append(pipes, pipeGenIndex)
-	}
-
 	minifiers := make(map[string]MinifyFn)
 	f.MinifyFlags = negate(f.MinifyFlags, f.NoMinifyFlags)
 
@@ -72,16 +65,22 @@ func SsgOptions(f Flags) []ssg.Option {
 
 	hook := hookMinify(minifiers)
 	if hook != nil {
-		opts = append(opts, ssg.WithHook(hook))
+		opts = append(opts, ssg.WithHooks(hook))
 	}
 	if f.MinifyHtmlGenerate {
-		opts = append(opts, ssg.WithHookGenerate(MinifyHtml))
+		opts = append(opts, ssg.WithHooksGenerate(MinifyHtml))
+	}
+
+	pipes := []any{}
+	if f.GenerateIndex {
+		pipeGenIndex := NewIndexGenerator(f.GenerateIndexMode)
+		pipes = append(pipes, pipeGenIndex)
 	}
 
 	return append(opts, ssg.WithPipelines(pipes...))
 }
 
-func GetIndexGenerator(m IndexGeneratorMode) func(*ssg.Ssg) ssg.Pipeline {
+func NewIndexGenerator(m IndexGeneratorMode) func(*ssg.Ssg) ssg.Pipeline {
 	switch m {
 	case
 		IndexGeneratorModeReverse,
