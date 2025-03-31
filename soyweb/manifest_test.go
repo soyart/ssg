@@ -67,7 +67,7 @@ func TestManifestUnmarshal(t *testing.T) {
 			},
 			Replaces: map[string]ReplaceTarget{
 				"replace-me-0": {
-					Text: "new-text-0", Count: 1,
+					Text: "new-text-0", Count: 0,
 				},
 				"replace-me-1": {
 					Text: "new-text-1", Count: 3,
