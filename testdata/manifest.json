@@ -5,7 +5,7 @@
 		"src": "johndoe.com/src",
 		"dst": "johndoe.com/dst",
 		"cleanup": true,
-		"generate_blog": true,
+		"generate-index": true,
 		"copies": {
 			"./assets/some.txt": "johndoe.com/src/some-txt.txt",
 			"./assets/some": {

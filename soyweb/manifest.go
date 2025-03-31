@@ -53,6 +53,9 @@ type ReplaceTarget struct {
 
 type Replaces map[string]ReplaceTarget
 
+func (s *Site) Src() string { return s.ssg.Src }
+func (s *Site) Dst() string { return s.ssg.Dst }
+
 func (s *Site) UnmarshalJSON(b []byte) error {
 	var site struct {
 		Src   string `json:"src"`
@@ -287,6 +290,10 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 		if len(site.Replaces) != 0 {
 			hookReplacer := Replacer(site.Replaces)
 			opts = append(opts, ssg.PrependHooks(hookReplacer))
+		}
+		// TODO: refactor init options for manifest at 1 place!
+		if site.GenerateIndex {
+			opts = append(opts, ssg.WithPipelines(NewIndexGenerator(IndexGeneratorModeDefault)))
 		}
 
 		s.With(opts...)

@@ -1,8 +1,10 @@
-package soyweb
+package soyweb_test
 
 import (
 	"errors"
 	"testing"
+
+	. "github.com/soyart/ssg/soyweb"
 )
 
 func TestErr(t *testing.T) {

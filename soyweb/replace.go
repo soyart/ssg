@@ -25,11 +25,9 @@ type hookReplace struct {
 }
 
 func (r hookReplace) hook(path string, data []byte) ([]byte, error) {
-	fmt.Println("hook-replace!", path)
 	for k, rp := range r.replaces {
 		var err error
 		holder, ok := r.placeholders[k]
-		fmt.Println("replacing", rp, "holder", holder, "key", k)
 		if !ok {
 			panic(fmt.Errorf("missing placeholder for key %s", k))
 		}
