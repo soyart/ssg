@@ -68,6 +68,8 @@ type Ssg struct {
 	cache      []OutputFile
 }
 
+func (s *Ssg) Options() Options { return s.options }
+
 // Build returns the ssg outputs built from src without writing the outputs.
 func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile, error) {
 	s := New(src, dst, title, url)
@@ -274,10 +276,10 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 	if err != nil {
 		return err
 	}
-	if s.options.hook != nil {
-		data, err = s.options.hook(path, data)
+	for i, hook := range s.options.hooks {
+		data, err = hook(path, data)
 		if err != nil {
-			return fmt.Errorf("hook error when building %s: %w", path, err)
+			return fmt.Errorf("hooks[%d]: error when building %s: %w", i, path, err)
 		}
 	}
 
@@ -329,10 +331,10 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 	buf.Write(ToHtml(data))
 	buf.Write(footer.Bytes())
 
-	if s.options.hookGenerate != nil {
-		b, err := s.options.hookGenerate(buf.Bytes())
+	for i, h := range s.options.hookGenerate {
+		b, err := h(buf.Bytes())
 		if err != nil {
-			return fmt.Errorf("hook error when building %s: %w", path, err)
+			return fmt.Errorf("hooksGenerate[%d] error when building %s: %w", i, path, err)
 		}
 		buf = bytes.NewBuffer(b)
 	}

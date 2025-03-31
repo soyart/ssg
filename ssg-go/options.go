@@ -27,13 +27,27 @@ type (
 	Pipeline func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error)
 
 	options struct {
-		hook         Hook
-		hookGenerate HookGenerate
+		hooks        []Hook
+		hookGenerate []HookGenerate
 		pipelines    []Pipeline
 		caching      bool
 		writers      int
 	}
+
+	Options interface {
+		Hooks() []Hook
+		HooksGenerate() []HookGenerate
+		Pipelines() []Pipeline
+		Caching() bool
+		Writers() int
+	}
 )
+
+func (o options) Hooks() []Hook                 { return o.hooks }
+func (o options) HooksGenerate() []HookGenerate { return o.hookGenerate }
+func (o options) Pipelines() []Pipeline         { return o.pipelines }
+func (o options) Caching() bool                 { return o.caching }
+func (o options) Writers() int                  { return o.writers }
 
 // WritersFromEnv returns an option that sets the parallel writes
 // to whatever [GetEnvWriters] returns
@@ -59,32 +73,34 @@ func GetEnvWriters() int {
 // Caching allows outputs to be built and retained for later use.
 // This is enabled in [Build].
 func Caching() Option {
-	return func(s *Ssg) {
-		s.options.caching = true
-	}
+	return func(s *Ssg) { s.options.caching = true }
 }
 
 // Writers set the number of concurrent output writers.
 func Writers(u uint) Option {
-	return func(s *Ssg) {
-		s.options.writers = int(u)
-	}
+	return func(s *Ssg) { s.options.writers = int(u) }
 }
 
-// WithHook will make [Ssg] call hook(path, fileContent)
+// WithHooks will make [Ssg] iterate through hooks and call hook(path, fileContent)
 // on every unignored files.
-func WithHook(hook Hook) Option {
+func WithHooks(hooks ...Hook) Option {
+	return func(s *Ssg) { s.options.hooks = append(s.options.hooks, hooks...) }
+}
+
+// PrependHooks prepends [hooks] to Ssg's existing hook options.
+// e.g. if we have a Ssg with existing hook options = [hook1, hook2]
+// then PrependHooks(hook3, hook4) will make
+func PrependHooks(hooks ...Hook) Option {
 	return func(s *Ssg) {
-		s.options.hook = hook
+		hooks = append(hooks, s.options.hooks...)
+		s.options.hooks = hooks
 	}
 }
 
-// WithHookGenerate assigns hook to be called on full output of files
+// WithHooksGenerate assigns hook to be called on full output of files
 // that will be converted by ssg from Markdown to HTML.
-func WithHookGenerate(hook HookGenerate) Option {
-	return func(s *Ssg) {
-		s.options.hookGenerate = hook
-	}
+func WithHooksGenerate(hooks ...HookGenerate) Option {
+	return func(s *Ssg) { s.options.hookGenerate = append(s.options.hookGenerate, hooks...) }
 }
 
 // WithPipelines returns an option that allows caller
@@ -92,7 +108,7 @@ func WithHookGenerate(hook HookGenerate) Option {
 // in a fashion similar to middlewares in HTTP frameworks.
 //
 // pipelines can be of type Pipeline or func(*Ssg) Pipeline
-func WithPipelines(pipes ...interface{}) Option {
+func WithPipelines(pipes ...any) Option {
 	return func(s *Ssg) {
 		pipelines := make([]Pipeline, len(pipes))
 		for i, p := range pipes {

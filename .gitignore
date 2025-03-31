@@ -6,6 +6,7 @@
 testdata/johndoe.com/*
 !testdata/johndoe.com/src
 testdata/johndoe.com/src/style.css
+testdata/johndoe.com/src/style-copy*
 testdata/johndoe.com/src/some-txt.txt
 testdata/johndoe.com/src/drop
 testdata/johndoe.com/src/assets
