@@ -124,103 +124,102 @@ func TestManifestUnmarshal(t *testing.T) {
 
 	t.Run("error on invalid json manifest", func(t *testing.T) {
 		tests := []string{
-			// Missing ssg-go fields
 			`{
-	"johndoe.com": {
-		"name": "JohnDoe.com",
-		"url": "https://johndoe.com",
-		"dst": "johndoe.com/dst",
-		"copies": [1]
-	}
-}`,
+				"johndoe.com": {
+					"name": "JohnDoe.com",
+					"url": "https://johndoe.com",
+					"dst": "johndoe.com/dst",
+					"copies": [1]
+				}
+			}`,
 			// Invalid copies
 			`{
-	"johndoe.com": {
-		"name": "JohnDoe.com",
-		"url": "https://johndoe.com",
-		"src": "johndoe.com/src",
-		"dst": "johndoe.com/dst",
-		"copies": [1]
-	}
-}`,
+				"johndoe.com": {
+					"name": "JohnDoe.com",
+					"url": "https://johndoe.com",
+					"src": "johndoe.com/src",
+					"dst": "johndoe.com/dst",
+					"copies": [1]
+				}
+			}`,
 			// Invalid cleanup
 			`{
-	"johndoe.com": {
-		"name": "JohnDoe.com",
-		"url": "https://johndoe.com",
-		"src": "johndoe.com/src",
-		"dst": "johndoe.com/dst",
-		"cleanup": "johndoe.com/cleanhere"
-	}
-}`,
+				"johndoe.com": {
+					"name": "JohnDoe.com",
+					"url": "https://johndoe.com",
+					"src": "johndoe.com/src",
+					"dst": "johndoe.com/dst",
+					"cleanup": "johndoe.com/cleanhere"
+				}
+			}`,
 			// Invalid copies
 			`{
-	"johndoe.com": {
-		"name": "JohnDoe.com",
-		"url": "https://johndoe.com",
-		"src": "johndoe.com/src",
-		"dst": "johndoe.com/dst",
-		"cleanup": false,
-		"copies": [
-			{
-				"force": true,
-				"target": "johndoe.com/src/drop"
-			}
-		]
-	}
-}`,
+				"johndoe.com": {
+					"name": "JohnDoe.com",
+					"url": "https://johndoe.com",
+					"src": "johndoe.com/src",
+					"dst": "johndoe.com/dst",
+					"cleanup": false,
+					"copies": [
+						{
+							"force": true,
+							"target": "johndoe.com/src/drop"
+						}
+					]
+				}
+			}`,
 			// Invalid replaces.count
 			`{
-	"johndoe.com": {
-		"name": "JohnDoe.com",
-		"url": "https://johndoe.com",
-		"src": "johndoe.com/src",
-		"dst": "johndoe.com/dst",
-		"cleanup": false,
-		"replaces": {
-			"replace-me-0": "new-text-0",
-			"replace-me-1": {
-				"text": "new-text-1",
-				"count": "1"
-			}
-		}
-	}
-}`,
+				"johndoe.com": {
+					"name": "JohnDoe.com",
+					"url": "https://johndoe.com",
+					"src": "johndoe.com/src",
+					"dst": "johndoe.com/dst",
+					"cleanup": false,
+					"replaces": {
+						"replace-me-0": "new-text-0",
+						"replace-me-1": {
+							"text": "new-text-1",
+							"count": "1"
+						}
+					}
+				}
+			}`,
 
 			// Negative count -1
 			`{
-	"johndoe.com": {
-		"name": "JohnDoe.com",
-		"url": "https://johndoe.com",
-		"src": "johndoe.com/src",
-		"dst": "johndoe.com/dst",
-		"copies": {
-			"./assets/some.txt": "johndoe.com/src/some-txt.txt",
-			"./assets/some": {
-				"force": true,
-				"target": "johndoe.com/src/drop"
-			},
-			"./assets/style.css": [
-				"johndoe.com/src/style-copy-0.css",
-				{
-					"target": "johndoe.com/src/style-copy-1.css",
-					"force": true
-				},
-				{
-					"target": "johndoe.com/src/style-copy-2.css",
-					"force": true
+				"johndoe.com": {
+					"name": "JohnDoe.com",
+					"url": "https://johndoe.com",
+					"src": "johndoe.com/src",
+					"dst": "johndoe.com/dst",
+					"copies": {
+					"./assets/some.txt": "johndoe.com/src/some-txt.txt",
+					"./assets/some": {
+						"force": true,
+						"target": "johndoe.com/src/drop"
+					},
+					"./assets/style.css": [
+						"johndoe.com/src/style-copy-0.css",
+						{
+							"target": "johndoe.com/src/style-copy-1.css",
+							"force": true
+						},
+						{
+							"target": "johndoe.com/src/style-copy-2.css",
+							"force": true
+						}
+					]
+					},
+					"replaces": {
+						"replace-me-0": "new-text-0",
+						"replace-me-1": {
+							"text": "new-text-1",
+							"count": -1
+						}
+					}
 				}
-			]
-		},
-		"replaces": {
-			"replace-me-0": "new-text-0",
-			"replace-me-1": {
-				"text": "new-text-1",
-				"count": -1
-			}
-		}
-	}
-}`,
+			}`,
 		}
 
 		for i, s := range tests {
@@ -383,28 +382,28 @@ func TestManifest(t *testing.T) {
 		},
 		{
 			manifestJSON: `
-{
-	"johndoe.com": {
-		"name": "JohnDoe.com",
-		"url": "https://johndoe.com",
-		"src": "../testdata/johndoe.com/src",
-		"dst": "../testdata/johndoe.com/dst",
-		"cleanup": true,
-		"copies": {
-			"../testdata/assets/style.css": {
-				"target": "../testdata/johndoe.com/src/style.css",
-				"force": true
-			},
-			"../testdata/assets/some.txt": "../testdata/johndoe.com/src/debug/some-txt.txt",
-			"../testdata/assets/some/nested/path/some.env": "../testdata/johndoe.com/src/assets/env",
-			"../testdata/assets/some/fonts": {
-				"force": true,
-				"target": "../testdata/johndoe.com/src/assets"
+		{
+			"johndoe.com": {
+				"name": "JohnDoe.com",
+				"url": "https://johndoe.com",
+				"src": "../testdata/johndoe.com/src",
+				"dst": "../testdata/johndoe.com/dst",
+				"cleanup": true,
+				"copies": {
+					"../testdata/assets/style.css": {
+						"target": "../testdata/johndoe.com/src/style.css",
+						"force": true
+					},
+					"../testdata/assets/some.txt": "../testdata/johndoe.com/src/debug/some-txt.txt",
+					"../testdata/assets/some/nested/path/some.env": "../testdata/johndoe.com/src/assets/env",
+					"../testdata/assets/some/fonts": {
+						"force": true,
+						"target": "../testdata/johndoe.com/src/assets"
+					}
+				},
+				"generate-index": true
 			}
-		},
-		"generate-index": true
-	}
-}`,
+		}`,
 			siteKey: "johndoe.com",
 			dir:     "../testdata",
 			copies: []string{
