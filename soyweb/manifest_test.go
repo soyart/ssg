@@ -533,7 +533,7 @@ func TestManifest(t *testing.T) {
 			t.Fatalf("[case %d] cannot remove dst '%s': %v", i, dst, err)
 		}
 
-		err = ApplyManifest(manifests, StagesAll)
+		err = ApplyManifest(manifests, StageAll)
 		if err != nil {
 			t.Fatalf("[case %d] error building manifest: %v", i, err)
 		}
@@ -594,22 +594,22 @@ func TestStages(t *testing.T) {
 			oks:      []Stage{StageBuild},
 		},
 		{
-			original: StagesAll,
-			skips:    []Stage{StagesAll},
+			original: StageAll,
+			skips:    []Stage{StageAll},
 			oks:      []Stage{},
 		},
 		{
-			original: StagesAll,
+			original: StageAll,
 			skips:    []Stage{StageBuild},
 			oks:      []Stage{StageCleanUp, StageCopy},
 		},
 		{
-			original: StagesAll,
+			original: StageAll,
 			skips:    []Stage{StageBuild, StageCopy},
 			oks:      []Stage{StageCleanUp},
 		},
 		{
-			original: StagesAll,
+			original: StageAll,
 			skips:    []Stage{StageCopy},
 			oks:      []Stage{StageCleanUp, StageBuild},
 		},

@@ -4,7 +4,6 @@ import (
 	"github.com/alexflint/go-arg"
 
 	"github.com/soyart/ssg/soyweb"
-	"github.com/soyart/ssg/ssg-go"
 )
 
 type cli struct {
@@ -20,12 +19,7 @@ type manifests struct {
 
 type cmdBuild struct {
 	manifests
-	soyweb.Flags
-
-	NoCleanup bool `arg:"--no-cleanup" help:"Skip cleanup stage"`
-	NoCopy    bool `arg:"--no-copy" help:"Skip scopy stage"`
-	NoBuild   bool `arg:"--no-build" help:"Skip build stage"`
-	NoReplace bool `arg:"--no-replace" help:"Skip text replacement hook"`
+	soyweb.FlagsV2
 }
 
 type cmdOther struct {
@@ -40,27 +34,16 @@ func main() {
 }
 
 func run(c *cli) {
-	stages := soyweb.StageAll
-	opts := []ssg.Option{
-		ssg.WritersFromEnv(),
-	}
+	var (
+		manifests []string
+		flags     soyweb.FlagsV2
+		stages    soyweb.Stage
+	)
 
-	var manifests []string
+	stages = soyweb.StageAll
 	switch {
 	case c.Build != nil:
-		manifests = c.Build.Manifests
-		opts = append(opts, soyweb.SsgOptions(c.Build.Flags)...)
-
-		if c.Build.NoCleanup {
-			stages.Skip(soyweb.StageCleanUp)
-		}
-		if c.Build.NoCopy {
-			stages.Skip(soyweb.StageCopy)
-		}
-		if c.Build.NoBuild {
-			stages.Skip(soyweb.StageBuild)
-			opts = nil
-		}
+		manifests, flags = c.Build.Manifests, c.Build.FlagsV2
 
 	case c.Copy != nil:
 		manifests = c.Copy.Manifests
@@ -80,9 +63,12 @@ func run(c *cli) {
 	}
 
 	for i := range manifests {
-		err := soyweb.ApplyFromManifest(manifests[i], stages, opts...)
+		manifest := manifests[i]
+		m, err := soyweb.NewManifest(manifest)
 		if err != nil {
-			panic(err)
+			panic(err.Error())
 		}
+
+		soyweb.ApplyManifestV2(m, flags, stages)
 	}
 }

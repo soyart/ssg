@@ -7,7 +7,10 @@ import (
 	"github.com/soyart/ssg/ssg-go"
 )
 
-func Replacer(r Replaces) ssg.Hook {
+func HookReplacer(r Replaces) ssg.Hook {
+	if len(r) == 0 {
+		return nil
+	}
 	holders := make(map[string]string)
 	for k := range r {
 		holders[k] = placeholder(k)
