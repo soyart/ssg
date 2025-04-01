@@ -25,7 +25,7 @@ const (
 	StageCopy
 	StageBuild
 
-	StagesAll = StageCollect | StageCleanUp | StageCopy | StageBuild
+	StageAll Stage = StageCollect | StageCleanUp | StageCopy | StageBuild
 )
 
 type Manifest map[string]Site
@@ -292,7 +292,7 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 
 		s := &site.ssg
 		if len(site.Replaces) != 0 {
-			hookReplacer := Replacer(site.Replaces)
+			hookReplacer := HookReplacer(site.Replaces)
 			opts = append(opts, ssg.PrependHooks(hookReplacer))
 		}
 		// TODO: refactor init options for manifest at 1 place!

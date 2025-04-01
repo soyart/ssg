@@ -1,11 +1,26 @@
 package soyweb
 
 import (
+	"errors"
 	"log/slog"
 
 	"github.com/soyart/ssg/ssg-go"
 )
 
+type IndexGeneratorMode string
+
+const (
+	MarkerIndex string = "_index.soyweb"
+
+	IndexGeneratorModeDefault IndexGeneratorMode = ""
+	IndexGeneratorModeReverse IndexGeneratorMode = "reverse"
+	IndexGeneratorModeModTime IndexGeneratorMode = "modtime"
+)
+
+var ErrNotSupported = errors.New("unsupported web format")
+
+// FlagsV2 represents CLI arguments that could modify soyweb behavior, such as skipping stages
+// and minifying content of certain file extensions.
 type FlagsV2 struct {
 	NoCleanup       bool `arg:"--no-cleanup" help:"Skip cleanup stage"`
 	NoCopy          bool `arg:"--no-copy" help:"Skip scopy stage"`
@@ -13,11 +28,11 @@ type FlagsV2 struct {
 	NoReplace       bool `arg:"--no-replace" help:"Do not do text replacements defined in manifest"`
 	NoGenerateIndex bool `arg:"--no-gen-index" help:"Do not generate indexes on _index.soyweb"`
 
-	MinifyHtmlGenerate bool `arg:"--min-html" default:"true" help:"Minify converted HTML outputs"`
-	MinifyHtmlCopy     bool `arg:"--min-html-copy" default:"true" help:"Minify all copied HTML"`
-	MinifyCss          bool `arg:"--min-css" default:"true" help:"Minify CSS files"`
-	MinifyJs           bool `arg:"--min-js" default:"true" help:"Minify Javascript files"`
-	MinifyJson         bool `arg:"--min-json" default:"true" help:"Minify JSON files"`
+	MinifyHtmlGenerate bool `arg:"--min-html" help:"Minify converted HTML outputs"`
+	MinifyHtmlCopy     bool `arg:"--min-html-copy" help:"Minify all copied HTML"`
+	MinifyCss          bool `arg:"--min-css" help:"Minify CSS files"`
+	MinifyJs           bool `arg:"--min-js" help:"Minify Javascript files"`
+	MinifyJson         bool `arg:"--min-json" help:"Minify JSON files"`
 }
 
 type builder struct {
@@ -35,18 +50,16 @@ func (b *builder) initialize() {
 	b.ssg.With(
 		ssg.WithHooks(b.Hooks()...),
 		ssg.WithHooksGenerate(b.HooksGenerate()...),
-		ssg.WithPipelines(b.Pipelines()),
+		ssg.WithPipelines(b.Pipelines()...),
 	)
 }
-
-var _ ssg.Options = &builder{}
 
 func (b *builder) Caching() bool { panic("unexpected call to Caching()") }
 func (b *builder) Writers() int  { panic("unexpected call to Writers()") }
 
 func (b FlagsV2) Stage() Stage {
-	s := StagesAll
-	if b.NoCleanup { // TODO: remove Site.CleanUp
+	s := StageAll
+	if b.NoCleanup {
 		s.Skip(StageCleanUp)
 	}
 	if b.NoCopy {
@@ -77,14 +90,32 @@ func (b *builder) Hooks() []ssg.Hook {
 		minifiers[".json"] = MinifyJson
 	}
 
-	if b.NoReplace || len(b.Replaces) == 0 {
+	hookMinifies := HookMinify(minifiers)
+	hookReplacer := HookReplacer(b.Replaces)
+
+	if hookMinifies == nil && hookReplacer == nil {
+		return nil
+	}
+
+	// Minify only
+	if b.NoReplace {
+		if hookMinifies == nil {
+			return nil
+		}
 		return []ssg.Hook{
-			hookMinify(minifiers),
+			hookMinifies,
+		}
+	}
+
+	// Replace and minify
+	if hookMinifies == nil {
+		return []ssg.Hook{
+			hookReplacer,
 		}
 	}
 	return []ssg.Hook{
-		Replacer(b.Replaces),
-		hookMinify(minifiers),
+		hookReplacer,
+		hookMinifies,
 	}
 }
 
@@ -97,11 +128,11 @@ func (b *builder) HooksGenerate() []ssg.HookGenerate {
 	return nil
 }
 
-func (b *builder) Pipelines() []ssg.Pipeline {
+func (b *builder) Pipelines() []any {
 	if b.NoGenerateIndex || !b.GenerateIndex {
 		return nil
 	}
-	return []ssg.Pipeline{
+	return []any{
 		NewIndexGenerator(b.GenerateIndexMode)(&b.ssg),
 	}
 }

@@ -1,24 +1,11 @@
 package soyweb
 
 import (
-	"errors"
 	"io/fs"
 	"sort"
 
 	"github.com/soyart/ssg/ssg-go"
 )
-
-type IndexGeneratorMode string
-
-const (
-	MarkerIndex string = "_index.soyweb"
-
-	IndexGeneratorModeDefault IndexGeneratorMode = ""
-	IndexGeneratorModeReverse IndexGeneratorMode = "reverse"
-	IndexGeneratorModeModTime IndexGeneratorMode = "modtime"
-)
-
-var ErrNotSupported = errors.New("unsupported web format")
 
 type (
 	MinifyFlags struct {
@@ -63,7 +50,7 @@ func SsgOptions(f Flags) []ssg.Option {
 		minifiers[".json"] = MinifyJson
 	}
 
-	hook := hookMinify(minifiers)
+	hook := HookMinify(minifiers)
 	if hook != nil {
 		opts = append(opts, ssg.WithHooks(hook))
 	}

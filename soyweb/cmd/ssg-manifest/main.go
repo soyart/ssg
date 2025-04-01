@@ -40,7 +40,7 @@ func main() {
 }
 
 func run(c *cli) {
-	stages := soyweb.StagesAll
+	stages := soyweb.StageAll
 	opts := []ssg.Option{
 		ssg.WritersFromEnv(),
 	}

@@ -36,10 +36,11 @@ func main() {
 func run(c *cli) {
 	var (
 		manifests []string
-		stages    soyweb.Stage
 		flags     soyweb.FlagsV2
+		stages    soyweb.Stage
 	)
 
+	stages = soyweb.StageAll
 	switch {
 	case c.Build != nil:
 		manifests, flags = c.Build.Manifests, c.Build.FlagsV2
