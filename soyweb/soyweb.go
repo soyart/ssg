@@ -2,6 +2,7 @@ package soyweb
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/soyart/ssg/ssg-go"
@@ -98,7 +99,7 @@ func (b *builder) Hooks() []ssg.Hook {
 	}
 
 	// Minify only
-	if b.NoReplace {
+	if b.NoReplace || hookReplacer == nil {
 		if hookMinifies == nil {
 			return nil
 		}
@@ -107,12 +108,14 @@ func (b *builder) Hooks() []ssg.Hook {
 		}
 	}
 
-	// Replace and minify
+	// Replace only
 	if hookMinifies == nil {
 		return []ssg.Hook{
 			hookReplacer,
 		}
 	}
+
+	// Replace and minify
 	return []ssg.Hook{
 		hookReplacer,
 		hookMinifies,
@@ -204,9 +207,9 @@ func ApplyManifestV2(m Manifest, f FlagsV2, do Stage) error {
 				"key", key,
 				"url", site.ssg.Url,
 				// @TODO: Len logs below will be removed
-				"len_hooks", len(b.Hooks()),
-				"len_hooks_generate", len(b.HooksGenerate()),
-				"len_pipelines", len(b.Pipelines()),
+				// "len_hooks", len(b.Hooks()),
+				// "len_hooks_generate", len(b.HooksGenerate()),
+				// "len_pipelines", len(b.Pipelines()),
 			).
 			Info("building site")
 
