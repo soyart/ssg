@@ -2,7 +2,6 @@ package soyweb
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 
 	"github.com/soyart/ssg/ssg-go"
