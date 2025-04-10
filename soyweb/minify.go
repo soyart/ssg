@@ -98,7 +98,7 @@ func ExtToMediaType(ext string) (string, error) {
 		return mediaTypeJson, nil
 	}
 
-	return "", fmt.Errorf("'%s': %w", ext, ErrNotSupported)
+	return "", fmt.Errorf("'%s': %w", ext, ErrWebFormatNotSupported)
 }
 
 func ExtToFn(ext string) (func([]byte) ([]byte, error), error) {
@@ -113,7 +113,7 @@ func ExtToFn(ext string) (func([]byte) ([]byte, error), error) {
 		return MinifyJson, nil
 	}
 
-	return nil, fmt.Errorf("'%s': %w", ext, ErrNotSupported)
+	return nil, fmt.Errorf("'%s': %w", ext, ErrWebFormatNotSupported)
 }
 
 func minifyFormat(original []byte, format string) ([]byte, error) {

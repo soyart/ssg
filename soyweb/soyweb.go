@@ -17,7 +17,7 @@ const (
 	IndexGeneratorModeModTime IndexGeneratorMode = "modtime"
 )
 
-var ErrNotSupported = errors.New("unsupported web format")
+var ErrWebFormatNotSupported = errors.New("unsupported web format")
 
 // FlagsV2 represents CLI arguments that could modify soyweb behavior, such as skipping stages
 // and minifying content of certain file extensions.
@@ -35,12 +35,26 @@ type FlagsV2 struct {
 	MinifyJson         bool `arg:"--min-json" help:"Minify JSON files"`
 }
 
+func (b FlagsV2) Stage() Stage {
+	s := StageAll
+	if b.NoCleanup {
+		s.Skip(StageCleanUp)
+	}
+	if b.NoCopy {
+		s.Skip(StageCopy)
+	}
+	if b.NoBuild {
+		s.Skip(StageBuild)
+	}
+	return s
+}
+
 type builder struct {
 	Site
 	FlagsV2
 }
 
-func NewManifestBuilder(s Site, f FlagsV2) *builder {
+func newManifestBuilder(s Site, f FlagsV2) *builder {
 	b := &builder{Site: s, FlagsV2: f}
 	b.initialize()
 	return b
@@ -56,20 +70,6 @@ func (b *builder) initialize() {
 
 func (b *builder) Caching() bool { panic("unexpected call to Caching()") }
 func (b *builder) Writers() int  { panic("unexpected call to Writers()") }
-
-func (b FlagsV2) Stage() Stage {
-	s := StageAll
-	if b.NoCleanup {
-		s.Skip(StageCleanUp)
-	}
-	if b.NoCopy {
-		s.Skip(StageCopy)
-	}
-	if b.NoBuild {
-		s.Skip(StageBuild)
-	}
-	return s
-}
 
 func (b *builder) Hooks() []ssg.Hook {
 	if b.NoBuild {
@@ -199,7 +199,7 @@ func ApplyManifestV2(m Manifest, f FlagsV2, do Stage) error {
 		}
 
 		slog.SetDefault(log)
-		b := NewManifestBuilder(site, f)
+		b := newManifestBuilder(site, f)
 
 		log.
 			With(
