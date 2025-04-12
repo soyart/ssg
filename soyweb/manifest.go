@@ -102,7 +102,6 @@ func (c *CopyTargets) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-
 	*c = result
 	return nil
 }
@@ -231,102 +230,6 @@ func (s *Stage) Ok(targets ...Stage) bool {
 	return true
 }
 
-// ApplyManifest loops through all sites and apply manifest stages
-// described in do. It applies opts to each site's [Ssg] before
-// the call to [Ssg.Generate].
-func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
-	slog.Info("stages",
-		StageCleanUp.String(), stages.Ok(StageCleanUp),
-		StageCopy.String(), stages.Ok(StageCopy),
-		StageBuild.String(), stages.Ok(StageBuild),
-	)
-
-	targets, err := collect(m)
-	if err != nil {
-		return err
-	}
-	if stages.Ok(StageCleanUp) {
-		err = cleanup(m, targets)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Copy
-	old := slog.Default()
-	for key, site := range m {
-		if !stages.Ok(StageCopy) {
-			old.Info("skipping stage copy")
-			break
-		}
-		slog.SetDefault(old.
-			WithGroup("copy").
-			With("key", key, "url", site.ssg.Url),
-		)
-		if err := site.Copy(); err != nil {
-			return manifestError{
-				err:   err,
-				key:   key,
-				msg:   "failed to copy",
-				stage: StageCopy,
-			}
-		}
-
-		slog.SetDefault(old)
-	}
-
-	// Build
-	for key, site := range m {
-		if !stages.Ok(StageBuild) {
-			old.Info("skipping stage build")
-			break
-		}
-
-		old.
-			WithGroup("build").
-			With(
-				"key", key,
-				"url", site.ssg.Url,
-			).
-			Info("building site")
-
-		s := &site.ssg
-		if len(site.Replaces) != 0 {
-			hookReplacer := HookReplacer(site.Replaces)
-			opts = append(opts, ssg.PrependHooks(hookReplacer))
-		}
-		// TODO: refactor init options for manifest at 1 place!
-		if site.GenerateIndex {
-			opts = append(opts, ssg.WithPipelines(NewIndexGenerator(IndexGeneratorModeDefault)))
-		}
-
-		s.With(opts...)
-		if err := s.Generate(); err != nil {
-			return manifestError{
-				err:   err,
-				key:   key,
-				msg:   "failed to build",
-				stage: StageBuild,
-			}
-		}
-	}
-
-	return nil
-}
-
-func ApplyFromManifest(path string, do Stage, opts ...ssg.Option) error {
-	logger := newLogger().With("manifest", path)
-	slog.SetDefault(logger)
-	slog.Info("parsing manifest")
-
-	m, err := NewManifest(path)
-	if err != nil {
-		logger.Error("failed to parse manifest", "error", err)
-		return err
-	}
-	return ApplyManifest(m, do, opts...)
-}
-
 func NewManifest(filename string) (Manifest, error) {
 	b, err := os.ReadFile(filename)
 	if err != nil {
@@ -373,17 +276,6 @@ func (s Stage) String() string {
 		return "build"
 	}
 	return "BAD_STAGE"
-}
-
-func newLogger() *slog.Logger {
-	loglevel.Set(slog.LevelDebug)
-	return slog.New(slog.NewJSONHandler(
-		os.Stdout,
-		&slog.HandlerOptions{
-			AddSource: true,
-			Level:     loglevel,
-		}),
-	)
 }
 
 func collect(m Manifest) (map[string]ssg.Set, error) {

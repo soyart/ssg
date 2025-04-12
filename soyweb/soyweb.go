@@ -3,6 +3,7 @@ package soyweb
 import (
 	"errors"
 	"log/slog"
+	"os"
 
 	"github.com/soyart/ssg/ssg-go"
 )
@@ -139,7 +140,19 @@ func (b *builder) Pipelines() []any {
 	}
 }
 
+func newLogger() *slog.Logger {
+	loglevel.Set(slog.LevelDebug)
+	return slog.New(slog.NewJSONHandler(
+		os.Stdout,
+		&slog.HandlerOptions{
+			AddSource: true,
+			Level:     loglevel,
+		}),
+	)
+}
+
 func ApplyManifestV2(m Manifest, f FlagsV2, do Stage) error {
+	slog.SetDefault(newLogger())
 	slog.Info("stages",
 		StageCleanUp.String(), do.Ok(StageCleanUp),
 		StageCopy.String(), do.Ok(StageCopy),
