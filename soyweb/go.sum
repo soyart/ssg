@@ -11,8 +11,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06 h1:OkMGxebDjyw0ULyrTYWeN0UNCCkmCWfjPnIA2W6oviI=
 github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06/go.mod h1:+ePHsJ1keEjQtpvf9HHw0f4ZeJ0TLRsxhunSI2hYJSs=
-github.com/soyart/ssg/ssg-go v0.0.0-20250327191826-fca3df8fba2f h1:xCxdVYtd0lIEku7C33M6lltOkln3PGz5bNRS7qA9t/c=
-github.com/soyart/ssg/ssg-go v0.0.0-20250327191826-fca3df8fba2f/go.mod h1:Rv11yFI29OLFeQZ+4a8PnTVVH3TbUWHUN4lt2BQcMI8=
+github.com/soyart/ssg/ssg-go v0.0.0-20250412172051-bcb2c995154d h1:LeN8Q54cUVeXpRduf5S3kh0DXyg742fmRPZHdEgNYSU=
+github.com/soyart/ssg/ssg-go v0.0.0-20250412172051-bcb2c995154d/go.mod h1:Rv11yFI29OLFeQZ+4a8PnTVVH3TbUWHUN4lt2BQcMI8=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=

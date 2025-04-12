@@ -6,7 +6,7 @@ toolchain go1.24.1
 
 require (
 	github.com/alexflint/go-arg v1.5.1
-	github.com/soyart/ssg/ssg-go v0.0.0-20250327191826-fca3df8fba2f
+	github.com/soyart/ssg/ssg-go v0.0.0-20250412172051-bcb2c995154d
 	github.com/tdewolff/minify/v2 v2.23.1
 )
 
