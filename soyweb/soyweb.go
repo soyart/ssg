@@ -2,8 +2,7 @@ package soyweb
 
 import (
 	"errors"
-	"io/fs"
-	"sort"
+	"log/slog"
 
 	"github.com/soyart/ssg/ssg-go"
 )
@@ -18,214 +17,209 @@ const (
 	IndexGeneratorModeModTime IndexGeneratorMode = "modtime"
 )
 
-var ErrNotSupported = errors.New("unsupported web format")
+var ErrWebFormatNotSupported = errors.New("unsupported web format")
 
-type (
-	MinifyFlags struct {
-		MinifyHtmlGenerate bool `arg:"--min-html" help:"Minify converted HTML outputs"`
-		MinifyHtmlCopy     bool `arg:"--min-html-copy" help:"Minify all copied HTML"`
-		MinifyCss          bool `arg:"--min-css" help:"Minify CSS files"`
-		MinifyJs           bool `arg:"--min-js" help:"Minify Javascript files"`
-		MinifyJson         bool `arg:"--min-json" help:"Minify JSON files"`
+// FlagsV2 represents CLI arguments that could modify soyweb behavior, such as skipping stages
+// and minifying content of certain file extensions.
+type FlagsV2 struct {
+	NoCleanup       bool `arg:"--no-cleanup" help:"Skip cleanup stage"`
+	NoCopy          bool `arg:"--no-copy" help:"Skip scopy stage"`
+	NoBuild         bool `arg:"--no-build" help:"Skip build stage"`
+	NoReplace       bool `arg:"--no-replace" help:"Do not do text replacements defined in manifest"`
+	NoGenerateIndex bool `arg:"--no-gen-index" help:"Do not generate indexes on _index.soyweb"`
+
+	MinifyHtmlGenerate bool `arg:"--min-html" help:"Minify converted HTML outputs"`
+	MinifyHtmlCopy     bool `arg:"--min-html-copy" help:"Minify all copied HTML"`
+	MinifyCss          bool `arg:"--min-css" help:"Minify CSS files"`
+	MinifyJs           bool `arg:"--min-js" help:"Minify Javascript files"`
+	MinifyJson         bool `arg:"--min-json" help:"Minify JSON files"`
+}
+
+func (b FlagsV2) Stage() Stage {
+	s := StageAll
+	if b.NoCleanup {
+		s.Skip(StageCleanUp)
+	}
+	if b.NoCopy {
+		s.Skip(StageCopy)
+	}
+	if b.NoBuild {
+		s.Skip(StageBuild)
+	}
+	return s
+}
+
+type builder struct {
+	Site
+	FlagsV2
+}
+
+func newManifestBuilder(s Site, f FlagsV2) *builder {
+	b := &builder{Site: s, FlagsV2: f}
+	b.initialize()
+	return b
+}
+
+func (b *builder) initialize() {
+	b.ssg.With(
+		ssg.WithHooks(b.Hooks()...),
+		ssg.WithHooksGenerate(b.HooksGenerate()...),
+		ssg.WithPipelines(b.Pipelines()...),
+	)
+}
+
+func (b *builder) Caching() bool { panic("unexpected call to Caching()") }
+func (b *builder) Writers() int  { panic("unexpected call to Writers()") }
+
+func (b *builder) Hooks() []ssg.Hook {
+	if b.NoBuild {
+		return nil
 	}
 
-	NoMinifyFlags struct {
-		NoMinifyHtmlGenerate bool `arg:"--no-min-html,env:NO_MIN_HTML" help:"Do not minify converted HTML outputs"`
-		NoMinifyHtmlCopy     bool `arg:"--no-min-html-copy,env:NO_MIN_HTML_COPY" help:"Do not minify all copied HTML"`
-		NoMinifyCss          bool `arg:"--no-min-css,env:NO_MIN_CSS" help:"Do not minify CSS files"`
-		NoMinifyJs           bool `arg:"--no-min-js,env:NO_MIN_JS" help:"Do not minify Javascript files"`
-		NoMinifyJson         bool `arg:"--no-min-json,env:NO_MIN_JSON" help:"Do not minify JSON files"`
-	}
-
-	Flags struct {
-		MinifyFlags
-		NoMinifyFlags
-		GenerateIndex     bool               `arg:"--gen-index" default:"true" help:"Generate index on _index.soyweb"`
-		GenerateIndexMode IndexGeneratorMode `arg:"--gen-index-mode" help:"Index generation mode"`
-	}
-)
-
-func SsgOptions(f Flags) []ssg.Option {
-	opts := []ssg.Option{}
 	minifiers := make(map[string]MinifyFn)
-	f.MinifyFlags = negate(f.MinifyFlags, f.NoMinifyFlags)
-
-	if f.MinifyHtmlCopy {
+	if b.MinifyHtmlCopy {
 		minifiers[".html"] = MinifyHtml
 	}
-	if f.MinifyCss {
+	if b.MinifyCss {
 		minifiers[".css"] = MinifyCss
 	}
-	if f.MinifyJs {
+	if b.MinifyJs {
 		minifiers[".js"] = MinifyJs
 	}
-	if f.MinifyJson {
+	if b.MinifyJson {
 		minifiers[".json"] = MinifyJson
 	}
 
-	hook := hookMinify(minifiers)
-	if hook != nil {
-		opts = append(opts, ssg.WithHooks(hook))
-	}
-	if f.MinifyHtmlGenerate {
-		opts = append(opts, ssg.WithHooksGenerate(MinifyHtml))
-	}
+	hookMinifies := HookMinify(minifiers)
+	hookReplacer := HookReplacer(b.Replaces)
 
-	pipes := []any{}
-	if f.GenerateIndex {
-		pipeGenIndex := NewIndexGenerator(f.GenerateIndexMode)
-		pipes = append(pipes, pipeGenIndex)
+	if hookMinifies == nil && hookReplacer == nil {
+		return nil
 	}
 
-	return append(opts, ssg.WithPipelines(pipes...))
-}
-
-func NewIndexGenerator(m IndexGeneratorMode) func(*ssg.Ssg) ssg.Pipeline {
-	switch m {
-	case
-		IndexGeneratorModeReverse,
-		"rev",
-		"r":
-		return IndexGeneratorReverse
-
-	case
-		IndexGeneratorModeModTime,
-		"updated_at",
-		"u":
-		return IndexGeneratorModTime
+	// Minify only
+	if b.NoReplace || hookReplacer == nil {
+		if hookMinifies == nil {
+			return nil
+		}
+		return []ssg.Hook{
+			hookMinifies,
+		}
 	}
 
-	return IndexGenerator
+	// Replace only
+	if hookMinifies == nil {
+		return []ssg.Hook{
+			hookReplacer,
+		}
+	}
+
+	// Replace and minify
+	return []ssg.Hook{
+		hookReplacer,
+		hookMinifies,
+	}
 }
 
-// IndexGenerator returns an [ssg.Pipeline] that would look for
-// marker file "_index.soyweb" within a directory.
-//
-// Once it finds a marked directory, it inspects the children
-// and generate a Markdown list with name index.md,
-// which is later sent to supplied impl
-func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
-	return IndexGeneratorTemplate(
-		nil,
-		generateIndex,
-	)(s)
+func (b *builder) HooksGenerate() []ssg.HookGenerate {
+	if b.MinifyHtmlGenerate {
+		return []ssg.HookGenerate{
+			MinifyHtml,
+		}
+	}
+	return nil
 }
 
-// IndexGeneratorReverse returns an index generator whose index list
-// is populated reversed, i.e. descending alphanumerical sort
-func IndexGeneratorReverse(s *ssg.Ssg) ssg.Pipeline {
-	return IndexGeneratorTemplate(
-		func(entries []fs.FileInfo) []fs.FileInfo {
-			reverseInPlace(entries)
-			return entries
-		},
-		generateIndex,
-	)(s)
+func (b *builder) Pipelines() []any {
+	if b.NoGenerateIndex || !b.GenerateIndex {
+		return nil
+	}
+	return []any{
+		NewIndexGenerator(b.GenerateIndexMode)(&b.ssg),
+	}
 }
 
-// IndexGeneratorModTime returns an index generator that sort index entries
-// by ModTime returned by fs.FileInfo
-func IndexGeneratorModTime(s *ssg.Ssg) ssg.Pipeline {
-	sortByModTime := func(entries []fs.FileInfo) func(i int, j int) bool {
-		return func(i, j int) bool {
-			infoI, infoJ := entries[i], entries[j]
-			cmp := infoI.ModTime().Compare(infoJ.ModTime())
-			if cmp == 0 {
-				return infoI.Name() < infoJ.Name()
+func ApplyManifestV2(m Manifest, f FlagsV2, do Stage) error {
+	slog.Info("stages",
+		StageCleanUp.String(), do.Ok(StageCleanUp),
+		StageCopy.String(), do.Ok(StageCopy),
+		StageBuild.String(), do.Ok(StageBuild),
+	)
+
+	targets, err := collect(m)
+	if err != nil {
+		return err
+	}
+	if do.Ok(StageCleanUp) {
+		err = cleanup(m, targets)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Copy
+	old := slog.Default()
+	for key, site := range m {
+		slog.SetDefault(old.
+			WithGroup("copy").
+			With(
+				"key", key,
+				"url", site.ssg.Url,
+			),
+		)
+		if !do.Ok(StageCopy) {
+			slog.Info("skipping stage copy")
+			break
+		}
+
+		if err := site.Copy(); err != nil {
+			return manifestError{
+				err:   err,
+				key:   key,
+				msg:   "failed to copy",
+				stage: StageCopy,
 			}
-			return cmp == -1
 		}
+
+		slog.SetDefault(old)
 	}
 
-	return IndexGeneratorTemplate(
-		func(entries []fs.FileInfo) []fs.FileInfo {
-			sort.Slice(entries, sortByModTime(entries))
-			return entries
-		},
-		generateIndex,
-	)(s)
-}
+	// Build
+	for key, site := range m {
+		log := old.
+			WithGroup("build").
+			With(
+				"key", key,
+				"url", site.ssg.Url,
+			)
 
-func reverseInPlace(arr []fs.FileInfo) {
-	for i, j := 0, len(arr)-1; i < j; i, j = i+1, j-1 {
-		arr[i], arr[j] = arr[j], arr[i]
+		if !do.Ok(StageBuild) {
+			log.Info("skipping stage build")
+			break
+		}
+
+		slog.SetDefault(log)
+		b := newManifestBuilder(site, f)
+
+		log.
+			With(
+				"key", key,
+				"url", site.ssg.Url,
+				// @TODO: Len logs below will be removed
+				// "len_hooks", len(b.Hooks()),
+				// "len_hooks_generate", len(b.HooksGenerate()),
+				// "len_pipelines", len(b.Pipelines()),
+			).
+			Info("building site")
+
+		if err := b.ssg.Generate(); err != nil {
+			return manifestError{
+				err:   err,
+				key:   key,
+				msg:   "failed to build",
+				stage: StageBuild,
+			}
+		}
 	}
-}
-
-func (m MinifyFlags) Skip(ext string) bool {
-	switch ext {
-	case ".html":
-		if m.MinifyHtmlGenerate {
-			return false
-		}
-		if m.MinifyHtmlCopy {
-			return false
-		}
-	case ".css":
-		if m.MinifyCss {
-			return false
-		}
-	case ".js":
-		if m.MinifyJs {
-			return false
-		}
-	case ".json":
-		if m.MinifyJson {
-			return false
-		}
-
-	default:
-		return true
-	}
-
-	return true
-}
-
-func (n NoMinifyFlags) Skip(ext string) bool {
-	switch ext {
-	case ".html":
-		if n.NoMinifyHtmlGenerate {
-			return true
-		}
-		if n.NoMinifyHtmlCopy {
-			return true
-		}
-	case ".css":
-		if n.NoMinifyCss {
-			return true
-		}
-	case ".js":
-		if n.NoMinifyJs {
-			return true
-		}
-	case ".json":
-		if n.NoMinifyJson {
-			return true
-		}
-
-	default:
-		return true
-	}
-
-	return false
-}
-
-func negate(yes MinifyFlags, no NoMinifyFlags) MinifyFlags {
-	if no.NoMinifyHtmlGenerate {
-		yes.MinifyHtmlGenerate = false
-	}
-	if no.NoMinifyHtmlCopy {
-		yes.MinifyHtmlCopy = false
-	}
-	if no.NoMinifyCss {
-		yes.MinifyCss = false
-	}
-	if no.NoMinifyJs {
-		yes.MinifyJs = false
-	}
-	if no.NoMinifyJson {
-		yes.MinifyJson = false
-	}
-
-	return yes
+	return nil
 }

@@ -25,7 +25,7 @@ const (
 	StageCopy
 	StageBuild
 
-	StagesAll = StageCollect | StageCleanUp | StageCopy | StageBuild
+	StageAll Stage = StageCollect | StageCleanUp | StageCopy | StageBuild
 )
 
 type Manifest map[string]Site
@@ -33,10 +33,11 @@ type Manifest map[string]Site
 type Site struct {
 	ssg ssg.Ssg `json:"-"`
 
-	Copies        map[string]CopyTargets `json:"-"`
-	Replaces      Replaces               `json:"-"`
-	CleanUp       bool                   `json:"-"`
-	GenerateIndex bool                   `json:"-"`
+	CleanUp           bool                   `json:"-"` // Remove files in Copies before copying them
+	Copies            map[string]CopyTargets `json:"-"`
+	GenerateIndex     bool                   `json:"-"`
+	GenerateIndexMode IndexGeneratorMode     `json:"-"`
+	Replaces          Replaces               `json:"-"`
 }
 
 type CopyTarget struct {
@@ -63,21 +64,24 @@ func (s *Site) UnmarshalJSON(b []byte) error {
 		Title string `json:"title"`
 		Url   string `json:"url"`
 
-		Copies        map[string]CopyTargets `json:"copies"`
-		Replaces      Replaces               `json:"replaces"`
-		CleanUp       bool                   `json:"cleanup"`
-		GenerateIndex bool                   `json:"generate-index"`
+		Copies            map[string]CopyTargets `json:"copies"`
+		CleanUp           bool                   `json:"cleanup"`
+		GenerateIndex     bool                   `json:"generate-index"`
+		GenerateIndexMode IndexGeneratorMode     `json:"generate-index-mode"`
+		Replaces          Replaces               `json:"replaces"`
 	}
+
 	err := json.Unmarshal(b, &site)
 	if err != nil {
 		return err
 	}
 
 	*s = Site{
-		Copies:        site.Copies,
-		Replaces:      site.Replaces,
-		CleanUp:       site.CleanUp,
-		GenerateIndex: site.GenerateIndex,
+		Copies:            site.Copies,
+		Replaces:          site.Replaces,
+		CleanUp:           site.CleanUp,
+		GenerateIndex:     site.GenerateIndex,
+		GenerateIndexMode: site.GenerateIndexMode,
 		ssg: ssg.New(
 			site.Src,
 			site.Dst,
@@ -288,7 +292,7 @@ func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
 
 		s := &site.ssg
 		if len(site.Replaces) != 0 {
-			hookReplacer := Replacer(site.Replaces)
+			hookReplacer := HookReplacer(site.Replaces)
 			opts = append(opts, ssg.PrependHooks(hookReplacer))
 		}
 		// TODO: refactor init options for manifest at 1 place!
@@ -320,7 +324,6 @@ func ApplyFromManifest(path string, do Stage, opts ...ssg.Option) error {
 		logger.Error("failed to parse manifest", "error", err)
 		return err
 	}
-
 	return ApplyManifest(m, do, opts...)
 }
 
