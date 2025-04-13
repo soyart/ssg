@@ -63,10 +63,6 @@ jobs:
           name: ssg-zip
           path: ./
       
-      - name: Inspect zip artifact
-        run: |
-          du -sh  ./ssg-go-x86_64_linux.zip
-
       - name: Create Release
         id: create_release
         uses: actions/create-release@master
@@ -104,11 +100,6 @@ jobs:
           name: ssg-zip
           path: ./
       
-      - name: Inspect zip artifact
-        run: |
-          ls -al ./ssg-go-x86_64_linux.zip
-          du -sh  ./ssg-go-x86_64_linux.zip
-
       - name: Get today's date
         run: |
           # Store 2025-01-01 in env $RELEASE_DATE
