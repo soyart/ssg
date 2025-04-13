@@ -7,9 +7,9 @@ handling of header and footer templates, preference of source HTML files
 over the Markdown, file permissions, etc.
 
 In addition to the library, it also confusingly
-provides an executable [`cmd/soyweb`](#soyweb-main-programcmdsoyweb).
+provides an executable [`cmd/soyweb`](#soyweb-main-program).
 
-## [soyweb (main program)](./cmd/soyweb)
+## soyweb (main program)
 
 soyweb extends Go ssg implementation for complex static site management,
 and is intended to be a better replacement for [webtools](https://github.com/soyart/artnoi.com/commit/ec01c2ec884bca8c4ca15ff5afa7db0e7b4608a6).
@@ -183,7 +183,7 @@ Above is a soyweb manifest that defines 2 sites: `Example Site 1` and `Example S
 `Example Site 1` is accessed via `some-site-1` site key.
 
 Each site object contains options for the site,
-like [the soyweb index generator](#soyweb-index-generatorindexgo)
+like [the soyweb index generator](#soyweb-index-generator)
 and [soyweb minifiers](#soyweb-minifiers).
 
 Real world example would be [manifest.json](../testdata/manifest.json).
@@ -205,12 +205,13 @@ hooks that map 1 input data to 1 output data.
 
 The minifiers is available to all programs under soyweb.
 
-### [soyweb index generator](./index.go)
+### soyweb index generator
 
-soyweb provides an automatic index generator implemented as a [ssg.Pipeline](../ssg-go/options.go).
-This pipeline will automatically generate index sibling Markdowns, HTMLs, and directories.
+soyweb provides an automatic [index generator](./index.go),
+implemented as a [ssg.Pipeline](../ssg-go/options.go). This pipeline
+will automatically generate index sibling Markdowns, HTMLs, and directories.
 
-It looks for marker file `_index.soyweb` somewhere under `${src}`, and,
+The pipeline looks for marker file `_index.soyweb` somewhere under `${src}`, and,
 if found, lists all links to the children (i.e. "articles").
 
 The marker `_index.soyweb` can be empty, or contain template. If not empty, the
