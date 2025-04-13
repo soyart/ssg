@@ -52,11 +52,11 @@ func (b FlagsV2) Stage() Stage {
 
 type builder struct {
 	Site
-	FlagsV2
+	flags FlagsV2
 }
 
 func newManifestBuilder(s Site, f FlagsV2) *builder {
-	b := &builder{Site: s, FlagsV2: f}
+	b := &builder{Site: s, flags: f}
 	b.initialize()
 	return b
 }
@@ -73,21 +73,21 @@ func (b *builder) Caching() bool { panic("unexpected call to Caching()") }
 func (b *builder) Writers() int  { panic("unexpected call to Writers()") }
 
 func (b *builder) Hooks() []ssg.Hook {
-	if b.NoBuild {
+	if b.flags.NoBuild {
 		return nil
 	}
 
 	minifiers := make(map[string]MinifyFn)
-	if b.MinifyHtmlCopy {
+	if b.flags.MinifyHtmlCopy {
 		minifiers[".html"] = MinifyHtml
 	}
-	if b.MinifyCss {
+	if b.flags.MinifyCss {
 		minifiers[".css"] = MinifyCss
 	}
-	if b.MinifyJs {
+	if b.flags.MinifyJs {
 		minifiers[".js"] = MinifyJs
 	}
-	if b.MinifyJson {
+	if b.flags.MinifyJson {
 		minifiers[".json"] = MinifyJson
 	}
 
@@ -99,7 +99,7 @@ func (b *builder) Hooks() []ssg.Hook {
 	}
 
 	// Minify only
-	if b.NoReplace || hookReplacer == nil {
+	if b.flags.NoReplace || hookReplacer == nil {
 		if hookMinifies == nil {
 			return nil
 		}
@@ -123,7 +123,7 @@ func (b *builder) Hooks() []ssg.Hook {
 }
 
 func (b *builder) HooksGenerate() []ssg.HookGenerate {
-	if b.MinifyHtmlGenerate {
+	if b.flags.MinifyHtmlGenerate {
 		return []ssg.HookGenerate{
 			MinifyHtml,
 		}
@@ -132,7 +132,7 @@ func (b *builder) HooksGenerate() []ssg.HookGenerate {
 }
 
 func (b *builder) Pipelines() []any {
-	if b.NoGenerateIndex || !b.GenerateIndex {
+	if b.flags.NoGenerateIndex || !b.GenerateIndex {
 		return nil
 	}
 	return []any{
