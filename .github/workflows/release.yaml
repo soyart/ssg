@@ -79,8 +79,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref_name }}-$RELEASE_DATE
-          release_name: Release ${{ github.ref_name }} for $RELEASE_DATE
+          tag_name: ${{ github.ref_name }}-${{ env.RELEASE_DATE }}
+          release_name: Release ${{ github.ref_name }} for ${{ env.RELEASE_DATE }}
           draft: false
           prerelease: false
 
