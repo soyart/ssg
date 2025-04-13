@@ -17,6 +17,16 @@ type (
 	}
 )
 
+func (f NoMinifyFlags) Flags() FlagsV2 {
+	return FlagsV2{
+		MinifyHtmlGenerate: !f.NoMinifyHtmlGenerate,
+		MinifyHtmlCopy:     !f.NoMinifyHtmlCopy,
+		MinifyCss:          !f.NoMinifyCss,
+		MinifyJs:           !f.NoMinifyJs,
+		MinifyJson:         !f.NoMinifyJson,
+	}
+}
+
 func NewIndexGenerator(m IndexGeneratorMode) func(*ssg.Ssg) ssg.Pipeline {
 	switch m {
 	case
@@ -91,29 +101,31 @@ func reverseInPlace(arr []fs.FileInfo) {
 
 func (n NoMinifyFlags) Skip(ext string) bool {
 	switch ext {
-	case ".html":
+	case ExtHtml:
 		if n.NoMinifyHtmlGenerate {
 			return true
 		}
 		if n.NoMinifyHtmlCopy {
 			return true
 		}
-	case ".css":
+	case ExtCss:
 		if n.NoMinifyCss {
 			return true
 		}
-	case ".js":
+	case ExtJs:
 		if n.NoMinifyJs {
 			return true
 		}
-	case ".json":
+	case ExtJson:
 		if n.NoMinifyJson {
 			return true
 		}
 
+		// Skip unknown file extension and media type
 	default:
 		return true
 	}
 
+	// Do not skip this extension
 	return false
 }

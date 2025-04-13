@@ -105,16 +105,14 @@ func (m *minifier) walk(path string, d fs.DirEntry, e error) error {
 		return err
 	}
 	dst := filepath.Join(m.dst, rel)
-	if m.NoMinifyFlags.Skip(filepath.Ext(path)) {
+	if m.Skip(filepath.Ext(path)) {
 		copied, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-
 		m.dist = append(m.dist, ssg.Output(dst, path, copied, info.Mode().Perm()))
 		return nil
 	}
-
 	minified, err := soyweb.MinifyFile(path)
 	if err != nil {
 		return err

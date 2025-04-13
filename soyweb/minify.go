@@ -6,13 +6,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/soyart/ssg/ssg-go"
 	"github.com/tdewolff/minify/v2"
 	"github.com/tdewolff/minify/v2/css"
 	"github.com/tdewolff/minify/v2/html"
 	"github.com/tdewolff/minify/v2/js"
 	"github.com/tdewolff/minify/v2/json"
-
-	"github.com/soyart/ssg/ssg-go"
 )
 
 type (
@@ -24,6 +23,11 @@ const (
 	MediaTypeCss  = "style/css"
 	MediaTypeJs   = "text/javascript"
 	MediaTypeJson = "application/json"
+
+	ExtHtml = ".html"
+	ExtCss  = ".css"
+	ExtJs   = ".js"
+	ExtJson = ".json"
 )
 
 var m = minify.New()
@@ -88,56 +92,45 @@ func MinifyFile(path string) ([]byte, error) {
 
 func ExtToMediaType(ext string) (string, error) {
 	switch ext {
-	case ".html":
+	case ExtHtml:
 		return MediaTypeHtml, nil
-	case ".css":
+	case ExtCss:
 		return MediaTypeCss, nil
-	case ".js":
+	case ExtJs:
 		return MediaTypeJs, nil
-	case ".json":
+	case ExtJson:
 		return MediaTypeJson, nil
 	}
-
 	return "", fmt.Errorf("'%s': %w", ext, ErrWebFormatNotSupported)
 }
 
 func ExtToFn(ext string) (func([]byte) ([]byte, error), error) {
 	switch ext {
-	case ".html":
+	case ExtHtml:
 		return MinifyHtml, nil
-	case ".css":
+	case ExtCss:
 		return MinifyCss, nil
-	case ".js":
+	case ExtJs:
 		return MinifyJs, nil
-	case ".json":
+	case ExtJson:
 		return MinifyJson, nil
 	}
-
 	return nil, fmt.Errorf("'%s': %w", ext, ErrWebFormatNotSupported)
-}
-
-func minifyMedia(original []byte, mediaType string) ([]byte, error) {
-	min := bytes.NewBuffer(nil)
-	err := m.Minify(mediaType, min, bytes.NewBuffer(original))
-	if err != nil {
-		return nil, err
-	}
-	return min.Bytes(), nil
 }
 
 func HookMinifyDefault(mediaTypes ssg.Set) ssg.Hook {
 	m := make(map[string]MinifyFn)
 	if mediaTypes.Contains(MediaTypeHtml) {
-		m[".html"] = MinifyHtml
+		m[ExtHtml] = MinifyHtml
 	}
 	if mediaTypes.Contains(MediaTypeJs) {
-		m[".js"] = MinifyJs
+		m[ExtJs] = MinifyJs
 	}
 	if mediaTypes.Contains(MediaTypeJson) {
-		m[".json"] = MinifyJson
+		m[ExtJson] = MinifyJson
 	}
 	if mediaTypes.Contains(MediaTypeCss) {
-		m["css"] = MinifyCss
+		m[ExtCss] = MinifyCss
 	}
 	return HookMinify(m)
 }
@@ -158,4 +151,13 @@ func HookMinify(m map[string]MinifyFn) ssg.Hook {
 		}
 		return b, nil
 	}
+}
+
+func minifyMedia(original []byte, mediaType string) ([]byte, error) {
+	min := bytes.NewBuffer(nil)
+	err := m.Minify(mediaType, min, bytes.NewBuffer(original))
+	if err != nil {
+		return nil, err
+	}
+	return min.Bytes(), nil
 }
