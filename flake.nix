@@ -77,7 +77,7 @@ rec {
           };
           src = ./.;
           modRoot = "./soyweb";
-          vendorHash = "sha256-UCTlE8j2A2/4KeM55oPt2kbsaGM2yQ+YGVAj/8XDumk=";
+          vendorHash = "sha256-JfLD/VchxoFqyS98S/UBOjWGI0w2HamMsvvm3Jo8E4Y=";
           meta = {
             homepage = "https://github.com/soyart/ssg";
             description = "soyweb - ssg wrapper";
