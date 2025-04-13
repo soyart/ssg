@@ -517,11 +517,11 @@ func cp(src string, dst CopyTarget, perm fs.FileMode) error {
 		}
 		perm = stat.Mode().Perm()
 	}
+
 	err = os.WriteFile(dst.Target, b, perm)
 	if err != nil {
 		return fmt.Errorf("error writing to dst: %w", err)
 	}
-
 	return nil
 }
 
@@ -546,16 +546,13 @@ func cpRecurse(src string, dst CopyTarget) error {
 			return err
 		}
 
-		target := filepath.Join(dstRoot, rel)
-		// slog.Debug("cpRecurse", "src", src, "base", filepath.Base(path), "dst", dst, "target", target)
-
 		out := CopyTarget{
-			Target: target,
+			Target: filepath.Join(dstRoot, rel),
 			Force:  dst.Force,
 		}
-
 		return cp(path, out, info.Mode().Perm())
 	})
+
 	if err != nil {
 		return fmt.Errorf("walkDir failed for src '%s', dst '%s': %w", src, dst.Target, err)
 	}
@@ -563,10 +560,18 @@ func cpRecurse(src string, dst CopyTarget) error {
 	return nil
 }
 
-func copyFiles(dirs ssg.Set, src string, dst CopyTarget, permsCache map[string]fs.FileMode) error {
+func copyFiles(
+	existingDirs ssg.Set,
+	src string,
+	dst CopyTarget,
+	permsCache map[string]fs.FileMode,
+) error {
+	isDirSrc, isDirDst := existingDirs.Contains(src), existingDirs.Contains(dst.Target)
+	isDirBoth := isDirSrc && isDirDst
+
 	switch {
 	// Copy dir to dir, with target not yet existing
-	case dirs.Contains(src) && !dirs.Contains(dst.Target):
+	case isDirSrc && !isDirDst:
 		err := os.MkdirAll(dst.Target, os.ModePerm)
 		if err != nil {
 			return fmt.Errorf("failed to prepare dst directory: %w", err)
@@ -575,12 +580,12 @@ func copyFiles(dirs ssg.Set, src string, dst CopyTarget, permsCache map[string]f
 		fallthrough
 
 	// Copy dir to dir, with target dir existing
-	case dirs.Contains(src, dst.Target):
+	case isDirBoth:
 		return cpRecurse(src, dst)
 
 	// Copy file to dir, i.e. cp foo.json ./some-dir/
 	// which will just writes out to ./some-dir/foo.json
-	case dirs.Contains(dst.Target):
+	case isDirDst:
 		base := filepath.Base(src)
 		dst.Target = filepath.Join(dst.Target, base)
 	}
