@@ -1,13 +1,120 @@
 # soyweb
 
-soyweb is a collection of [ssg-go](https://github.com/soyart/ssg)
-wrappers and extensions.
+soyweb is a Go library providing [ssg-go extensions](https://github.com/soyart/ssg).
 
 soyweb extensions respect ssg-go quirks such as ssgignore,
 handling of header and footer templates, preference of source HTML files
 over the Markdown, file permissions, etc.
 
-## soyweb programs
+In addition to the library, it also confusingly
+provides an executable [`cmd/soyweb`](#soyweb-main-programcmdsoyweb).
+
+## [soyweb (main program)](./cmd/soyweb)
+
+soyweb extends Go ssg implementation for better multi-site management,
+and is intended to be a better replacement for [webtools](https://github.com/soyart/artnoi.com/commit/ec01c2ec884bca8c4ca15ff5afa7db0e7b4608a6)
+
+It uses a *manifest* file to describe how each *ssg site* is going to be built.
+The manifest is like `go.mod` or `package.json` for our site - it defines
+the source and destination directories and extra soyweb options.
+
+> See [`manifest.json`](../testdata/manifest.json) as example
+>
+> To try soyweb, go into `./testdata` and run soyweb
+
+Synopsis:
+```
+soyweb <command> [<args>]
+```
+
+soyweb reads manifest(s) and apply changes specified in them.
+Because it is a multi-stage application, soyweb exposes these stages
+as 3+1 CLI *subcommand*:
+
+- Default mode
+
+  It builds `./manifest.json` with all stages.
+
+  Due to the limitation of the CLI library, this default
+  mode takes no arguments.
+
+  ```shell
+  # Build from ./manifest.json (default path)
+  soyweb
+  ```
+
+- `soyweb build`
+
+  This subcommands build sites from one or multiple manifests.
+
+  We can specify skip flags to `build`, which will make soyweb
+  skip some particular stages during application of manifests.
+
+  > By default, `soyweb build` enables the soyweb index generator
+  > and all minifiers are disabled.
+
+  Help:
+
+  ```shell
+  soyweb build -h
+  ```
+
+  Examples:
+
+  ```shell
+  # Build from ./manifest.json (same with default behavior)
+  soyweb build
+
+  # Like above, but do not generate index from marker _index.soyweb
+  soyweb build --no-gen-index
+
+  # Build from ./manifest.json
+  # without copying files defined in manifest
+  soyweb build --no-copy
+
+  # Build from ./m1.json and ./m2.sjon
+  soyweb build ./m1.json ./m2.json
+
+  # Build from ./m1.json and ./m2.json
+  # without actually building HTMLs from Markdowns
+  #
+  # The --no-build option also disables all soyweb build features
+  # that relies on ssg options, such as minifiers and index generator
+  soyweb build --no-build ./m1.json ./m2.json
+
+  # Build from ./m1.json and ./m2.json
+  # and minify all HTML files built from Markdown
+  soyweb build ./m1.json ./m2.json --min-html
+
+  # Like above, but minify all HTML files
+  soyweb build ./m1.json ./m2.json --min-html --min-html-copy
+
+  # Like above, but minify all HTML files and CSS files
+  soyweb build ./m1.json ./m2.json --min-html --min-html-copy --min-css
+  ```
+
+- `soyweb clean`
+
+  Removes target files specified in the manifests' `copies` directive
+
+  Help:
+
+  ```shell
+  soyweb clean -h
+  soyweb cleanup -h
+  ```
+
+- `soyweb copy`
+
+  Copy files specified in the manifests' `copies` directive
+
+  Help:
+
+  ```shell
+  soyweb copy -h
+  ```
+
+## Other soyweb programs
 
 In addition to extension library, soyweb provides a few programs that
 serve as a collection of tools meant to replace [webtools](https://github.com/soyart/webtools).
@@ -23,113 +130,79 @@ to streamline the site's CI/CD pipelines.
   minified version to different location, or all supported files under
   the source directory
 
+  `minifier` by default minifies all known media types, but this behavior
+  can be controlled with `--no-min-{ext}` flags:
+
+  ```shell
+  # Do not minify .js files
+  minifier some/src some/dst --no-min-js
+
+  # Do not minify .html and .css files
+  minifier some/src some/dst --no-min-html --no-min-css
+  ```
+
 - [ssg-minifier](./cmd/ssg-minifier)
 
   A minifier-enabled version of standard ssg
 
-- [ssg-manifest](./cmd/ssg-manifest)
+## soyweb manifest
 
-  ssg-manifest wraps Go ssg implementation for better multi-site management,
-  and is intended to be a better replacement for [webtools](https://github.com/soyart/webtools)
+A soyweb manifest is a JSON file describing all ssg-go and soyweb options for *soyweb site*s.
+It defines soyweb sites as a JSON map object, accessed via *site key*:
 
-  > See [`manifest.json`](../testdata/manifest.json) as example
-  >
-  > To try ssg-manifest, go into `./testdata` and run ssg-manifest
+```json
+{
+  "some-site-1": {
+    "src": "some-site-1/src",
+    "dst": "some-site-1/dist",
+    "title": "Title Site 1",
+    "url": "example-1.com",
+    "name": "Example Site 1",
+    "option-1": false,
+    "options-2": [
+      "foo",
+      "bar",
+      "baz"
+    ]
+  },
+  "some-site-2": {
+    "src": "some-site-2/src",
+    "dst": "some-site-2/dist",
+    "title": "Title Site 2",
+    "url": "example-2.com",
+    "name": "Example Site 2",
+    "option-1": true,
+  }
+}
+```
 
-  Synopsis:
-  ```
-  ssg-manifest <command> [<args>]
-  ```
+Above is a soyweb manifest that defines 2 sites: `Example Site 1` and `Example Site 2`.
+`Example Site 1` is accessed via `some-site-1` site key.
 
-  ssg-manifest reads manifest(s) and apply changes specified in them.
-  Because it is a multi-stage application, ssg-manifest supports 3 subcommands
-  for better user experience:
+Each site object contains options for the site,
+like [the soyweb index generator](#soyweb-index-generatorindexgo)
+and [soyweb minifiers](#soyweb-minifiers).
 
-  - Default mode
+Real world example would be [manifest.json](../testdata/manifest.json).
 
-    It builds `./manifest.json` with all stages.
+A soyweb site can be thought of as the smallest unit of a website,
+and how your site will be organized into soyweb sites are entirely up to you.
 
-    Due to the limitation of the CLI library, this default
-    mode takes no arguments.
-
-    ```shell
-    # Build from ./manifest.json (default path)
-    ssg-manifest
-    ```
-
-  - `ssg-manifest build`
-
-    This subcommands build sites from one or multiple manifests.
-
-    We can specify skip flags to `build`, which will make ssg-manifest
-    skip some particular stages during application of manifests.
-
-    Help:
-
-    ```shell
-    ssg-manifest build -h
-    ```
-
-    Examples:
-
-    ```shell
-    # Build from ./manifest.json (same with default behavior)
-    ssg-manifest build
-
-    # Build from ./m1.json and ./m2.sjon
-    ssg-manifest build ./m1.json ./m2.json
-
-    # Build from ./manifest.json without copying
-    ssg-manifest build --no-copy
-
-    # Build from ./m1.json and ./m2.json
-    # without actually building HTMLs from Markdowns
-    ssg-manifest build --no-build ./m1.json ./m2.json
-
-    # Build from ./m1.json and ./m2.json
-    # and minify all HTML files built from Markdown
-    ssg-manifest build ./m1.json ./m2.json --min-html
-
-    # Like above, but minify all HTML files
-    ssg-manifest build ./m1.json ./m2.json --min-html --min-html-copy
-
-    # Like above, but minify all HTML files and CSS files
-    ssg-manifest build ./m1.json ./m2.json --min-html --min-html-copy --min-css
-    ```
-
-  - `ssg-manifest clean`
-
-    Removes target files specified in the manifests' `copies` directive
-
-    Help:
-
-    ```shell
-    ssg-manifest clean -h
-    ssg-manifest cleanup -h
-    ```
-
-  - `ssg-manifest copy`
-
-    Copy files specified in the manifests' `copies` directive
-
-    Help:
-
-    ```shell
-    ssg-manifest copy -h
-    ```
+In reality, a soyweb site only exists so that we can apply different soyweb options
+against different source roots. Multiple such sites may in reality make up 1 website.
 
 ## soyweb ssg-go options
 
 soyweb extends ssg-go options using `ssg.Option` type.
 
-### Minifiers
+### soyweb minifiers
 
 soyweb provides webformat minifiers opitions for ssg, implemented as
 hooks that map 1 input data to 1 output data.
 
 The minifiers is available to all programs under soyweb.
 
-### [Index generator](./index.go)
+### [soyweb index generator](./index.go)
 
 soyweb provides an automatic index generator implemented as a [ssg.Pipeline](../ssg-go/options.go).
 This pipeline will automatically generate index sibling Markdowns, HTMLs, and directories.
@@ -155,7 +228,7 @@ at least one of the criteria:
 
   The generated index will point to `${sibling}/index.html`
 
-The generator is currently available to `ssg-manifest` via the site manifest specification.
+The generator is currently available to `soyweb` via the site manifest specification.
 
 #### Index generator: templates in markers
 
