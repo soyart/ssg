@@ -3,6 +3,7 @@ package soyweb
 import (
 	"errors"
 	"log/slog"
+	"os"
 
 	"github.com/soyart/ssg/ssg-go"
 )
@@ -19,43 +20,15 @@ const (
 
 var ErrWebFormatNotSupported = errors.New("unsupported web format")
 
-// FlagsV2 represents CLI arguments that could modify soyweb behavior, such as skipping stages
-// and minifying content of certain file extensions.
-type FlagsV2 struct {
-	NoCleanup       bool `arg:"--no-cleanup" help:"Skip cleanup stage"`
-	NoCopy          bool `arg:"--no-copy" help:"Skip scopy stage"`
-	NoBuild         bool `arg:"--no-build" help:"Skip build stage"`
-	NoReplace       bool `arg:"--no-replace" help:"Do not do text replacements defined in manifest"`
-	NoGenerateIndex bool `arg:"--no-gen-index" help:"Do not generate indexes on _index.soyweb"`
-
-	MinifyHtmlGenerate bool `arg:"--min-html" help:"Minify converted HTML outputs"`
-	MinifyHtmlCopy     bool `arg:"--min-html-copy" help:"Minify all copied HTML"`
-	MinifyCss          bool `arg:"--min-css" help:"Minify CSS files"`
-	MinifyJs           bool `arg:"--min-js" help:"Minify Javascript files"`
-	MinifyJson         bool `arg:"--min-json" help:"Minify JSON files"`
-}
-
-func (b FlagsV2) Stage() Stage {
-	s := StageAll
-	if b.NoCleanup {
-		s.Skip(StageCleanUp)
-	}
-	if b.NoCopy {
-		s.Skip(StageCopy)
-	}
-	if b.NoBuild {
-		s.Skip(StageBuild)
-	}
-	return s
-}
-
+// builder controls `soyweb build` behavior
+// by ordering hooks and pipeline
 type builder struct {
 	Site
-	FlagsV2
+	flags FlagsV2
 }
 
 func newManifestBuilder(s Site, f FlagsV2) *builder {
-	b := &builder{Site: s, FlagsV2: f}
+	b := &builder{Site: s, flags: f}
 	b.initialize()
 	return b
 }
@@ -68,61 +41,23 @@ func (b *builder) initialize() {
 	)
 }
 
-func (b *builder) Caching() bool { panic("unexpected call to Caching()") }
-func (b *builder) Writers() int  { panic("unexpected call to Writers()") }
-
 func (b *builder) Hooks() []ssg.Hook {
-	if b.NoBuild {
+	if b.flags.NoBuild {
 		return nil
 	}
-
-	minifiers := make(map[string]MinifyFn)
-	if b.MinifyHtmlCopy {
-		minifiers[".html"] = MinifyHtml
+	if b.flags.NoReplace {
+		return filterNilHooks(
+			b.flags.hookMinify(),
+		)
 	}
-	if b.MinifyCss {
-		minifiers[".css"] = MinifyCss
-	}
-	if b.MinifyJs {
-		minifiers[".js"] = MinifyJs
-	}
-	if b.MinifyJson {
-		minifiers[".json"] = MinifyJson
-	}
-
-	hookMinifies := HookMinify(minifiers)
-	hookReplacer := HookReplacer(b.Replaces)
-
-	if hookMinifies == nil && hookReplacer == nil {
-		return nil
-	}
-
-	// Minify only
-	if b.NoReplace || hookReplacer == nil {
-		if hookMinifies == nil {
-			return nil
-		}
-		return []ssg.Hook{
-			hookMinifies,
-		}
-	}
-
-	// Replace only
-	if hookMinifies == nil {
-		return []ssg.Hook{
-			hookReplacer,
-		}
-	}
-
-	// Replace and minify
-	return []ssg.Hook{
-		hookReplacer,
-		hookMinifies,
-	}
+	return filterNilHooks(
+		HookReplacer(b.Replaces),
+		b.flags.hookMinify(),
+	)
 }
 
 func (b *builder) HooksGenerate() []ssg.HookGenerate {
-	if b.MinifyHtmlGenerate {
+	if b.flags.MinifyHtmlGenerate {
 		return []ssg.HookGenerate{
 			MinifyHtml,
 		}
@@ -131,7 +66,7 @@ func (b *builder) HooksGenerate() []ssg.HookGenerate {
 }
 
 func (b *builder) Pipelines() []any {
-	if b.NoGenerateIndex || !b.GenerateIndex {
+	if b.flags.NoGenerateIndex || !b.GenerateIndex {
 		return nil
 	}
 	return []any{
@@ -139,87 +74,25 @@ func (b *builder) Pipelines() []any {
 	}
 }
 
-func ApplyManifestV2(m Manifest, f FlagsV2, do Stage) error {
-	slog.Info("stages",
-		StageCleanUp.String(), do.Ok(StageCleanUp),
-		StageCopy.String(), do.Ok(StageCopy),
-		StageBuild.String(), do.Ok(StageBuild),
+func newLogger() *slog.Logger {
+	loglevel.Set(slog.LevelDebug)
+	return slog.New(slog.NewJSONHandler(
+		os.Stdout,
+		&slog.HandlerOptions{
+			AddSource: true,
+			Level:     loglevel,
+		}),
 	)
+}
 
-	targets, err := collect(m)
-	if err != nil {
-		return err
+func filterNilHooks(slice ...ssg.Hook) []ssg.Hook {
+	var result []ssg.Hook
+	for i := range slice {
+		elem := slice[i]
+		if elem == nil {
+			continue
+		}
+		result = append(result, elem)
 	}
-	if do.Ok(StageCleanUp) {
-		err = cleanup(m, targets)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Copy
-	old := slog.Default()
-	for key, site := range m {
-		slog.SetDefault(old.
-			WithGroup("copy").
-			With(
-				"key", key,
-				"url", site.ssg.Url,
-			),
-		)
-		if !do.Ok(StageCopy) {
-			slog.Info("skipping stage copy")
-			break
-		}
-
-		if err := site.Copy(); err != nil {
-			return manifestError{
-				err:   err,
-				key:   key,
-				msg:   "failed to copy",
-				stage: StageCopy,
-			}
-		}
-
-		slog.SetDefault(old)
-	}
-
-	// Build
-	for key, site := range m {
-		log := old.
-			WithGroup("build").
-			With(
-				"key", key,
-				"url", site.ssg.Url,
-			)
-
-		if !do.Ok(StageBuild) {
-			log.Info("skipping stage build")
-			break
-		}
-
-		slog.SetDefault(log)
-		b := newManifestBuilder(site, f)
-
-		log.
-			With(
-				"key", key,
-				"url", site.ssg.Url,
-				// @TODO: Len logs below will be removed
-				// "len_hooks", len(b.Hooks()),
-				// "len_hooks_generate", len(b.HooksGenerate()),
-				// "len_pipelines", len(b.Pipelines()),
-			).
-			Info("building site")
-
-		if err := b.ssg.Generate(); err != nil {
-			return manifestError{
-				err:   err,
-				key:   key,
-				msg:   "failed to build",
-				stage: StageBuild,
-			}
-		}
-	}
-	return nil
+	return result
 }

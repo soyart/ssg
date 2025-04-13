@@ -13,33 +13,28 @@ type cli struct {
 	Title string `arg:"required,positional"`
 	Url   string `arg:"required,positional"`
 
-	soyweb.NoMinifyFlags
+	soyweb.FlagsNoMinify
 }
 
 func main() {
 	c := cli{}
 	arg.MustParse(&c)
-
-	err := run(&c)
-	if err != nil {
+	if err := run(&c); err != nil {
 		panic(err)
 	}
 }
 
 func run(c *cli) error {
-	opts := []ssg.Option{ssg.WritersFromEnv()}
-	opts = append(
-		opts,
-		soyweb.SsgOptions(soyweb.Flags{
-			MinifyFlags: soyweb.MinifyFlags{
-				MinifyHtmlGenerate: true,
-				MinifyHtmlCopy:     true,
-				MinifyCss:          true,
-				MinifyJson:         true,
-			},
-			NoMinifyFlags: c.NoMinifyFlags,
-		})...,
-	)
+	flags := c.Flags()
+
+	opts := []ssg.Option{
+		ssg.WritersFromEnv(),
+		ssg.WithHooks(flags.Hooks()...),
+	}
+	if flags.MinifyHtmlGenerate {
+		opts = append(opts, ssg.WithHooksGenerate(soyweb.MinifyHtml))
+	}
 
 	return ssg.Generate(c.Src, c.Dst, c.Title, c.Url, opts...)
+
 }

@@ -533,7 +533,7 @@ func TestManifest(t *testing.T) {
 			t.Fatalf("[case %d] cannot remove dst '%s': %v", i, dst, err)
 		}
 
-		err = ApplyManifest(manifests, StageAll)
+		err = ApplyManifestV2(manifests, FlagsV2{}, StageAll)
 		if err != nil {
 			t.Fatalf("[case %d] error building manifest: %v", i, err)
 		}
