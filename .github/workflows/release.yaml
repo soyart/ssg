@@ -4,7 +4,8 @@ on:
 
   push:
     branches:
-      - 'poc/cicd'
+      - poc/cicd
+      - master
 
     tags:
       - 'v*'
@@ -15,10 +16,10 @@ on:
 name: Release ssg-go
 jobs:
   generate:
-    name: Build and release
+    name: Build ssg
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout the repository
+      - name: Checkout for build
         uses: actions/checkout@master
 
       - name: Install Nix
@@ -42,6 +43,30 @@ jobs:
         run: |
           zip -r ssg-go-x86_64_linux.zip result/bin
 
+      - name: Upload artifact
+        uses: actions/upload-artifact@master
+        with:
+          name: ssg-zip
+          path: ./ssg-go-x86_64_linux.zip
+
+  release:
+    name: Release ssg
+    runs-on: ubuntu-latest
+    needs: generate
+    steps:
+      - name: Checkout for release
+        uses: actions/checkout@master
+
+      - name: Download pre-built zip artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ssg-zip
+          path: ./ssg-go-x86_64_linux.zip
+      
+      - name: Inspect zip artifact
+        run: |
+          du -sh  ./ssg-go-x86_64_linux.zip
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@master
@@ -63,3 +88,4 @@ jobs:
           asset_path: ./ssg-go-x86_64_linux.zip
           asset_name: ssg-go-x86_64_linux.zip
           asset_content_type: application/zip
+
