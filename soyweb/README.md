@@ -11,12 +11,17 @@ provides an executable [`cmd/soyweb`](#soyweb-main-programcmdsoyweb).
 
 ## [soyweb (main program)](./cmd/soyweb)
 
-soyweb extends Go ssg implementation for better multi-site management,
-and is intended to be a better replacement for [webtools](https://github.com/soyart/artnoi.com/commit/ec01c2ec884bca8c4ca15ff5afa7db0e7b4608a6)
+soyweb extends Go ssg implementation for complex static site management,
+and is intended to be a better replacement for [webtools](https://github.com/soyart/artnoi.com/commit/ec01c2ec884bca8c4ca15ff5afa7db0e7b4608a6).
 
-It uses a *manifest* file to describe how each *ssg site* is going to be built.
-The manifest is like `go.mod` or `package.json` for our site - it defines
-the source and destination directories and extra soyweb options.
+It could also be used to build multiple static sites at once, each with different
+set of ssg options.
+
+It uses a [*manifest*](#soyweb-manifest) file to describe how each *ssg site*
+is going to be built.
+
+The manifest is like a config file or `package.json` for our site -
+it defines the source and destination directories and extra soyweb options.
 
 > See [`manifest.json`](../testdata/manifest.json) as example
 >
