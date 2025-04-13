@@ -62,10 +62,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ssg-zip
-          path: ./ssg-go-x86_64_linux.zip
+          path: ./
       
       - name: Inspect zip artifact
         run: |
+          ls -al ./ssg-go-x86_64_linux.zip
           du -sh  ./ssg-go-x86_64_linux.zip
 
       - name: Get today's date
@@ -108,7 +109,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ssg-zip
-          path: ./ssg-go-x86_64_linux.zip
+          path: ./
       
       - name: Inspect zip artifact
         run: |
