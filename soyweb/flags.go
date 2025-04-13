@@ -1,13 +1,26 @@
 package soyweb
 
 import (
-	"io/fs"
-	"sort"
-
 	"github.com/soyart/ssg/ssg-go"
 )
 
 type (
+	// FlagsV2 represents CLI arguments that could modify soyweb behavior, such as skipping stages
+	// and minifying content of certain file extensions.
+	FlagsV2 struct {
+		NoCleanup       bool `arg:"--no-cleanup" help:"Skip cleanup stage"`
+		NoCopy          bool `arg:"--no-copy" help:"Skip scopy stage"`
+		NoBuild         bool `arg:"--no-build" help:"Skip build stage"`
+		NoReplace       bool `arg:"--no-replace" help:"Do not do text replacements defined in manifest"`
+		NoGenerateIndex bool `arg:"--no-gen-index" help:"Do not generate indexes on _index.soyweb"`
+
+		MinifyHtmlGenerate bool `arg:"--min-html" help:"Minify converted HTML outputs"`
+		MinifyHtmlCopy     bool `arg:"--min-html-copy" help:"Minify all copied HTML"`
+		MinifyCss          bool `arg:"--min-css" help:"Minify CSS files"`
+		MinifyJs           bool `arg:"--min-js" help:"Minify Javascript files"`
+		MinifyJson         bool `arg:"--min-json" help:"Minify JSON files"`
+	}
+
 	NoMinifyFlags struct {
 		NoMinifyHtmlGenerate bool `arg:"--no-min-html,env:NO_MIN_HTML" help:"Do not minify converted HTML outputs"`
 		NoMinifyHtmlCopy     bool `arg:"--no-min-html-copy,env:NO_MIN_HTML_COPY" help:"Do not minify all copied HTML"`
@@ -17,6 +30,43 @@ type (
 	}
 )
 
+func (f FlagsV2) Stage() Stage {
+	s := StageAll
+	if f.NoCleanup {
+		s.Skip(StageCleanUp)
+	}
+	if f.NoCopy {
+		s.Skip(StageCopy)
+	}
+	if f.NoBuild {
+		s.Skip(StageBuild)
+	}
+	return s
+}
+
+func (f FlagsV2) Hooks() []ssg.Hook {
+	return filterNilHooks(
+		f.hookMinify(),
+	)
+}
+
+func (f FlagsV2) hookMinify() ssg.Hook {
+	m := make(map[string]MinifyFn)
+	if f.MinifyHtmlCopy {
+		m[".html"] = MinifyHtml
+	}
+	if f.MinifyCss {
+		m[".css"] = MinifyCss
+	}
+	if f.MinifyJs {
+		m[".js"] = MinifyJs
+	}
+	if f.MinifyJson {
+		m[".json"] = MinifyJson
+	}
+	return HookMinify(m)
+}
+
 func (f NoMinifyFlags) Flags() FlagsV2 {
 	return FlagsV2{
 		MinifyHtmlGenerate: !f.NoMinifyHtmlGenerate,
@@ -24,78 +74,6 @@ func (f NoMinifyFlags) Flags() FlagsV2 {
 		MinifyCss:          !f.NoMinifyCss,
 		MinifyJs:           !f.NoMinifyJs,
 		MinifyJson:         !f.NoMinifyJson,
-	}
-}
-
-func NewIndexGenerator(m IndexGeneratorMode) func(*ssg.Ssg) ssg.Pipeline {
-	switch m {
-	case
-		IndexGeneratorModeReverse,
-		"rev",
-		"r":
-		return IndexGeneratorReverse
-
-	case
-		IndexGeneratorModeModTime,
-		"updated_at",
-		"u":
-		return IndexGeneratorModTime
-	}
-
-	return IndexGenerator
-}
-
-// IndexGenerator returns an [ssg.Pipeline] that would look for
-// marker file "_index.soyweb" within a directory.
-//
-// Once it finds a marked directory, it inspects the children
-// and generate a Markdown list with name index.md,
-// which is later sent to supplied impl
-func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
-	return IndexGeneratorTemplate(
-		nil,
-		generateIndex,
-	)(s)
-}
-
-// IndexGeneratorReverse returns an index generator whose index list
-// is populated reversed, i.e. descending alphanumerical sort
-func IndexGeneratorReverse(s *ssg.Ssg) ssg.Pipeline {
-	return IndexGeneratorTemplate(
-		func(entries []fs.FileInfo) []fs.FileInfo {
-			reverseInPlace(entries)
-			return entries
-		},
-		generateIndex,
-	)(s)
-}
-
-// IndexGeneratorModTime returns an index generator that sort index entries
-// by ModTime returned by fs.FileInfo
-func IndexGeneratorModTime(s *ssg.Ssg) ssg.Pipeline {
-	sortByModTime := func(entries []fs.FileInfo) func(i int, j int) bool {
-		return func(i, j int) bool {
-			infoI, infoJ := entries[i], entries[j]
-			cmp := infoI.ModTime().Compare(infoJ.ModTime())
-			if cmp == 0 {
-				return infoI.Name() < infoJ.Name()
-			}
-			return cmp == -1
-		}
-	}
-
-	return IndexGeneratorTemplate(
-		func(entries []fs.FileInfo) []fs.FileInfo {
-			sort.Slice(entries, sortByModTime(entries))
-			return entries
-		},
-		generateIndex,
-	)(s)
-}
-
-func reverseInPlace(arr []fs.FileInfo) {
-	for i, j := 0, len(arr)-1; i < j; i, j = i+1, j-1 {
-		arr[i], arr[j] = arr[j], arr[i]
 	}
 }
 
