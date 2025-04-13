@@ -40,6 +40,21 @@ type Site struct {
 	Replaces          Replaces               `json:"-"`
 }
 
+func NewManifest(filename string) (Manifest, error) {
+	b, err := os.ReadFile(filename)
+	if err != nil {
+		slog.Error("failed to read manifest file")
+		return Manifest{}, fmt.Errorf("failed to read manifest from file '%s': %w", filename, err)
+	}
+	m := Manifest{}
+	err = json.Unmarshal(b, &m)
+	if err != nil {
+		return Manifest{}, nil
+	}
+
+	return m, nil
+}
+
 type CopyTarget struct {
 	Target string `json:"-"`
 	Force  bool   `json:"-"`
@@ -230,21 +245,6 @@ func (s *Stage) Ok(targets ...Stage) bool {
 	return true
 }
 
-func NewManifest(filename string) (Manifest, error) {
-	b, err := os.ReadFile(filename)
-	if err != nil {
-		slog.Error("failed to read manifest file")
-		return Manifest{}, fmt.Errorf("failed to read manifest from file '%s': %w", filename, err)
-	}
-	m := Manifest{}
-	err = json.Unmarshal(b, &m)
-	if err != nil {
-		return Manifest{}, nil
-	}
-
-	return m, nil
-}
-
 func (s manifestError) Error() string {
 	if s.err == nil {
 		return fmt.Sprintf("[%s %s] %s", s.stage, s.key, s.msg)
@@ -276,6 +276,92 @@ func (s Stage) String() string {
 		return "build"
 	}
 	return "BAD_STAGE"
+}
+
+func ApplyManifestV2(m Manifest, f FlagsV2, do Stage) error {
+	slog.SetDefault(newLogger())
+	slog.Info("stages",
+		StageCleanUp.String(), do.Ok(StageCleanUp),
+		StageCopy.String(), do.Ok(StageCopy),
+		StageBuild.String(), do.Ok(StageBuild),
+	)
+
+	targets, err := collect(m)
+	if err != nil {
+		return err
+	}
+	if do.Ok(StageCleanUp) {
+		err = cleanup(m, targets)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Copy
+	old := slog.Default()
+	for key, site := range m {
+		slog.SetDefault(old.
+			WithGroup("copy").
+			With(
+				"key", key,
+				"url", site.ssg.Url,
+			),
+		)
+		if !do.Ok(StageCopy) {
+			slog.Info("skipping stage copy")
+			break
+		}
+
+		if err := site.Copy(); err != nil {
+			return manifestError{
+				err:   err,
+				key:   key,
+				msg:   "failed to copy",
+				stage: StageCopy,
+			}
+		}
+
+		slog.SetDefault(old)
+	}
+
+	// Build
+	for key, site := range m {
+		log := old.
+			WithGroup("build").
+			With(
+				"key", key,
+				"url", site.ssg.Url,
+			)
+
+		if !do.Ok(StageBuild) {
+			log.Info("skipping stage build")
+			break
+		}
+
+		slog.SetDefault(log)
+		b := newManifestBuilder(site, f)
+
+		log.
+			With(
+				"key", key,
+				"url", site.ssg.Url,
+				// @TODO: Len logs below will be removed
+				// "len_hooks", len(b.Hooks()),
+				// "len_hooks_generate", len(b.HooksGenerate()),
+				// "len_pipelines", len(b.Pipelines()),
+			).
+			Info("building site")
+
+		if err := b.ssg.Generate(); err != nil {
+			return manifestError{
+				err:   err,
+				key:   key,
+				msg:   "failed to build",
+				stage: StageBuild,
+			}
+		}
+	}
+	return nil
 }
 
 func collect(m Manifest) (map[string]ssg.Set, error) {

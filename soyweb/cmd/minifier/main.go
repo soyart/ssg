@@ -12,11 +12,19 @@ import (
 	"github.com/soyart/ssg/ssg-go"
 )
 
+type noMinifyFlags struct {
+	NoMinifyHtmlGenerate bool `arg:"--no-min-html,env:NO_MIN_HTML" help:"Do not minify converted HTML outputs"`
+	NoMinifyHtmlCopy     bool `arg:"--no-min-html-copy,env:NO_MIN_HTML_COPY" help:"Do not minify all copied HTML"`
+	NoMinifyCss          bool `arg:"--no-min-css,env:NO_MIN_CSS" help:"Do not minify CSS files"`
+	NoMinifyJs           bool `arg:"--no-min-js,env:NO_MIN_JS" help:"Do not minify Javascript files"`
+	NoMinifyJson         bool `arg:"--no-min-json,env:NO_MIN_JSON" help:"Do not minify JSON files"`
+}
+
 type cli struct {
 	Src string `arg:"positional" default:"src"`
 	Dst string `arg:"positional" default:"dist"`
 
-	soyweb.NoMinifyFlags
+	noMinifyFlags
 }
 
 type minifier struct {
@@ -24,7 +32,7 @@ type minifier struct {
 	dst  string
 	dist []ssg.OutputFile
 
-	soyweb.NoMinifyFlags
+	noMinifyFlags
 }
 
 func main() {
@@ -41,7 +49,7 @@ func run(c *cli) error {
 	m := minifier{
 		src:           c.Src,
 		dst:           c.Dst,
-		NoMinifyFlags: c.NoMinifyFlags,
+		noMinifyFlags: c.noMinifyFlags,
 	}
 
 	writes, err := m.minify()
@@ -55,6 +63,37 @@ func run(c *cli) error {
 	}
 
 	return nil
+}
+
+func (n noMinifyFlags) skip(ext string) bool {
+	switch ext {
+	case soyweb.ExtHtml:
+		if n.NoMinifyHtmlGenerate {
+			return true
+		}
+		if n.NoMinifyHtmlCopy {
+			return true
+		}
+	case soyweb.ExtCss:
+		if n.NoMinifyCss {
+			return true
+		}
+	case soyweb.ExtJs:
+		if n.NoMinifyJs {
+			return true
+		}
+	case soyweb.ExtJson:
+		if n.NoMinifyJson {
+			return true
+		}
+
+	default:
+		// Skip unknown file extension and media type
+		return true
+	}
+
+	// Do not skip this extension
+	return false
 }
 
 func (m *minifier) minify() ([]ssg.OutputFile, error) {
@@ -105,7 +144,7 @@ func (m *minifier) walk(path string, d fs.DirEntry, e error) error {
 		return err
 	}
 	dst := filepath.Join(m.dst, rel)
-	if m.Skip(filepath.Ext(path)) {
+	if m.skip(filepath.Ext(path)) {
 		copied, err := os.ReadFile(path)
 		if err != nil {
 			return err
@@ -113,11 +152,11 @@ func (m *minifier) walk(path string, d fs.DirEntry, e error) error {
 		m.dist = append(m.dist, ssg.Output(dst, path, copied, info.Mode().Perm()))
 		return nil
 	}
+
 	minified, err := soyweb.MinifyFile(path)
 	if err != nil {
 		return err
 	}
-
 	m.dist = append(m.dist, ssg.Output(dst, path, minified, info.Mode().Perm()))
 	return nil
 }
