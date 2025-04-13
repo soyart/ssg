@@ -50,7 +50,7 @@ jobs:
           echo "PWD: $pwd"
           mkdir -p $ARTIFACT_SOYWEB
           echo 'Building ssg-go/ssg'
-          go build -o $ARTIFACT_SOYWEB/ssg-manifest ./cmd/ssg-manifest
+          go build -o $ARTIFACT_SOYWEB/soyweb ./cmd/soyweb
           go build -o $ARTIFACT_SOYWEB/ssg-minifier ./cmd/ssg-minifier
           go build -o $ARTIFACT_SOYWEB/minifier ./cmd/minifier
 

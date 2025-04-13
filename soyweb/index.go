@@ -6,9 +6,82 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/soyart/ssg/ssg-go"
 )
+
+func NewIndexGenerator(m IndexGeneratorMode) func(*ssg.Ssg) ssg.Pipeline {
+	switch m {
+	case
+		IndexGeneratorModeReverse,
+		"rev",
+		"r":
+		return IndexGeneratorReverse
+
+	case
+		IndexGeneratorModeModTime,
+		"updated_at",
+		"u":
+		return IndexGeneratorModTime
+	}
+
+	return IndexGenerator
+}
+
+// IndexGenerator returns an [ssg.Pipeline] that would look for
+// marker file "_index.soyweb" within a directory.
+//
+// Once it finds a marked directory, it inspects the children
+// and generate a Markdown list with name index.md,
+// which is later sent to supplied impl
+func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
+	return IndexGeneratorTemplate(
+		nil,
+		generateIndex,
+	)(s)
+}
+
+// IndexGeneratorReverse returns an index generator whose index list
+// is populated reversed, i.e. descending alphanumerical sort
+func IndexGeneratorReverse(s *ssg.Ssg) ssg.Pipeline {
+	return IndexGeneratorTemplate(
+		func(entries []fs.FileInfo) []fs.FileInfo {
+			reverseInPlace(entries)
+			return entries
+		},
+		generateIndex,
+	)(s)
+}
+
+// IndexGeneratorModTime returns an index generator that sort index entries
+// by ModTime returned by fs.FileInfo
+func IndexGeneratorModTime(s *ssg.Ssg) ssg.Pipeline {
+	sortByModTime := func(entries []fs.FileInfo) func(i int, j int) bool {
+		return func(i, j int) bool {
+			infoI, infoJ := entries[i], entries[j]
+			cmp := infoI.ModTime().Compare(infoJ.ModTime())
+			if cmp == 0 {
+				return infoI.Name() < infoJ.Name()
+			}
+			return cmp == -1
+		}
+	}
+
+	return IndexGeneratorTemplate(
+		func(entries []fs.FileInfo) []fs.FileInfo {
+			sort.Slice(entries, sortByModTime(entries))
+			return entries
+		},
+		generateIndex,
+	)(s)
+}
+
+func reverseInPlace(arr []fs.FileInfo) {
+	for i, j := 0, len(arr)-1; i < j; i, j = i+1, j-1 {
+		arr[i], arr[j] = arr[j], arr[i]
+	}
+}
 
 func IndexGeneratorTemplate(
 	fnOverrideEntries func(entries []fs.FileInfo) []fs.FileInfo,

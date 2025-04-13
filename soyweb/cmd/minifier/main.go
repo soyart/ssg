@@ -16,7 +16,7 @@ type cli struct {
 	Src string `arg:"positional" default:"src"`
 	Dst string `arg:"positional" default:"dist"`
 
-	soyweb.NoMinifyFlags
+	soyweb.FlagsNoMinify
 }
 
 type minifier struct {
@@ -24,7 +24,7 @@ type minifier struct {
 	dst  string
 	dist []ssg.OutputFile
 
-	soyweb.NoMinifyFlags
+	soyweb.FlagsNoMinify
 }
 
 func main() {
@@ -41,7 +41,7 @@ func run(c *cli) error {
 	m := minifier{
 		src:           c.Src,
 		dst:           c.Dst,
-		NoMinifyFlags: c.NoMinifyFlags,
+		FlagsNoMinify: c.FlagsNoMinify,
 	}
 
 	writes, err := m.minify()
@@ -105,12 +105,11 @@ func (m *minifier) walk(path string, d fs.DirEntry, e error) error {
 		return err
 	}
 	dst := filepath.Join(m.dst, rel)
-	if m.NoMinifyFlags.Skip(filepath.Ext(path)) {
+	if m.Skip(filepath.Ext(path)) {
 		copied, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-
 		m.dist = append(m.dist, ssg.Output(dst, path, copied, info.Mode().Perm()))
 		return nil
 	}
@@ -119,7 +118,6 @@ func (m *minifier) walk(path string, d fs.DirEntry, e error) error {
 	if err != nil {
 		return err
 	}
-
 	m.dist = append(m.dist, ssg.Output(dst, path, minified, info.Mode().Perm()))
 	return nil
 }

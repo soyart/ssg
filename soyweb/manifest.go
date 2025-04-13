@@ -40,6 +40,21 @@ type Site struct {
 	Replaces          Replaces               `json:"-"`
 }
 
+func NewManifest(filename string) (Manifest, error) {
+	b, err := os.ReadFile(filename)
+	if err != nil {
+		slog.Error("failed to read manifest file")
+		return Manifest{}, fmt.Errorf("failed to read manifest from file '%s': %w", filename, err)
+	}
+	m := Manifest{}
+	err = json.Unmarshal(b, &m)
+	if err != nil {
+		return Manifest{}, nil
+	}
+
+	return m, nil
+}
+
 type CopyTarget struct {
 	Target string `json:"-"`
 	Force  bool   `json:"-"`
@@ -102,7 +117,6 @@ func (c *CopyTargets) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-
 	*c = result
 	return nil
 }
@@ -231,117 +245,6 @@ func (s *Stage) Ok(targets ...Stage) bool {
 	return true
 }
 
-// ApplyManifest loops through all sites and apply manifest stages
-// described in do. It applies opts to each site's [Ssg] before
-// the call to [Ssg.Generate].
-func ApplyManifest(m Manifest, stages Stage, opts ...ssg.Option) error {
-	slog.Info("stages",
-		StageCleanUp.String(), stages.Ok(StageCleanUp),
-		StageCopy.String(), stages.Ok(StageCopy),
-		StageBuild.String(), stages.Ok(StageBuild),
-	)
-
-	targets, err := collect(m)
-	if err != nil {
-		return err
-	}
-	if stages.Ok(StageCleanUp) {
-		err = cleanup(m, targets)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Copy
-	old := slog.Default()
-	for key, site := range m {
-		if !stages.Ok(StageCopy) {
-			old.Info("skipping stage copy")
-			break
-		}
-		slog.SetDefault(old.
-			WithGroup("copy").
-			With("key", key, "url", site.ssg.Url),
-		)
-		if err := site.Copy(); err != nil {
-			return manifestError{
-				err:   err,
-				key:   key,
-				msg:   "failed to copy",
-				stage: StageCopy,
-			}
-		}
-
-		slog.SetDefault(old)
-	}
-
-	// Build
-	for key, site := range m {
-		if !stages.Ok(StageBuild) {
-			old.Info("skipping stage build")
-			break
-		}
-
-		old.
-			WithGroup("build").
-			With(
-				"key", key,
-				"url", site.ssg.Url,
-			).
-			Info("building site")
-
-		s := &site.ssg
-		if len(site.Replaces) != 0 {
-			hookReplacer := HookReplacer(site.Replaces)
-			opts = append(opts, ssg.PrependHooks(hookReplacer))
-		}
-		// TODO: refactor init options for manifest at 1 place!
-		if site.GenerateIndex {
-			opts = append(opts, ssg.WithPipelines(NewIndexGenerator(IndexGeneratorModeDefault)))
-		}
-
-		s.With(opts...)
-		if err := s.Generate(); err != nil {
-			return manifestError{
-				err:   err,
-				key:   key,
-				msg:   "failed to build",
-				stage: StageBuild,
-			}
-		}
-	}
-
-	return nil
-}
-
-func ApplyFromManifest(path string, do Stage, opts ...ssg.Option) error {
-	logger := newLogger().With("manifest", path)
-	slog.SetDefault(logger)
-	slog.Info("parsing manifest")
-
-	m, err := NewManifest(path)
-	if err != nil {
-		logger.Error("failed to parse manifest", "error", err)
-		return err
-	}
-	return ApplyManifest(m, do, opts...)
-}
-
-func NewManifest(filename string) (Manifest, error) {
-	b, err := os.ReadFile(filename)
-	if err != nil {
-		slog.Error("failed to read manifest file")
-		return Manifest{}, fmt.Errorf("failed to read manifest from file '%s': %w", filename, err)
-	}
-	m := Manifest{}
-	err = json.Unmarshal(b, &m)
-	if err != nil {
-		return Manifest{}, nil
-	}
-
-	return m, nil
-}
-
 func (s manifestError) Error() string {
 	if s.err == nil {
 		return fmt.Sprintf("[%s %s] %s", s.stage, s.key, s.msg)
@@ -375,15 +278,90 @@ func (s Stage) String() string {
 	return "BAD_STAGE"
 }
 
-func newLogger() *slog.Logger {
-	loglevel.Set(slog.LevelDebug)
-	return slog.New(slog.NewJSONHandler(
-		os.Stdout,
-		&slog.HandlerOptions{
-			AddSource: true,
-			Level:     loglevel,
-		}),
+func ApplyManifestV2(m Manifest, f FlagsV2, do Stage) error {
+	slog.SetDefault(newLogger())
+	slog.Info("stages",
+		StageCleanUp.String(), do.Ok(StageCleanUp),
+		StageCopy.String(), do.Ok(StageCopy),
+		StageBuild.String(), do.Ok(StageBuild),
 	)
+
+	targets, err := collect(m)
+	if err != nil {
+		return err
+	}
+	if do.Ok(StageCleanUp) {
+		err = cleanup(m, targets)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Copy
+	old := slog.Default()
+	for key, site := range m {
+		slog.SetDefault(old.
+			WithGroup("copy").
+			With(
+				"key", key,
+				"url", site.ssg.Url,
+			),
+		)
+		if !do.Ok(StageCopy) {
+			slog.Info("skipping stage copy")
+			break
+		}
+
+		if err := site.Copy(); err != nil {
+			return manifestError{
+				err:   err,
+				key:   key,
+				msg:   "failed to copy",
+				stage: StageCopy,
+			}
+		}
+
+		slog.SetDefault(old)
+	}
+
+	// Build
+	for key, site := range m {
+		log := old.
+			WithGroup("build").
+			With(
+				"key", key,
+				"url", site.ssg.Url,
+			)
+
+		if !do.Ok(StageBuild) {
+			log.Info("skipping stage build")
+			break
+		}
+
+		slog.SetDefault(log)
+		b := newManifestBuilder(site, f)
+
+		log.
+			With(
+				"key", key,
+				"url", site.ssg.Url,
+				// @TODO: Len logs below will be removed
+				// "len_hooks", len(b.Hooks()),
+				// "len_hooks_generate", len(b.HooksGenerate()),
+				// "len_pipelines", len(b.Pipelines()),
+			).
+			Info("building site")
+
+		if err := b.ssg.Generate(); err != nil {
+			return manifestError{
+				err:   err,
+				key:   key,
+				msg:   "failed to build",
+				stage: StageBuild,
+			}
+		}
+	}
+	return nil
 }
 
 func collect(m Manifest) (map[string]ssg.Set, error) {
@@ -539,11 +517,11 @@ func cp(src string, dst CopyTarget, perm fs.FileMode) error {
 		}
 		perm = stat.Mode().Perm()
 	}
+
 	err = os.WriteFile(dst.Target, b, perm)
 	if err != nil {
 		return fmt.Errorf("error writing to dst: %w", err)
 	}
-
 	return nil
 }
 
@@ -568,16 +546,13 @@ func cpRecurse(src string, dst CopyTarget) error {
 			return err
 		}
 
-		target := filepath.Join(dstRoot, rel)
-		// slog.Debug("cpRecurse", "src", src, "base", filepath.Base(path), "dst", dst, "target", target)
-
 		out := CopyTarget{
-			Target: target,
+			Target: filepath.Join(dstRoot, rel),
 			Force:  dst.Force,
 		}
-
 		return cp(path, out, info.Mode().Perm())
 	})
+
 	if err != nil {
 		return fmt.Errorf("walkDir failed for src '%s', dst '%s': %w", src, dst.Target, err)
 	}
@@ -585,10 +560,18 @@ func cpRecurse(src string, dst CopyTarget) error {
 	return nil
 }
 
-func copyFiles(dirs ssg.Set, src string, dst CopyTarget, permsCache map[string]fs.FileMode) error {
+func copyFiles(
+	existingDirs ssg.Set,
+	src string,
+	dst CopyTarget,
+	permsCache map[string]fs.FileMode,
+) error {
+	isDirSrc, isDirDst := existingDirs.Contains(src), existingDirs.Contains(dst.Target)
+	isDirBoth := isDirSrc && isDirDst
+
 	switch {
 	// Copy dir to dir, with target not yet existing
-	case dirs.Contains(src) && !dirs.Contains(dst.Target):
+	case isDirSrc && !isDirDst:
 		err := os.MkdirAll(dst.Target, os.ModePerm)
 		if err != nil {
 			return fmt.Errorf("failed to prepare dst directory: %w", err)
@@ -597,12 +580,12 @@ func copyFiles(dirs ssg.Set, src string, dst CopyTarget, permsCache map[string]f
 		fallthrough
 
 	// Copy dir to dir, with target dir existing
-	case dirs.Contains(src, dst.Target):
+	case isDirBoth:
 		return cpRecurse(src, dst)
 
 	// Copy file to dir, i.e. cp foo.json ./some-dir/
 	// which will just writes out to ./some-dir/foo.json
-	case dirs.Contains(dst.Target):
+	case isDirDst:
 		base := filepath.Base(src)
 		dst.Target = filepath.Join(dst.Target, base)
 	}
