@@ -36,20 +36,45 @@ type FlagsV2 struct {
 	MinifyJson         bool `arg:"--min-json" help:"Minify JSON files"`
 }
 
-func (b FlagsV2) Stage() Stage {
+func (f FlagsV2) Stage() Stage {
 	s := StageAll
-	if b.NoCleanup {
+	if f.NoCleanup {
 		s.Skip(StageCleanUp)
 	}
-	if b.NoCopy {
+	if f.NoCopy {
 		s.Skip(StageCopy)
 	}
-	if b.NoBuild {
+	if f.NoBuild {
 		s.Skip(StageBuild)
 	}
 	return s
 }
 
+func (f FlagsV2) Hooks() []ssg.Hook {
+	return filterNilHooks(
+		f.hookMinify(),
+	)
+}
+
+func (f FlagsV2) hookMinify() ssg.Hook {
+	m := make(map[string]MinifyFn)
+	if f.MinifyHtmlCopy {
+		m[".html"] = MinifyHtml
+	}
+	if f.MinifyCss {
+		m[".css"] = MinifyCss
+	}
+	if f.MinifyJs {
+		m[".js"] = MinifyJs
+	}
+	if f.MinifyJson {
+		m[".json"] = MinifyJson
+	}
+	return HookMinify(m)
+}
+
+// builder controls `soyweb build` behavior
+// by ordering hooks and pipeline
 type builder struct {
 	Site
 	flags FlagsV2
@@ -69,57 +94,19 @@ func (b *builder) initialize() {
 	)
 }
 
-func (b *builder) Caching() bool { panic("unexpected call to Caching()") }
-func (b *builder) Writers() int  { panic("unexpected call to Writers()") }
-
 func (b *builder) Hooks() []ssg.Hook {
 	if b.flags.NoBuild {
 		return nil
 	}
-
-	minifiers := make(map[string]MinifyFn)
-	if b.flags.MinifyHtmlCopy {
-		minifiers[".html"] = MinifyHtml
+	if b.flags.NoReplace {
+		return filterNilHooks(
+			b.flags.hookMinify(),
+		)
 	}
-	if b.flags.MinifyCss {
-		minifiers[".css"] = MinifyCss
-	}
-	if b.flags.MinifyJs {
-		minifiers[".js"] = MinifyJs
-	}
-	if b.flags.MinifyJson {
-		minifiers[".json"] = MinifyJson
-	}
-
-	hookMinifies := HookMinify(minifiers)
-	hookReplacer := HookReplacer(b.Replaces)
-
-	if hookMinifies == nil && hookReplacer == nil {
-		return nil
-	}
-
-	// Minify only
-	if b.flags.NoReplace || hookReplacer == nil {
-		if hookMinifies == nil {
-			return nil
-		}
-		return []ssg.Hook{
-			hookMinifies,
-		}
-	}
-
-	// Replace only
-	if hookMinifies == nil {
-		return []ssg.Hook{
-			hookReplacer,
-		}
-	}
-
-	// Replace and minify
-	return []ssg.Hook{
-		hookReplacer,
-		hookMinifies,
-	}
+	return filterNilHooks(
+		HookReplacer(b.Replaces),
+		b.flags.hookMinify(),
+	)
 }
 
 func (b *builder) HooksGenerate() []ssg.HookGenerate {
@@ -235,4 +222,16 @@ func ApplyManifestV2(m Manifest, f FlagsV2, do Stage) error {
 		}
 	}
 	return nil
+}
+
+func filterNilHooks(slice ...ssg.Hook) []ssg.Hook {
+	var result []ssg.Hook
+	for i := range slice {
+		elem := slice[i]
+		if elem == nil {
+			continue
+		}
+		result = append(result, elem)
+	}
+	return result
 }
