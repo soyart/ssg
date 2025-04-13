@@ -135,6 +135,9 @@ provides minimal executables to integrate into other static site pipelines:
   can be controlled with `--no-min-{ext}` flags:
 
   ```shell
+  # Minify all known file extensions
+  minifier some/src some/dst
+
   # Do not minify .js files
   minifier some/src some/dst --no-min-js
 
@@ -144,7 +147,19 @@ provides minimal executables to integrate into other static site pipelines:
 
 - [ssg-minifier](./cmd/ssg-minifier)
 
-  A minifier-enabled version of standard ssg.
+  A minifier-enabled version of standard ssg. Usage is like with the original ssg
+  or ssg-go, but CLI accepts `--no-min-{ext}` flags just like `cmd/minifier`:
+
+  ```shell
+  # Build from some/src to some/dst, minifying every known file extension
+  ssg-minifier some/src some/dst some-title some-url.com
+
+  # Build from some/src to some/dst, minifying every file extension except for .json
+  ssg-minifier some/src some/dst some-title some-url.com --no-min-json
+
+  # Build from some/src to some/dst, minifying every file extension except for .js and .css
+  ssg-minifier some/src some/dst some-title some-url.com --no-min-js --no-min-css
+  ```
 
 ## soyweb manifest
 

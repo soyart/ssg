@@ -12,14 +12,6 @@ import (
 	"github.com/soyart/ssg/ssg-go"
 )
 
-type noMinifyFlags struct {
-	NoMinifyHtmlGenerate bool `arg:"--no-min-html,env:NO_MIN_HTML" help:"Do not minify converted HTML outputs"`
-	NoMinifyHtmlCopy     bool `arg:"--no-min-html-copy,env:NO_MIN_HTML_COPY" help:"Do not minify all copied HTML"`
-	NoMinifyCss          bool `arg:"--no-min-css,env:NO_MIN_CSS" help:"Do not minify CSS files"`
-	NoMinifyJs           bool `arg:"--no-min-js,env:NO_MIN_JS" help:"Do not minify Javascript files"`
-	NoMinifyJson         bool `arg:"--no-min-json,env:NO_MIN_JSON" help:"Do not minify JSON files"`
-}
-
 type cli struct {
 	Src string `arg:"positional" default:"src"`
 	Dst string `arg:"positional" default:"dist"`
