@@ -50,7 +50,7 @@ jobs:
           path: ./ssg-go-x86_64_linux.zip
 
   release-tag:
-    if: ${{ github.ref_type  == tag }}
+    if: ${{ github.ref_type  == 'tag' }}
     name: Release ssg
     runs-on: ubuntu-latest
     needs: generate
