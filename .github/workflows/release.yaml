@@ -115,7 +115,7 @@ jobs:
           # Store 2025-01-01 in env $RELEASE_DATE
           echo "RELEASE_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
-      - name: Create Release for branch 
+      - name: Create Release for branch ${{ github.ref_name }}
         id: create_release
         uses: actions/create-release@master
         env:
