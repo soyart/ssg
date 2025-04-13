@@ -24,7 +24,7 @@ type cli struct {
 	Src string `arg:"positional" default:"src"`
 	Dst string `arg:"positional" default:"dist"`
 
-	noMinifyFlags
+	soyweb.FlagsNoMinify
 }
 
 type minifier struct {
@@ -32,7 +32,7 @@ type minifier struct {
 	dst  string
 	dist []ssg.OutputFile
 
-	noMinifyFlags
+	soyweb.FlagsNoMinify
 }
 
 func main() {
@@ -49,7 +49,7 @@ func run(c *cli) error {
 	m := minifier{
 		src:           c.Src,
 		dst:           c.Dst,
-		noMinifyFlags: c.noMinifyFlags,
+		FlagsNoMinify: c.FlagsNoMinify,
 	}
 
 	writes, err := m.minify()
@@ -63,37 +63,6 @@ func run(c *cli) error {
 	}
 
 	return nil
-}
-
-func (n noMinifyFlags) skip(ext string) bool {
-	switch ext {
-	case soyweb.ExtHtml:
-		if n.NoMinifyHtmlGenerate {
-			return true
-		}
-		if n.NoMinifyHtmlCopy {
-			return true
-		}
-	case soyweb.ExtCss:
-		if n.NoMinifyCss {
-			return true
-		}
-	case soyweb.ExtJs:
-		if n.NoMinifyJs {
-			return true
-		}
-	case soyweb.ExtJson:
-		if n.NoMinifyJson {
-			return true
-		}
-
-	default:
-		// Skip unknown file extension and media type
-		return true
-	}
-
-	// Do not skip this extension
-	return false
 }
 
 func (m *minifier) minify() ([]ssg.OutputFile, error) {
@@ -144,7 +113,7 @@ func (m *minifier) walk(path string, d fs.DirEntry, e error) error {
 		return err
 	}
 	dst := filepath.Join(m.dst, rel)
-	if m.skip(filepath.Ext(path)) {
+	if m.Skip(filepath.Ext(path)) {
 		copied, err := os.ReadFile(path)
 		if err != nil {
 			return err

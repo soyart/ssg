@@ -119,13 +119,11 @@ as 3+1 CLI *subcommand*:
 
 ## Other soyweb programs
 
-In addition to extension library, soyweb provides a few programs that
-serve as a collection of tools meant to replace [webtools](https://github.com/soyart/webtools).
-The main purpose is to build [artnoi.com](https://artnoi.com) with a single binary
-to streamline the site's CI/CD pipelines.
-
 > Most of these programs share the same CLI flags, and the help messages
 > can be accessible via `-h` or `--help`
+
+In addition to the bloated executable`soyweb`, soyweb (the project) also
+provides minimal executables to integrate into other static site pipelines:
 
 - [minifier](./cmd/minifier)
 
@@ -146,7 +144,7 @@ to streamline the site's CI/CD pipelines.
 
 - [ssg-minifier](./cmd/ssg-minifier)
 
-  A minifier-enabled version of standard ssg
+  A minifier-enabled version of standard ssg.
 
 ## soyweb manifest
 
