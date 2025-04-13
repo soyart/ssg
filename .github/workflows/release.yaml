@@ -4,6 +4,7 @@ on:
 
   push:
     branches:
+      - poc/cicd
       - master
 
     tags:
