@@ -13,7 +13,7 @@ type cli struct {
 	Title string `arg:"required,positional"`
 	Url   string `arg:"required,positional"`
 
-	soyweb.FlagsV2
+	soyweb.FlagsNoMinify
 }
 
 func main() {
@@ -25,14 +25,16 @@ func main() {
 }
 
 func run(c *cli) error {
-	var hookGenerate ssg.HookGenerate
-	if c.MinifyHtmlGenerate {
-		hookGenerate = soyweb.MinifyHtml
-	}
-	return ssg.Generate(
-		c.Src, c.Dst, c.Title, c.Url,
+	flags := c.Flags()
+
+	opts := []ssg.Option{
 		ssg.WritersFromEnv(),
-		ssg.WithHooks(c.FlagsV2.Hooks()...),
-		ssg.WithHooksGenerate(hookGenerate),
-	)
+		ssg.WithHooks(flags.Hooks()...),
+	}
+	if flags.MinifyHtmlGenerate {
+		opts = append(opts, ssg.WithHooksGenerate(soyweb.MinifyHtml))
+	}
+
+	return ssg.Generate(c.Src, c.Dst, c.Title, c.Url, opts...)
+
 }
