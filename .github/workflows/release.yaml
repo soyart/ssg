@@ -52,6 +52,7 @@ jobs:
   release-branch:
     if: ${{ github.ref_type  == 'branch' }}
     name: Release from branch
+    needs: generate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout for release
