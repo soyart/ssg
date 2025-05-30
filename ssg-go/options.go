@@ -26,20 +26,20 @@ type (
 	// to control subsequent operations of the walk.
 	Pipeline func(path string, data []byte, d fs.DirEntry) (string, []byte, fs.DirEntry, error)
 
-	options struct {
-		hooks        []Hook
-		hookGenerate []HookGenerate
-		pipelines    []Pipeline
-		caching      bool
-		writers      int
-	}
-
 	Options interface {
 		Hooks() []Hook
 		HooksGenerate() []HookGenerate
 		Pipelines() []Pipeline
 		Caching() bool
 		Writers() int
+	}
+
+	options struct {
+		hooks        []Hook
+		hookGenerate []HookGenerate
+		pipelines    []Pipeline
+		caching      bool
+		writers      int
 	}
 )
 
