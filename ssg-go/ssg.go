@@ -76,7 +76,7 @@ func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile,
 	return s.
 		With(opts...).
 		With(Caching()).
-		buildV2()
+		buildV2(nil)
 }
 
 // Generate builds and writes to outputs.
@@ -146,86 +146,75 @@ func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	}
 }
 
-func (s *Ssg) SetOutputStream(c chan<- OutputFile) {
-	if s.stream != nil {
-		panic(fmt.Sprintf("existing stream exists: %v", s.stream))
-	}
-	s.stream = c
-}
-
-func (s *Ssg) ClearOutputStream() {
-	if s.stream == nil {
-		panic("stream is nil")
-	}
-	s.stream = nil
-}
-
-func (s *Ssg) buildV2() ([]string, []OutputFile, error) {
-	err := filepath.WalkDir(s.Src, s.walkBuildV2)
+func (s *Ssg) buildV2(output chan<- OutputFile) ([]string, []OutputFile, error) {
+	err := filepath.WalkDir(s.Src, walker(s, output))
 	if err != nil {
 		return nil, nil, err
 	}
 	return s.files, s.cache, nil
 }
 
-func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
-	if err != nil {
-		return err
-	}
-	if d.IsDir() {
-		return s.collect(path)
-	}
-
-	base := filepath.Base(path)
-	ignore, err := shouldIgnore(s.ssgignores, path, base, d)
-	if err != nil {
-		return err
-	}
-	if ignore {
-		return nil
-	}
-
-	switch base {
-	case
-		MarkerHeader,
-		MarkerFooter,
-		SsgIgnore:
-
-		return nil
-	}
-
-	data, err := ReadFile(path)
-	if err != nil {
-		return err
-	}
-
-	// Remember input files for .files
-	//
-	// Original ssg does not include _header.html
-	// and _footer.html in .files
-	s.files = append(s.files, path)
-
-	skipCore := false
-	for i, p := range s.options.pipelines {
-		path, data, d, err = p(path, data, d)
-		if err == nil {
-			continue
+// TODO: use output
+func walker(s *Ssg, output chan<- OutputFile) fs.WalkDirFunc {
+	return func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		if errors.Is(err, ErrSkipCore) {
-			skipCore = true
-			break
+		if d.IsDir() {
+			return s.collect(path)
 		}
-		if errors.Is(err, ErrBreakPipelines) {
-			break
+
+		base := filepath.Base(path)
+		ignore, err := shouldIgnore(s.ssgignores, path, base, d)
+		if err != nil {
+			return err
 		}
-		return fmt.Errorf("[pipeline %d] error: %w", i, err)
-	}
+		if ignore {
+			return nil
+		}
 
-	if skipCore {
-		return nil
-	}
+		switch base {
+		case
+			MarkerHeader,
+			MarkerFooter,
+			SsgIgnore:
 
-	return s.core(path, data, d)
+			return nil
+		}
+
+		data, err := ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		// Remember input files for .files
+		//
+		// Original ssg does not include _header.html
+		// and _footer.html in .files
+		s.files = append(s.files, path)
+
+		skipCore := false
+		for i, p := range s.options.pipelines {
+			path, data, d, err = p(path, data, d)
+			if err == nil {
+				continue
+			}
+			if errors.Is(err, ErrSkipCore) {
+				skipCore = true
+				break
+			}
+			if errors.Is(err, ErrBreakPipelines) {
+				break
+			}
+			return fmt.Errorf("[pipeline %d] error: %w", i, err)
+		}
+
+		if skipCore {
+			return nil
+		}
+
+		return s.core(path, data, d)
+	}
 }
 
 func (s *Ssg) collect(path string) error {
