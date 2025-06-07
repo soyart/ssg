@@ -59,7 +59,7 @@ type Ssg struct {
 
 	options options
 
-	stream     chan<- OutputFile // TODO: refactor out of struct
+	outputs    Outputs
 	ssgignores func(path string) (ignore bool)
 	headers    headers
 	footers    footers
@@ -138,83 +138,85 @@ func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	if s.options.caching {
 		s.cache = append(s.cache, outputs...)
 	}
-	if s.stream == nil {
-		return
-	}
-	for i := range outputs {
-		s.stream <- outputs[i]
-	}
+	s.outputs.AddOutputs(outputs...)
 }
 
-func (s *Ssg) buildV2(output chan<- OutputFile) ([]string, []OutputFile, error) {
-	err := filepath.WalkDir(s.Src, walker(s, output))
+func (s *Ssg) buildV2(o Outputs) ([]string, []OutputFile, error) {
+	defer func() {
+		s.outputs = nil
+	}()
+	s.outputs = o
+
+	err := filepath.WalkDir(s.Src, s.walkBuildV2)
 	if err != nil {
 		return nil, nil, err
 	}
 	return s.files, s.cache, nil
 }
 
-// TODO: use output
-func walker(s *Ssg, output chan<- OutputFile) fs.WalkDirFunc {
-	return func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return s.collect(path)
-		}
-
-		base := filepath.Base(path)
-		ignore, err := shouldIgnore(s.ssgignores, path, base, d)
-		if err != nil {
-			return err
-		}
-		if ignore {
-			return nil
-		}
-
-		switch base {
-		case
-			MarkerHeader,
-			MarkerFooter,
-			SsgIgnore:
-
-			return nil
-		}
-
-		data, err := ReadFile(path)
-		if err != nil {
-			return err
-		}
-
-		// Remember input files for .files
-		//
-		// Original ssg does not include _header.html
-		// and _footer.html in .files
-		s.files = append(s.files, path)
-
-		skipCore := false
-		for i, p := range s.options.pipelines {
-			path, data, d, err = p(path, data, d)
-			if err == nil {
-				continue
-			}
-			if errors.Is(err, ErrSkipCore) {
-				skipCore = true
-				break
-			}
-			if errors.Is(err, ErrBreakPipelines) {
-				break
-			}
-			return fmt.Errorf("[pipeline %d] error: %w", i, err)
-		}
-
-		if skipCore {
-			return nil
-		}
-
-		return s.core(path, data, d)
+func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
+	if err != nil {
+		return err
 	}
+	if d.IsDir() {
+		return s.collect(path)
+	}
+
+	base := filepath.Base(path)
+	ignore, err := shouldIgnore(s.ssgignores, path, base, d)
+	if err != nil {
+		return err
+	}
+	if ignore {
+		return nil
+	}
+
+	switch base {
+	case
+		MarkerHeader,
+		MarkerFooter,
+		SsgIgnore:
+
+		return nil
+	}
+
+	data, err := ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	// Remember input files for .files
+	//
+	// Original ssg does not include _header.html
+	// and _footer.html in .files
+	s.files = append(s.files, path)
+
+	skipCore := false
+	for i, p := range s.options.pipelines {
+		path, data, d, err = p(path, data, d)
+		if err == nil {
+			continue
+		}
+		if errors.Is(err, ErrSkipCore) {
+			skipCore = true
+			break
+		}
+		if errors.Is(err, ErrBreakPipelines) {
+			break
+		}
+		return fmt.Errorf("[pipeline %d] error: %w", i, err)
+	}
+
+	if skipCore {
+		return nil
+	}
+
+	output, err := s.core(path, data, d)
+	if err != nil {
+		return fmt.Errorf("core error: %w", err)
+	}
+	s.outputs.AddOutputs(output)
+	return nil
 }
 
 func (s *Ssg) collect(path string) error {
@@ -274,15 +276,15 @@ func (s *Ssg) collect(path string) error {
 // simply be copied to outputs.
 // - If path has .md extension, it converts Markdown to HTML
 // and adds a new output with .html extension
-func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
+func (s *Ssg) core(path string, data []byte, d fs.DirEntry) (OutputFile, error) {
 	info, err := d.Info()
 	if err != nil {
-		return err
+		return OutputFile{}, err
 	}
 	for i, hook := range s.options.hooks {
 		data, err = hook(path, data)
 		if err != nil {
-			return fmt.Errorf("hooks[%d]: error when building %s: %w", i, path, err)
+			return OutputFile{}, fmt.Errorf("hooks[%d]: error when building %s: %w", i, path, err)
 		}
 	}
 
@@ -290,27 +292,26 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 	if ext != ".md" {
 		target, err := mirrorPath(s.Src, s.Dst, path)
 		if err != nil {
-			return err
+			return OutputFile{}, err
 		}
-		s.AddOutputs(Output(
+		return Output(
 			target,
 			path,
 			data,
 			info.Mode().Perm(),
-		))
-		return nil
+		), nil
 	}
 
 	// Make way for existing (preferred) html file with matching base name
 	if s.preferred.Contains(
 		ChangeExt(path, ".md", ".html"),
 	) {
-		return nil
+		return OutputFile{}, nil
 	}
 
 	target, err := mirrorPath(s.Src, s.Dst, path)
 	if err != nil {
-		return err
+		return OutputFile{}, err
 	}
 
 	target = ChangeExt(target, ".md", ".html")
@@ -337,19 +338,17 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 	for i, h := range s.options.hookGenerate {
 		b, err := h(buf.Bytes())
 		if err != nil {
-			return fmt.Errorf("hooksGenerate[%d] error when building %s: %w", i, path, err)
+			return OutputFile{}, fmt.Errorf("hooksGenerate[%d] error when building %s: %w", i, path, err)
 		}
 		buf = bytes.NewBuffer(b)
 	}
 
-	s.AddOutputs(Output(
+	return Output(
 		target,
 		path,
 		buf.Bytes(),
 		info.Mode().Perm(),
-	))
-
-	return nil
+	), nil
 }
 
 func (s *Ssg) Ignore(path string) bool {
