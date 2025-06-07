@@ -140,7 +140,7 @@ Some paragraph2`,
 func TestGenerate(t *testing.T) {
 	t.Run("build-v2", func(t *testing.T) {
 		testGenerate(t, func(s *Ssg) ([]string, []OutputFile, error) {
-			return s.buildV2()
+			return s.buildV2(s.stream)
 		})
 	})
 }

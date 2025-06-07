@@ -16,8 +16,6 @@ func generate(s *Ssg) error {
 	}
 
 	stream := make(chan OutputFile, s.options.writers*bufferMultiplier)
-	s.SetOutputStream(stream)
-
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -25,13 +23,12 @@ func generate(s *Ssg) error {
 	var files []string
 	go func() {
 		defer func() {
-			s.ClearOutputStream()
 			close(stream)
 			wg.Done()
 		}()
 
 		var err error
-		files, _, err = s.buildV2()
+		files, _, err = s.buildV2(stream)
 		if err != nil {
 			errBuild = err
 		}
