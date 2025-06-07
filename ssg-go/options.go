@@ -35,6 +35,7 @@ type (
 	}
 
 	options struct {
+		// outputs      Outputs
 		hooks        []Hook
 		hookGenerate []HookGenerate
 		pipelines    []Pipeline
@@ -80,6 +81,10 @@ func Caching() Option {
 func Writers(u uint) Option {
 	return func(s *Ssg) { s.options.writers = int(u) }
 }
+
+// func WithOutputs(c chan<- OutputFile) Option {
+// 	return func(s *Ssg) { s.options.outputs = NewOutputs(c) }
+// }
 
 // WithHooks will make [Ssg] iterate through hooks and call hook(path, fileContent)
 // on every unignored files.
