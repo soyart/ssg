@@ -146,6 +146,20 @@ func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	}
 }
 
+func (s *Ssg) SetOutputStream(c chan<- OutputFile) {
+	if s.stream != nil {
+		panic(fmt.Sprintf("existing stream exists: %v", s.stream))
+	}
+	s.stream = c
+}
+
+func (s *Ssg) ClearOutputStream() {
+	if s.stream == nil {
+		panic("stream is nil")
+	}
+	s.stream = nil
+}
+
 func (s *Ssg) buildV2() ([]string, []OutputFile, error) {
 	err := filepath.WalkDir(s.Src, s.walkBuildV2)
 	if err != nil {

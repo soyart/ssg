@@ -15,22 +15,22 @@ func generate(s *Ssg) error {
 		return fmt.Errorf("failed to stat src '%s': %w", s.Src, err)
 	}
 
-	var wg sync.WaitGroup
 	stream := make(chan OutputFile, s.options.writers*bufferMultiplier)
+	s.SetOutputStream(stream)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
 
 	var errBuild error
 	var files []string
-	wg.Add(1)
 	go func() {
 		defer func() {
-			s.stream = nil
+			s.ClearOutputStream()
 			close(stream)
 			wg.Done()
 		}()
 
-		s.stream = stream
 		var err error
-
 		files, _, err = s.buildV2()
 		if err != nil {
 			errBuild = err
@@ -39,7 +39,6 @@ func generate(s *Ssg) error {
 
 	var written []OutputFile
 	var errWrites error
-	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		var err error
