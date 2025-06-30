@@ -1,0 +1,35 @@
+name: update-flake-lock
+on:
+  workflow_dispatch: # allows manual triggering
+    inputs:
+      ref:
+        type: string
+        description: Git reference (branch, tag, or sha1)
+        required: false
+        default: dev
+
+  schedule:
+    - cron: '0 0 * * 1,4' # Run twice a week
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: install DeterminateSystems Nix
+        uses: DeterminateSystems/determinate-nix-action@v3
+
+      - name: update flake.lock
+        id: update
+        uses: DeterminateSystems/update-flake-lock@main
+        with:
+          nix-options: --debug --log-format raw
+          pr-assignees: soyart
+          pr-reviewers: soyart
+
+      - name: pr number
+        run: echo Pull request number is ${{ steps.update.outputs.pull-request-number }}.
