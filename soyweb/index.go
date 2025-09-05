@@ -38,7 +38,7 @@ func NewIndexGenerator(m IndexGeneratorMode) func(*ssg.Ssg) ssg.Pipeline {
 func IndexGenerator(s *ssg.Ssg) ssg.Pipeline {
 	return IndexGeneratorTemplate(
 		nil,
-		generateIndex,
+		generatorDefault,
 	)(s)
 }
 
@@ -50,7 +50,7 @@ func IndexGeneratorReverse(s *ssg.Ssg) ssg.Pipeline {
 			reverseInPlace(entries)
 			return entries
 		},
-		generateIndex,
+		generatorDefault,
 	)(s)
 }
 
@@ -73,7 +73,7 @@ func IndexGeneratorModTime(s *ssg.Ssg) ssg.Pipeline {
 			sort.Slice(entries, sortByModTime(entries))
 			return entries
 		},
-		generateIndex,
+		generatorDefault,
 	)(s)
 }
 
@@ -83,10 +83,16 @@ func reverseInPlace(arr []fs.FileInfo) {
 	}
 }
 
+// IndexGeneratorTemplate allows us to build an index generator pipeline from 2 components:
+// 1. fnEntries - a function that intercepts entries and returns the actual entries to be used.
+// This is useful when you want to implement some kind of entry filter, or just want to inspect entries
+// before handling them over to the generators.
+//
+// 2. fnGenIndex - a function that is called for each marker _index.soyweb.
 func IndexGeneratorTemplate(
-	fnOverrideEntries func(entries []fs.FileInfo) []fs.FileInfo,
+	fnEntries func(entries []fs.FileInfo) []fs.FileInfo,
 	fnGenIndex func(
-		src string,
+		ssgSrc string,
 		ignore func(path string) bool,
 		parent string,
 		siblings []fs.FileInfo,
@@ -127,8 +133,8 @@ func IndexGeneratorTemplate(
 				infos[i] = info
 			}
 
-			if fnOverrideEntries != nil {
-				infos = fnOverrideEntries(infos)
+			if fnEntries != nil {
+				infos = fnEntries(infos)
 			}
 
 			template, err := ssg.ReadFile(path)
@@ -145,7 +151,29 @@ func IndexGeneratorTemplate(
 	}
 }
 
-func generateIndex(
+// generatorDefault is a default index generator.
+//
+// It generates 1 index.md for each _index.soyweb.
+// The default generator does accept a template, and will append its generated content
+// to the template. The generated content will be lines of text,
+// each a markdown simple link to a sibling of the marker.
+//
+// Each sibling of the marker will be given 1 "link" line in markdown,
+// each line composing of 2 components: a link title and the actual link path,
+// looking something like this: `[link-title](/actual/link)`.
+//
+// generatorDefault ensures that all links have titles, and will automatically
+// select link titles based on these 2 steps:
+//
+// 1. From the entry filename or directory name.
+// For example, if there're 2 entries ./entry1.md and ./entry-2/index.md,
+// then generatorDefault will first assign "entry1" as link title for ./entry1.md,
+// while "entry-2" is used for ./entry-2/index.md.
+//
+// 2. From the entry's 1st h1 tag.
+// If your entry happens to have an h1 tag, generatorDefault will use those as link title.
+// Otherwise it just sticks with link title previously obtained from step 1.
+func generatorDefault(
 	src string,
 	ignore func(path string) bool,
 	parent string,
@@ -155,15 +183,19 @@ func generateIndex(
 	string,
 	error,
 ) {
-	content := bytes.NewBuffer(template)
-	if content.Len() == 0 {
-		ssg.Fprintf(content, "# Index of %s\n\n", filepath.Base(parent))
+	output := bytes.NewBuffer(template)
+	if len(template) == 0 {
+		// Default template is a simple h1
+		ssg.Fprintf(output, "# Index of %s\n\n", filepath.Base(parent))
 	}
 
 	for i := range siblings {
 		sib := siblings[i]
 		sibName := sib.Name()
 		sibIsDir := sib.IsDir()
+
+		// Default is to use dir/filename as link title
+		linkTitle := sibName
 
 		switch sibName {
 		case "index.html", "index.md":
@@ -172,7 +204,6 @@ func generateIndex(
 			}
 
 		case
-			MarkerIndex,      // Marker itself
 			ssg.MarkerHeader, // Ignore
 			ssg.MarkerFooter: // Ignore
 			continue
@@ -186,9 +217,6 @@ func generateIndex(
 		if ignore(sibPath) {
 			continue
 		}
-
-		// Default is to use dir/filename as link title
-		linkTitle := sibName
 
 		switch {
 		case sibIsDir:
@@ -213,6 +241,11 @@ func generateIndex(
 					break
 				}
 				if name == MarkerIndex {
+					nephewMarker := filepath.Join(parent, sibName, name)
+					nephewMarkerH1, err := extractTitle(nephewMarker)
+					if err == nil && len(nephewMarkerH1) != 0 {
+						linkTitle = string(nephewMarkerH1)
+					}
 					recurse = true
 					break
 				}
@@ -261,7 +294,7 @@ func generateIndex(
 			link += "/"
 		}
 
-		ssg.Fprintf(content, "- [%s](/%s)\n\n", linkTitle, link)
+		ssg.Fprintf(output, "- [%s](/%s)\n\n", linkTitle, link)
 	}
 
 	// ssg.Fprintln(os.Stdout, "Generated index for", parent)
@@ -269,7 +302,7 @@ func generateIndex(
 	// ssg.Fprintln(os.Stdout, content.String())
 	// ssg.Fprint(os.Stdout, "======== END ========\n")
 
-	return content.String(), nil
+	return output.String(), nil
 }
 
 func extractTitle(path string) ([]byte, error) {
