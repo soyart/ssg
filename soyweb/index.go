@@ -155,8 +155,11 @@ func IndexGeneratorTemplate(
 //
 // It generates 1 index.md for each _index.soyweb.
 // The default generator does accept a template, and will append its generated content
-// to the template. The generated content will be lines of text,
-// each a markdown simple link to a sibling of the marker.
+// to the template.
+//
+// The generated content will be a list of links to the sibling entries of the marker.
+// To be considered an entry, a node has to be either `{sibling}.html` or `{sibling}.md`,
+// or a directory with `{sibling}/_index.soyweb` (recursive).
 //
 // Each sibling of the marker will be given 1 "link" line in markdown,
 // each line composing of 2 components: a link title and the actual link path,
