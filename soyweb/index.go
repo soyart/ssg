@@ -222,39 +222,25 @@ func generatorDefault(
 		case sibIsDir:
 			// Find 1st-level subdir with index.html or index.md
 			// e.g. /parent/article/index.html
-			// or   /parent/article/index.md
+			// e.g. /parent/article/index.md
+			// or a "recursive" index /parent/article/_index.soyweb
 			nephews, err := os.ReadDir(sibPath)
 			if err != nil {
 				return "", fmt.Errorf("failed to read nephew dir '%s': %w", sibName, err)
 			}
-
 			index := ""
-			recurse := false
 			for j := range nephews {
 				nephew := nephews[j]
 				if nephew.IsDir() {
 					continue
 				}
 				name := nephew.Name()
-				if name == "index.html" || name == "index.md" {
+				if name == "index.html" || name == "index.md" || name == MarkerIndex {
 					index = name
 					break
 				}
-				if name == MarkerIndex {
-					nephewMarker := filepath.Join(parent, sibName, name)
-					nephewMarkerH1, err := extractTitle(nephewMarker)
-					if err == nil && len(nephewMarkerH1) != 0 {
-						linkTitle = string(nephewMarkerH1)
-					}
-					recurse = true
-					break
-				}
 			}
-
-			// Use dir as childTitle
-			if recurse {
-				break // switch
-			}
+			// We do not extract title from index.html due to parsing complexity.
 			// Use dir as childTitle
 			// No need to extract and change title from Markdown
 			if index == "index.html" {
@@ -264,7 +250,6 @@ func generatorDefault(
 			if index == "" {
 				continue
 			}
-
 			// Get linkTitle from nephew's content
 			title, err := extractTitle(filepath.Join(sibPath, index))
 			if err != nil {
@@ -293,7 +278,6 @@ func generatorDefault(
 		if sibIsDir {
 			link += "/"
 		}
-
 		ssg.Fprintf(output, "- [%s](/%s)\n\n", linkTitle, link)
 	}
 
@@ -314,6 +298,5 @@ func extractTitle(path string) ([]byte, error) {
 	if len(title) != 0 {
 		return title, nil
 	}
-
 	return ssg.GetTitleFromH1(data), nil
 }
