@@ -74,8 +74,8 @@ func (s *Ssg) Options() Options { return s.options }
 func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile, error) {
 	s := New(src, dst, title, url)
 	return s.
+		With(Caching(true)).
 		With(opts...).
-		With(Caching()).
 		buildV2(nil)
 }
 

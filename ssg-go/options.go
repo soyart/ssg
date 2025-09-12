@@ -73,8 +73,8 @@ func GetEnvWriters() int {
 
 // Caching allows outputs to be built and retained for later use.
 // This is enabled in [Build].
-func Caching() Option {
-	return func(s *Ssg) { s.options.caching = true }
+func Caching(b bool) Option {
+	return func(s *Ssg) { s.options.caching = b }
 }
 
 // Writers set the number of concurrent output writers.
