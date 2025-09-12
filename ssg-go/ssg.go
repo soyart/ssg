@@ -138,7 +138,9 @@ func (s *Ssg) AddOutputs(outputs ...OutputFile) {
 	if s.options.caching {
 		s.cache = append(s.cache, outputs...)
 	}
-	s.outputs.AddOutputs(outputs...)
+	if s.outputs != nil {
+		s.outputs.AddOutputs(outputs...)
+	}
 }
 
 func (s *Ssg) buildV2(o Outputs) ([]string, []OutputFile, error) {
@@ -215,7 +217,7 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 	if err != nil {
 		return fmt.Errorf("core error: %w", err)
 	}
-	s.outputs.AddOutputs(output)
+	s.AddOutputs(output)
 	return nil
 }
 
@@ -288,25 +290,21 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) (OutputFile, error) 
 		}
 	}
 
-	ext := filepath.Ext(path)
-	if ext != ".md" {
+	// Copy non-Markdown and HTML files
+	if ext := filepath.Ext(path); ext != ".md" || s.preferred.Contains(
+		ChangeExt(path, ".md", ".html"),
+	) {
 		target, err := mirrorPath(s.Src, s.Dst, path)
 		if err != nil {
 			return OutputFile{}, err
 		}
+		// Just copy the file to the destination
 		return Output(
 			target,
 			path,
 			data,
 			info.Mode().Perm(),
 		), nil
-	}
-
-	// Make way for existing (preferred) html file with matching base name
-	if s.preferred.Contains(
-		ChangeExt(path, ".md", ".html"),
-	) {
-		return OutputFile{}, nil
 	}
 
 	target, err := mirrorPath(s.Src, s.Dst, path)
