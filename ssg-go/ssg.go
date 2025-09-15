@@ -69,7 +69,7 @@ type Ssg struct {
 func (s *Ssg) Options() Options { return s.options }
 func (s *Ssg) Outputs() Outputs { return &s.result }
 
-// New returns a default [Ssg] with no options.
+// New returns a default [Ssg] with options.
 func New(src, dst, title, url string) Ssg {
 	src = filepath.Clean(src)
 	dst = filepath.Clean(dst)
@@ -77,8 +77,7 @@ func New(src, dst, title, url string) Ssg {
 	if err != nil {
 		panic(err)
 	}
-
-	return Ssg{
+	s := Ssg{
 		Src:        src,
 		Dst:        dst,
 		Title:      title,
@@ -88,6 +87,13 @@ func New(src, dst, title, url string) Ssg {
 		headers:    newHeaders(HeaderDefault),
 		footers:    newFooters(FooterDefault),
 	}
+	return s
+}
+
+func NewWithOptions(src, dst, title, url string, opts ...Option) *Ssg {
+	s := New(src, dst, title, url)
+	s.With(opts...)
+	return &s
 }
 
 // Build builds static site from src.
@@ -95,31 +101,39 @@ func New(src, dst, title, url string) Ssg {
 // If outputs is non-nil, then the builder's outputs
 // will also be added to outputs.
 func Build(src, dst, title, url string, outputs Outputs, opts ...Option) ([]string, []OutputFile, error) {
-	s := New(src, dst, title, url)
-	return s.
-		With(Caching(true)).
-		With(opts...).
-		Build(outputs)
+	withCachePrepended := append([]Option{Caching(true)}, opts...)
+	return build(NewWithOptions(
+		src,
+		dst,
+		title,
+		url,
+		withCachePrepended...,
+	),
+		outputs,
+	)
 }
 
 // Generate writes static site built from src to dst.
 // It creates a one-off [Ssg] that's used to generate a site right away.
 func Generate(src, dst, title, url string, opts ...Option) error {
-	s := New(src, dst, title, url)
-	return s.
-		With(opts...).
-		Generate()
-}
-
-// Generate builds from s.Src and writes the outputs to s.Dst
-func (s *Ssg) Generate() error {
-	return generate(s)
+	return generate(NewWithOptions(
+		src,
+		dst,
+		title,
+		url,
+		opts...,
+	))
 }
 
 // Build creates a new result from a directory walk.
 // Build is where Ssg controls its outputs.
 func (s *Ssg) Build(outputs Outputs) ([]string, []OutputFile, error) {
 	return build(s, outputs)
+}
+
+// Generate builds from s.Src and writes the outputs to s.Dst
+func (s *Ssg) Generate() error {
+	return generate(s)
 }
 
 // With applies opts to s sequentially
