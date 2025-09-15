@@ -29,7 +29,7 @@ func generate(s *Ssg) error {
 		}()
 
 		var err error
-		files, _, err = s.build(outputs)
+		files, _, err = s.Build(outputs)
 		if err != nil {
 			errBuild = err
 		}

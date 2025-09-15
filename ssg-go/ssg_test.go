@@ -140,7 +140,7 @@ Some paragraph2`,
 func TestGenerate(t *testing.T) {
 	t.Run("build-v2", func(t *testing.T) {
 		testGenerate(t, func(s *Ssg) ([]string, []OutputFile, error) {
-			return s.build(nil)
+			return s.Build(nil)
 		})
 	})
 }
@@ -393,8 +393,8 @@ func TestBuildAndWriteOut(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	// Build output
-	files, cache, err := Build(src, dstBuild, title, url)
+	// Build with nil outputs (no concurrent writer)
+	files, cache, err := Build(src, dstBuild, title, url, nil)
 	if err != nil {
 		panic(err)
 	}

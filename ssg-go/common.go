@@ -10,6 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/gomarkdown/markdown"
+	"github.com/gomarkdown/markdown/html"
+	"github.com/gomarkdown/markdown/parser"
 )
 
 type (
@@ -35,6 +39,15 @@ type (
 		perDir[*bytes.Buffer]
 	}
 )
+
+// ToHtml converts md (Markdown) into HTML document
+func ToHtml(md []byte) []byte {
+	root := markdown.Parse(md, parser.NewWithExtensions(SsgExtensions))
+	renderer := html.NewRenderer(html.RendererOptions{
+		Flags: HtmlFlags,
+	})
+	return markdown.Render(root, renderer)
+}
 
 func FileIs(f os.FileInfo, mode fs.FileMode) bool {
 	return f.Mode()&mode != 0

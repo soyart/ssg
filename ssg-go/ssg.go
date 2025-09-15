@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
 	"github.com/gomarkdown/markdown/parser"
 	ignore "github.com/sabhiram/go-gitignore"
@@ -70,24 +69,6 @@ type Ssg struct {
 func (s *Ssg) Options() Options { return s.options }
 func (s *Ssg) Outputs() Outputs { return &s.result }
 
-// Build returns the ssg outputs built from src without writing the outputs.
-func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile, error) {
-	s := New(src, dst, title, url)
-	return s.
-		With(Caching(true)).
-		With(opts...).
-		build(nil)
-}
-
-// Generate builds and writes to outputs.
-// It creates a one-off [Ssg] that's used to generate a site right away.
-func Generate(src, dst, title, url string, opts ...Option) error {
-	s := New(src, dst, title, url)
-	return s.
-		With(opts...).
-		Generate()
-}
-
 // New returns a default [Ssg] with no options.
 func New(src, dst, title, url string) Ssg {
 	src = filepath.Clean(src)
@@ -109,13 +90,36 @@ func New(src, dst, title, url string) Ssg {
 	}
 }
 
-// ToHtml converts md (Markdown) into HTML document
-func ToHtml(md []byte) []byte {
-	root := markdown.Parse(md, parser.NewWithExtensions(SsgExtensions))
-	renderer := html.NewRenderer(html.RendererOptions{
-		Flags: HtmlFlags,
-	})
-	return markdown.Render(root, renderer)
+// Build builds static site from src.
+// If outputs is nil, the result will only be cached.
+// If outputs is non-nil, then the builder's outputs
+// will also be added to outputs.
+func Build(src, dst, title, url string, outputs Outputs, opts ...Option) ([]string, []OutputFile, error) {
+	s := New(src, dst, title, url)
+	return s.
+		With(Caching(true)).
+		With(opts...).
+		Build(outputs)
+}
+
+// Generate writes static site built from src to dst.
+// It creates a one-off [Ssg] that's used to generate a site right away.
+func Generate(src, dst, title, url string, opts ...Option) error {
+	s := New(src, dst, title, url)
+	return s.
+		With(opts...).
+		Generate()
+}
+
+// Generate builds from s.Src and writes the outputs to s.Dst
+func (s *Ssg) Generate() error {
+	return generate(s)
+}
+
+// Build creates a new result from a directory walk.
+// Build is where Ssg controls its outputs.
+func (s *Ssg) Build(outputs Outputs) ([]string, []OutputFile, error) {
+	return build(s, outputs)
 }
 
 // With applies opts to s sequentially
@@ -124,90 +128,6 @@ func (s *Ssg) With(opts ...Option) *Ssg {
 		opts[i](s)
 	}
 	return s
-}
-
-// Generate builds from s.Src and writes the outputs to s.Dst
-func (s *Ssg) Generate() error {
-	return generate(s)
-}
-
-// build creates a new result from a directory walk.
-// build is where Ssg controls its outputs.
-func (s *Ssg) build(o Outputs) ([]string, []OutputFile, error) {
-	s.result = buildOutput{
-		cacheOutput: s.options.caching,
-		writer:      o,
-	}
-	err := filepath.WalkDir(s.Src, s.walkBuildV2)
-	if err != nil {
-		return nil, nil, err
-	}
-	return s.result.files, s.result.cache, nil
-}
-
-func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
-	if err != nil {
-		return err
-	}
-	if d.IsDir() {
-		return s.collect(path)
-	}
-
-	base := filepath.Base(path)
-	ignore, err := shouldIgnore(s.ssgignores, path, base, d)
-	if err != nil {
-		return err
-	}
-	if ignore {
-		return nil
-	}
-
-	switch base {
-	case
-		MarkerHeader,
-		MarkerFooter,
-		SsgIgnore:
-
-		return nil
-	}
-
-	data, err := ReadFile(path)
-	if err != nil {
-		return err
-	}
-
-	// Remember input files for .files
-	//
-	// Original ssg does not include _header.html
-	// and _footer.html in .files
-	s.result.files = append(s.result.files, path)
-
-	skipCore := false
-	for i, p := range s.options.pipelines {
-		path, data, d, err = p(path, data, d)
-		if err == nil {
-			continue
-		}
-		if errors.Is(err, ErrSkipCore) {
-			skipCore = true
-			break
-		}
-		if errors.Is(err, ErrBreakPipelines) {
-			break
-		}
-		return fmt.Errorf("[pipeline %d] error: %w", i, err)
-	}
-
-	if skipCore {
-		return nil
-	}
-
-	output, err := s.core(path, data, d)
-	if err != nil {
-		return fmt.Errorf("core error: %w", err)
-	}
-	s.result.Add(output)
-	return nil
 }
 
 func (s *Ssg) collect(path string) error {
