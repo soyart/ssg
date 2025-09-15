@@ -186,7 +186,7 @@ func testGenerate(t *testing.T, buildFn func(s *Ssg) ([]string, []OutputFile, er
 	for h, from := range titleFroms {
 		filename := filepath.Join(src, h)
 		dirname := filepath.Dir(filename)
-		header, ok := s.headers.perDir.values[dirname]
+		header, ok := s.headers.values[dirname]
 		if !ok {
 			t.Fatalf("missing header '%s' for dir '%s'", filename, dirname)
 		}
@@ -375,8 +375,8 @@ func TestSsgignore(t *testing.T) {
 	}
 }
 
-// TestBuildAndWriteOut tests that Build+WriteOut functions
-// work as expected (identical to streaming Generate)
+// TestBuildAndWriteOut tests that Build+WriteOut both
+// work as expected (identical to Generate)
 func TestBuildAndWriteOut(t *testing.T) {
 	root := "../testdata/johndoe.com"
 	src := filepath.Join(root, "/src")
@@ -393,17 +393,12 @@ func TestBuildAndWriteOut(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-
-	err = Generate(src, dstGenerate, title, url)
+	// Build output
+	files, cache, err := Build(src, dstBuild, title, url)
 	if err != nil {
 		panic(err)
 	}
-
-	files, dist, err := Build(src, dstBuild, title, url)
-	if err != nil {
-		panic(err)
-	}
-	err = WriteOutSlice(dist, 1)
+	err = WriteOutSlice(cache, 1)
 	if err != nil {
 		panic(err)
 	}
@@ -411,11 +406,16 @@ func TestBuildAndWriteOut(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	err = GenerateMetadata(src, dstBuild, url, files, dist, stat.ModTime())
+	err = GenerateMetadata(src, dstBuild, url, files, cache, stat.ModTime())
 	if err != nil {
 		panic(err)
 	}
-
+	// Generate output
+	err = Generate(src, dstGenerate, title, url)
+	if err != nil {
+		panic(err)
+	}
+	// Assert equal
 	testDeepEqual(t, dstGenerate, dstBuild)
 }
 

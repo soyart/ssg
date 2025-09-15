@@ -70,19 +70,18 @@ func TestPrependHooks(t *testing.T) {
 		opts = append(opts, original, prepend)
 
 		s := new(ssg.Ssg)
-		s.With(original, prepend)
+		s.With(opts...)
 		assert(t, s)
 	})
 
 	t.Run("option slice rev", func(t *testing.T) {
 		var opts []ssg.Option
 		original := ssg.WithHooks(hook3, hook4)
-		opts = append(opts, original)
 		prepend := ssg.PrependHooks(hook1, hook2)
 		opts = append(opts, prepend, original)
 
 		s := new(ssg.Ssg)
-		s.With(original, prepend)
+		s.With(opts...)
 		assert(t, s)
 	})
 }
