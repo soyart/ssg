@@ -140,7 +140,7 @@ Some paragraph2`,
 func TestGenerate(t *testing.T) {
 	t.Run("build-v2", func(t *testing.T) {
 		testGenerate(t, func(s *Ssg) ([]string, []OutputFile, error) {
-			return s.buildV2(nil)
+			return s.build(nil)
 		})
 	})
 }
@@ -166,8 +166,8 @@ func testGenerate(t *testing.T, buildFn func(s *Ssg) ([]string, []OutputFile, er
 		t.Fatalf("missing preferred html file /blog/index.html")
 	}
 
-	for i := range s.cache {
-		o := &s.cache[i]
+	for i := range s.result.cache {
+		o := &s.result.cache[i]
 
 		if strings.HasSuffix(o.target, "_header.html") {
 			t.Fatalf("unexpected _header.html output in '%s'", o.target)

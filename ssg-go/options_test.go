@@ -109,8 +109,7 @@ func inputHasher(s *ssg.Ssg) ssg.Pipeline {
 			return path, data, d, nil
 		}
 
-		s.AddOutputs(ssg.Output(hashPath, path, []byte(hash), 0o644))
-
+		s.Outputs().Add(ssg.Output(hashPath, path, []byte(hash), 0o644))
 		return path, data, d, nil
 	}
 }

@@ -59,16 +59,16 @@ type Ssg struct {
 
 	options options
 
-	outputs    Outputs
 	ssgignores func(path string) (ignore bool)
 	headers    headers
 	footers    footers
-	preferred  Set      // Used to prefer html and ignore md files with identical names, as with the original ssg
-	files      []string // Input files read (not ignored)
-	cache      []OutputFile
+	preferred  Set // Used to prefer html and ignore md files with identical names, as with the original ssg
+
+	result buildOutput
 }
 
 func (s *Ssg) Options() Options { return s.options }
+func (s *Ssg) Outputs() Outputs { return &s.result }
 
 // Build returns the ssg outputs built from src without writing the outputs.
 func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile, error) {
@@ -76,7 +76,7 @@ func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile,
 	return s.
 		With(Caching(true)).
 		With(opts...).
-		buildV2(nil)
+		build(nil)
 }
 
 // Generate builds and writes to outputs.
@@ -131,29 +131,18 @@ func (s *Ssg) Generate() error {
 	return generate(s)
 }
 
-// AddOutputs adds outputs to cache (if enabled)
-// and sends the outputs to output stream to concurrent writers.
-// **It does not write the outputs**.
-func (s *Ssg) AddOutputs(outputs ...OutputFile) {
-	if s.options.caching {
-		s.cache = append(s.cache, outputs...)
+// build creates a new result from a directory walk.
+// build is where Ssg controls its outputs.
+func (s *Ssg) build(o Outputs) ([]string, []OutputFile, error) {
+	s.result = buildOutput{
+		cacheOutput: s.options.caching,
+		writer:      o,
 	}
-	if s.outputs != nil {
-		s.outputs.AddOutputs(outputs...)
-	}
-}
-
-func (s *Ssg) buildV2(o Outputs) ([]string, []OutputFile, error) {
-	defer func() {
-		s.outputs = nil
-	}()
-	s.outputs = o
-
 	err := filepath.WalkDir(s.Src, s.walkBuildV2)
 	if err != nil {
 		return nil, nil, err
 	}
-	return s.files, s.cache, nil
+	return s.result.files, s.result.cache, nil
 }
 
 func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
@@ -191,7 +180,7 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 	//
 	// Original ssg does not include _header.html
 	// and _footer.html in .files
-	s.files = append(s.files, path)
+	s.result.files = append(s.result.files, path)
 
 	skipCore := false
 	for i, p := range s.options.pipelines {
@@ -217,7 +206,7 @@ func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
 	if err != nil {
 		return fmt.Errorf("core error: %w", err)
 	}
-	s.AddOutputs(output)
+	s.result.Add(output)
 	return nil
 }
 

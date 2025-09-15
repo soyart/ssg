@@ -16,11 +16,10 @@ func generate(s *Ssg) error {
 	}
 
 	stream := make(chan OutputFile, s.options.writers*bufferMultiplier)
-	outputs := NewOutputs(stream)
+	outputs := NewOutputsStreaming(stream)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-
 	var errBuild error
 	var files []string
 	go func() {
@@ -30,7 +29,7 @@ func generate(s *Ssg) error {
 		}()
 
 		var err error
-		files, _, err = s.buildV2(outputs)
+		files, _, err = s.build(outputs)
 		if err != nil {
 			errBuild = err
 		}
@@ -51,7 +50,7 @@ func generate(s *Ssg) error {
 	wg.Wait()
 
 	if errBuild != nil && errWrites != nil {
-		return fmt.Errorf("streaming_build_error='%w' streaming_write_error='%s'", errBuild, errWrites)
+		return fmt.Errorf("streaming_build_error='%w', streaming_write_error='%s'", errBuild, errWrites)
 	}
 	if errBuild != nil {
 		return fmt.Errorf("streaming_build_error: %w", errBuild)
@@ -59,12 +58,10 @@ func generate(s *Ssg) error {
 	if errWrites != nil {
 		return fmt.Errorf("streaming_write_error: %w", errWrites)
 	}
-
 	err = GenerateMetadata(s.Src, s.Dst, s.Url, files, written, stat.ModTime())
 	if err != nil {
 		return err
 	}
-
 	s.pront(len(written) + 2)
 	return nil
 }
@@ -116,7 +113,6 @@ func WriteOut(stream <-chan OutputFile, concurrent int) ([]OutputFile, error) {
 
 			written = append(written, Output(w.target, w.originator, nil, w.perm))
 			Fprintln(os.Stdout, w.target)
-
 		}(&w, wg)
 	}
 
