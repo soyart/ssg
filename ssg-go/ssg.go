@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
 	"github.com/gomarkdown/markdown/parser"
 	ignore "github.com/sabhiram/go-gitignore"
@@ -59,36 +58,18 @@ type Ssg struct {
 
 	options options
 
-	stream     chan<- OutputFile // TODO: refactor out of struct
 	ssgignores func(path string) (ignore bool)
 	headers    headers
 	footers    footers
-	preferred  Set      // Used to prefer html and ignore md files with identical names, as with the original ssg
-	files      []string // Input files read (not ignored)
-	cache      []OutputFile
+	preferred  Set // Used to prefer html and ignore md files with identical names, as with the original ssg
+
+	result buildOutput
 }
 
 func (s *Ssg) Options() Options { return s.options }
+func (s *Ssg) Outputs() Outputs { return &s.result }
 
-// Build returns the ssg outputs built from src without writing the outputs.
-func Build(src, dst, title, url string, opts ...Option) ([]string, []OutputFile, error) {
-	s := New(src, dst, title, url)
-	return s.
-		With(opts...).
-		With(Caching()).
-		buildV2()
-}
-
-// Generate builds and writes to outputs.
-// It creates a one-off [Ssg] that's used to generate a site right away.
-func Generate(src, dst, title, url string, opts ...Option) error {
-	s := New(src, dst, title, url)
-	return s.
-		With(opts...).
-		Generate()
-}
-
-// New returns a default [Ssg] with no options.
+// New returns a default [Ssg] with options.
 func New(src, dst, title, url string) Ssg {
 	src = filepath.Clean(src)
 	dst = filepath.Clean(dst)
@@ -96,8 +77,7 @@ func New(src, dst, title, url string) Ssg {
 	if err != nil {
 		panic(err)
 	}
-
-	return Ssg{
+	s := Ssg{
 		Src:        src,
 		Dst:        dst,
 		Title:      title,
@@ -107,15 +87,53 @@ func New(src, dst, title, url string) Ssg {
 		headers:    newHeaders(HeaderDefault),
 		footers:    newFooters(FooterDefault),
 	}
+	return s
 }
 
-// ToHtml converts md (Markdown) into HTML document
-func ToHtml(md []byte) []byte {
-	root := markdown.Parse(md, parser.NewWithExtensions(SsgExtensions))
-	renderer := html.NewRenderer(html.RendererOptions{
-		Flags: HtmlFlags,
-	})
-	return markdown.Render(root, renderer)
+func NewWithOptions(src, dst, title, url string, opts ...Option) *Ssg {
+	s := New(src, dst, title, url)
+	s.With(opts...)
+	return &s
+}
+
+// Build builds static site from src.
+// If outputs is nil, the result will only be cached.
+// If outputs is non-nil, then the builder's outputs
+// will also be added to outputs.
+func Build(src, dst, title, url string, outputs Outputs, opts ...Option) ([]string, []OutputFile, error) {
+	withCachePrepended := append([]Option{Caching(true)}, opts...)
+	return build(NewWithOptions(
+		src,
+		dst,
+		title,
+		url,
+		withCachePrepended...,
+	),
+		outputs,
+	)
+}
+
+// Generate writes static site built from src to dst.
+// It creates a one-off [Ssg] that's used to generate a site right away.
+func Generate(src, dst, title, url string, opts ...Option) error {
+	return generate(NewWithOptions(
+		src,
+		dst,
+		title,
+		url,
+		opts...,
+	))
+}
+
+// Build creates a new result from a directory walk.
+// Build is where Ssg controls its outputs.
+func (s *Ssg) Build(outputs Outputs) ([]string, []OutputFile, error) {
+	return build(s, outputs)
+}
+
+// Generate builds from s.Src and writes the outputs to s.Dst
+func (s *Ssg) Generate() error {
+	return generate(s)
 }
 
 // With applies opts to s sequentially
@@ -124,94 +142,6 @@ func (s *Ssg) With(opts ...Option) *Ssg {
 		opts[i](s)
 	}
 	return s
-}
-
-// Generate builds from s.Src and writes the outputs to s.Dst
-func (s *Ssg) Generate() error {
-	return generate(s)
-}
-
-// AddOutputs adds outputs to cache (if enabled)
-// and sends the outputs to output stream to concurrent writers.
-// **It does not write the outputs**.
-func (s *Ssg) AddOutputs(outputs ...OutputFile) {
-	if s.options.caching {
-		s.cache = append(s.cache, outputs...)
-	}
-	if s.stream == nil {
-		return
-	}
-	for i := range outputs {
-		s.stream <- outputs[i]
-	}
-}
-
-func (s *Ssg) buildV2() ([]string, []OutputFile, error) {
-	err := filepath.WalkDir(s.Src, s.walkBuildV2)
-	if err != nil {
-		return nil, nil, err
-	}
-	return s.files, s.cache, nil
-}
-
-func (s *Ssg) walkBuildV2(path string, d fs.DirEntry, err error) error {
-	if err != nil {
-		return err
-	}
-	if d.IsDir() {
-		return s.collect(path)
-	}
-
-	base := filepath.Base(path)
-	ignore, err := shouldIgnore(s.ssgignores, path, base, d)
-	if err != nil {
-		return err
-	}
-	if ignore {
-		return nil
-	}
-
-	switch base {
-	case
-		MarkerHeader,
-		MarkerFooter,
-		SsgIgnore:
-
-		return nil
-	}
-
-	data, err := ReadFile(path)
-	if err != nil {
-		return err
-	}
-
-	// Remember input files for .files
-	//
-	// Original ssg does not include _header.html
-	// and _footer.html in .files
-	s.files = append(s.files, path)
-
-	skipCore := false
-	for i, p := range s.options.pipelines {
-		path, data, d, err = p(path, data, d)
-		if err == nil {
-			continue
-		}
-		if errors.Is(err, ErrSkipCore) {
-			skipCore = true
-			break
-		}
-		if errors.Is(err, ErrBreakPipelines) {
-			break
-		}
-		return fmt.Errorf("[pipeline %d] error: %w", i, err)
-	}
-
-	if skipCore {
-		return nil
-	}
-
-	return s.core(path, data, d)
 }
 
 func (s *Ssg) collect(path string) error {
@@ -271,43 +201,38 @@ func (s *Ssg) collect(path string) error {
 // simply be copied to outputs.
 // - If path has .md extension, it converts Markdown to HTML
 // and adds a new output with .html extension
-func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
+func (s *Ssg) core(path string, data []byte, d fs.DirEntry) (OutputFile, error) {
 	info, err := d.Info()
 	if err != nil {
-		return err
+		return OutputFile{}, err
 	}
 	for i, hook := range s.options.hooks {
 		data, err = hook(path, data)
 		if err != nil {
-			return fmt.Errorf("hooks[%d]: error when building %s: %w", i, path, err)
+			return OutputFile{}, fmt.Errorf("hooks[%d]: error when building %s: %w", i, path, err)
 		}
 	}
 
-	ext := filepath.Ext(path)
-	if ext != ".md" {
+	// Copy non-Markdown and HTML files
+	if ext := filepath.Ext(path); ext != ".md" || s.preferred.Contains(
+		ChangeExt(path, ".md", ".html"),
+	) {
 		target, err := mirrorPath(s.Src, s.Dst, path)
 		if err != nil {
-			return err
+			return OutputFile{}, err
 		}
-		s.AddOutputs(Output(
+		// Just copy the file to the destination
+		return Output(
 			target,
 			path,
 			data,
 			info.Mode().Perm(),
-		))
-		return nil
-	}
-
-	// Make way for existing (preferred) html file with matching base name
-	if s.preferred.Contains(
-		ChangeExt(path, ".md", ".html"),
-	) {
-		return nil
+		), nil
 	}
 
 	target, err := mirrorPath(s.Src, s.Dst, path)
 	if err != nil {
-		return err
+		return OutputFile{}, err
 	}
 
 	target = ChangeExt(target, ".md", ".html")
@@ -334,19 +259,17 @@ func (s *Ssg) core(path string, data []byte, d fs.DirEntry) error {
 	for i, h := range s.options.hookGenerate {
 		b, err := h(buf.Bytes())
 		if err != nil {
-			return fmt.Errorf("hooksGenerate[%d] error when building %s: %w", i, path, err)
+			return OutputFile{}, fmt.Errorf("hooksGenerate[%d] error when building %s: %w", i, path, err)
 		}
 		buf = bytes.NewBuffer(b)
 	}
 
-	s.AddOutputs(Output(
+	return Output(
 		target,
 		path,
 		buf.Bytes(),
 		info.Mode().Perm(),
-	))
-
-	return nil
+	), nil
 }
 
 func (s *Ssg) Ignore(path string) bool {

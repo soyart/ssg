@@ -35,6 +35,7 @@ type (
 	}
 
 	options struct {
+		// outputs      Outputs
 		hooks        []Hook
 		hookGenerate []HookGenerate
 		pipelines    []Pipeline
@@ -72,14 +73,18 @@ func GetEnvWriters() int {
 
 // Caching allows outputs to be built and retained for later use.
 // This is enabled in [Build].
-func Caching() Option {
-	return func(s *Ssg) { s.options.caching = true }
+func Caching(b bool) Option {
+	return func(s *Ssg) { s.options.caching = b }
 }
 
 // Writers set the number of concurrent output writers.
 func Writers(u uint) Option {
 	return func(s *Ssg) { s.options.writers = int(u) }
 }
+
+// func WithOutputs(c chan<- OutputFile) Option {
+// 	return func(s *Ssg) { s.options.outputs = NewOutputs(c) }
+// }
 
 // WithHooks will make [Ssg] iterate through hooks and call hook(path, fileContent)
 // on every unignored files.

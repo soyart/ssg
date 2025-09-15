@@ -35,7 +35,7 @@ func TestGenerateStreaming(t *testing.T) {
 	// (old v2 flow)
 	caching := New(src, dst, title, url)
 	caching.With(
-		Caching(),
+		Caching(true),
 		Writers(uint(WritersDefault)),
 	)
 

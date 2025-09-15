@@ -10,21 +10,13 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/gomarkdown/markdown"
+	"github.com/gomarkdown/markdown/html"
+	"github.com/gomarkdown/markdown/parser"
 )
 
 type (
-	// OutputFile is the main output struct for ssg-go.
-	//
-	// Its values are not supposed to be changed by other packages,
-	// and thus the only ways other packages can work with OutputFile
-	// is via the constructor [Output] and the type's getter methods.
-	OutputFile struct {
-		target     string
-		originator string
-		data       []byte
-		perm       fs.FileMode
-	}
-
 	Set map[string]struct{}
 
 	// perDir tracks files under directory in a trie-like fashion.
@@ -47,6 +39,15 @@ type (
 		perDir[*bytes.Buffer]
 	}
 )
+
+// ToHtml converts md (Markdown) into HTML document
+func ToHtml(md []byte) []byte {
+	root := markdown.Parse(md, parser.NewWithExtensions(SsgExtensions))
+	renderer := html.NewRenderer(html.RendererOptions{
+		Flags: HtmlFlags,
+	})
+	return markdown.Render(root, renderer)
+}
 
 func FileIs(f os.FileInfo, mode fs.FileMode) bool {
 	return f.Mode()&mode != 0
@@ -73,30 +74,28 @@ func (s Set) Contains(items ...string) bool {
 	return true
 }
 
-func Fprint(w io.Writer, data ...interface{}) {
+func Fprint(w io.Writer, data ...any) {
 	_, err := fmt.Fprint(w, data...)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func Fprintf(w io.Writer, format string, data ...interface{}) {
+func Fprintf(w io.Writer, format string, data ...any) {
 	_, err := fmt.Fprintf(w, format, data...)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func Fprintln(w io.Writer, data ...interface{}) {
+func Fprintln(w io.Writer, data ...any) {
 	_, err := fmt.Fprintln(w, data...)
 	if err != nil {
 		panic(err)
 	}
 }
 
-// For debugging
 func ReadFile(path string) ([]byte, error) {
-	// fmt.Println(">>> reading file", path)
 	return os.ReadFile(path)
 }
 
