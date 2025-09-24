@@ -1,3 +1,10 @@
+# This repository has been archived
+
+Development of ssg-go moved to [soyart/ssg-go](https://github.com/soyart/ssg-go),
+while soyweb moved to [soyart/soyweb](https://github.com/soyart/soyweb).
+
+---
+
 # ssg (static site generator)
 
 ssg is a Markdown static site generator.
